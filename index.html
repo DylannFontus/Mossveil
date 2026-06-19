@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MOSSVEIL — Echoes Beneath</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html,body{margin:0;padding:0;background:#04070a;overflow:hidden;height:100%;cursor:default;user-select:none}
+  #game{position:fixed;inset:0;display:block}
+  #hud{position:fixed;inset:0;pointer-events:none}
+  #err{position:fixed;inset:0;display:none;color:#cfd8dc;font:16px Georgia,serif;padding:40px;background:#04070a}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<canvas id="hud"></canvas>
+<div id="err"></div>
+<script src="lib/three.min.js"></script>
+<script src="data/levels.js"></script>
+<script src="data/cutscenes.js"></script>
+<script src="src/util.js"></script>
+<script src="src/input.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/physics.js"></script>
+<script src="src/fx.js"></script>
+<script src="src/world.js"></script>
+<script src="src/map.js"></script>
+<script src="src/player.js"></script>
+<script src="src/enemies.js"></script>
+<script src="src/bosses.js"></script>
+<script src="src/cutscene.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

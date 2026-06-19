@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MOSSVEIL Editor</title>
+<style>
+  :root {
+    --bg0:#1b1b1f; --bg1:#242428; --bg2:#2d2d33; --bg3:#37373e;
+    --line:#121215; --txt:#cfd2d6; --txt2:#8a8e96; --acc:#4fa3ff; --warn:#ffb454;
+  }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; background:var(--bg0); color:var(--txt);
+    font:12px "Segoe UI", system-ui, sans-serif; overflow:hidden; user-select:none; }
+  #app { display:grid; height:100%;
+    grid-template-rows: 38px 1fr 210px 24px;
+    grid-template-columns: 250px 1fr 300px;
+    grid-template-areas:
+      "toolbar toolbar toolbar"
+      "left viewport inspector"
+      "left assets inspector"
+      "status status status"; }
+
+  /* toolbar */
+  #toolbar { grid-area:toolbar; background:var(--bg2); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:6px; padding:0 10px; }
+  #toolbar .logo { font-family:Georgia,serif; letter-spacing:2px; color:#9fd8b8; margin-right:10px; }
+  .tbtn { background:var(--bg3); color:var(--txt); border:1px solid #45454d; border-radius:4px;
+    padding:4px 10px; cursor:pointer; font-size:12px; }
+  .tbtn:hover { background:#42424b; }
+  .tbtn.on { background:var(--acc); color:#0c1014; border-color:var(--acc); }
+  .tbtn.play { background:#2f7d4f; border-color:#2f7d4f; color:#eafff0; font-weight:600; }
+  .tbtn.play:hover { background:#379159; }
+  .tsep { width:1px; height:22px; background:#46464e; margin:0 4px; }
+  #dirty { color:var(--warn); display:none; margin-left:4px; }
+
+  /* left panel */
+  #left { grid-area:left; background:var(--bg1); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; min-height:0; }
+  .ptabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--line); }
+  .ptab { padding:6px 12px; cursor:pointer; color:var(--txt2); border-right:1px solid var(--line); }
+  .ptab.on { background:var(--bg1); color:var(--txt); }
+  .pbody { flex:1; overflow-y:auto; min-height:0; }
+  .hgroup { padding:4px 8px; color:var(--txt2); font-weight:600; text-transform:uppercase;
+    font-size:10px; letter-spacing:1px; margin-top:6px; }
+  .hitem { padding:3px 8px 3px 18px; cursor:pointer; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; }
+  .hitem:hover { background:var(--bg2); }
+  .hitem.sel { background:#2c4663; color:#fff; }
+  .lvlitem { padding:6px 10px; cursor:pointer; border-bottom:1px solid #202024; }
+  .lvlitem:hover { background:var(--bg2); }
+  .lvlitem.cur { background:#2c4663; }
+  .lvlitem small { color:var(--txt2); display:block; }
+  .lvlbtns { padding:8px; display:flex; gap:6px; flex-wrap:wrap; }
+
+  /* viewport */
+  #viewportWrap { grid-area:viewport; position:relative; background:#000; min-width:0; min-height:0; }
+  #gl, #overlay, #mapCanvas { position:absolute; inset:0; width:100%; height:100%; }
+  #overlay { pointer-events:none; }
+  #mapCanvas { display:none; }
+  #viewportHint { position:absolute; left:10px; bottom:8px; color:rgba(220,230,225,.45);
+    font-size:11px; pointer-events:none; text-shadow:0 1px 2px #000; }
+
+  /* inspector */
+  #inspector { grid-area:inspector; background:var(--bg1); border-left:1px solid var(--line);
+    overflow-y:auto; padding-bottom:30px; }
+  #inspector h3 { margin:0; padding:8px 10px; background:var(--bg2); font-size:12px;
+    border-bottom:1px solid var(--line); }
+  .insBody { padding:8px 10px; }
+  .frow { display:flex; align-items:center; margin-bottom:6px; gap:6px; }
+  .frow label { width:92px; color:var(--txt2); flex-shrink:0; }
+  .frow input[type=text], .frow input[type=number], .frow select, .frow textarea {
+    flex:1; min-width:0; background:var(--bg0); color:var(--txt); border:1px solid #3c3c44;
+    border-radius:3px; padding:4px 6px; font:12px "Segoe UI", sans-serif; }
+  .frow textarea { height:64px; resize:vertical; }
+  .frow input[type=checkbox] { transform:scale(1.1); }
+  .frow input[type=color] { width:42px; height:24px; padding:0; border:1px solid #3c3c44; background:none; }
+  .insNote { color:var(--txt2); font-size:11px; margin:6px 0; line-height:1.5; }
+  .dangerBtn { background:#6b2f2f; border-color:#6b2f2f; }
+
+  /* assets */
+  #assets { grid-area:assets; background:var(--bg1); border-top:1px solid var(--line);
+    display:flex; flex-direction:column; min-height:0; }
+  #assetBody { flex:1; overflow-y:auto; padding:8px; display:flex; flex-wrap:wrap;
+    gap:6px; align-content:flex-start; }
+  .asset { width:104px; height:58px; background:var(--bg2); border:1px solid #3c3c44;
+    border-radius:5px; cursor:pointer; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:4px; text-align:center; padding:4px; }
+  .asset:hover { background:var(--bg3); border-color:#5a5a64; }
+  .asset.on { border-color:var(--acc); background:#253a52; }
+  .asset .ico { font-size:17px; }
+  .asset .nm { font-size:10px; color:var(--txt2); line-height:1.15; }
+
+  /* status */
+  #status { grid-area:status; background:var(--bg2); border-top:1px solid var(--line);
+    display:flex; align-items:center; gap:18px; padding:0 10px; color:var(--txt2); font-size:11px; }
+
+  /* modal */
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none;
+    align-items:center; justify-content:center; z-index:50; }
+  #modalBox { background:var(--bg1); border:1px solid #4a4a52; border-radius:8px;
+    padding:16px; width:330px; }
+  #modalBox h3 { margin:0 0 12px; }
+  #modalBtns { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <span class="logo">MOSSVEIL EDITOR</span>
+    <button class="tbtn" id="tabScene">Scene</button>
+    <button class="tbtn" id="tabMap">Map</button>
+    <span class="tsep"></span>
+    <button class="tbtn tool" data-tool="select" title="Select / move (1)">⬚ Select</button>
+    <button class="tbtn tool" data-tool="solid" title="Paint solid tiles (2)">▦ Solid</button>
+    <button class="tbtn tool" data-tool="oneway" title="Paint one-way platforms (3)">▭ One-way</button>
+    <button class="tbtn tool" data-tool="spike" title="Paint spikes (4)">▲ Spikes</button>
+    <button class="tbtn tool" data-tool="erase" title="Erase tiles (5)">⌫ Erase</button>
+    <span class="tsep"></span>
+    <button class="tbtn" id="btnSnap" title="Snap objects to half-tiles">Snap</button>
+    <button class="tbtn" id="btnGizmos" title="Show object gizmos (G)">Gizmos</button>
+    <span class="tsep"></span>
+    <button class="tbtn" id="btnUndo" title="Undo (Ctrl+Z)">↩</button>
+    <button class="tbtn" id="btnRedo" title="Redo (Ctrl+Y)">↪</button>
+    <span class="tsep"></span>
+    <button class="tbtn" id="btnSave" title="Save all levels (Ctrl+S)">💾 Save</button>
+    <button class="tbtn play" id="btnTest" title="Save & play this level">▶ Test Level</button>
+    <button class="tbtn" id="btnTestStart" title="Save & play from the title screen">▶ From Start</button>
+    <span id="dirty">● unsaved</span>
+  </div>
+
+  <div id="left">
+    <div class="ptabs">
+      <div class="ptab on" id="ltabH">Hierarchy</div>
+      <div class="ptab" id="ltabL">Levels</div>
+      <div class="ptab" id="ltabS">Scenes</div>
+    </div>
+    <div class="pbody" id="hierarchy"></div>
+    <div class="pbody" id="levels" style="display:none"></div>
+    <div class="pbody" id="scenes" style="display:none"></div>
+  </div>
+
+  <div id="viewportWrap">
+    <canvas id="gl"></canvas>
+    <canvas id="overlay"></canvas>
+    <canvas id="mapCanvas"></canvas>
+    <div id="viewportHint"></div>
+  </div>
+
+  <div id="inspector"><h3>Inspector</h3><div class="insBody" id="insBody"></div></div>
+
+  <div id="assets">
+    <div class="ptabs" id="assetTabs"></div>
+    <div id="assetBody"></div>
+  </div>
+
+  <div id="status">
+    <span id="stLevel"></span>
+    <span id="stMouse"></span>
+    <span id="stSel"></span>
+    <span style="flex:1"></span>
+    <span>RMB / MMB drag — pan · wheel — zoom · Del — delete · Ctrl+D — duplicate · F — focus</span>
+  </div>
+</div>
+
+<div id="modal"><div id="modalBox"></div></div>
+
+<script src="../lib/three.min.js"></script>
+<script src="../data/levels.js"></script>
+<script src="../data/cutscenes.js"></script>
+<script src="../src/util.js"></script>
+<script src="../src/audio.js"></script>
+<script src="../src/physics.js"></script>
+<script src="../src/fx.js"></script>
+<script src="../src/world.js"></script>
+<script src="../src/map.js"></script>
+<script src="../src/player.js"></script>
+<script src="../src/enemies.js"></script>
+<script src="../src/bosses.js"></script>
+<script src="../src/cutscene.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

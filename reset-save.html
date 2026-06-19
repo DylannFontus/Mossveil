@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MOSSVEIL — Reset Save</title>
+<style>
+  html,body{margin:0;height:100%;background:#04070a;color:#cfd8dc;
+    font:16px Georgia,serif;display:flex;align-items:center;justify-content:center}
+  .card{max-width:520px;text-align:center;padding:30px}
+  h1{font-weight:normal;letter-spacing:3px;color:#9fd8b8;margin:0 0 6px}
+  .sub{color:#7a8a82;font-style:italic;margin-bottom:26px}
+  #msg{font-size:18px;margin:18px 0;min-height:48px}
+  .ok{color:#a8f0c8} .none{color:#d9c08a}
+  pre{color:#8a9a92;font:12px monospace;text-align:left;background:#0a1014;
+    padding:10px 14px;border-radius:6px;overflow:auto;margin:18px 0}
+  a.btn{display:inline-block;margin:8px 6px;padding:10px 20px;border:1px solid #3a5;
+    border-radius:6px;color:#dff2e4;text-decoration:none}
+  a.btn:hover{background:#16271d}
+  .note{color:#69756e;font-size:13px;margin-top:22px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>M O S S V E I L</h1>
+  <div class="sub">— reset save —</div>
+  <div id="msg">…</div>
+  <pre id="dump"></pre>
+  <a class="btn" href="index.html?new=1">Begin anew →</a>
+  <a class="btn" href="index.html">Open game</a>
+  <div class="note">
+    This wipes the local save (masks, soul, bench, the moth wings, beaten bosses, the
+    discovered map) so the next run starts as a brand-new player — the intro cutscene
+    plays again.<br>
+    Open this page the same way you open the game (double-click the file, <i>or</i> the
+    editor's <code>localhost</code> address) so it clears the matching browser storage.
+  </div>
+</div>
+<script>
+  var KEY = 'mossveil-save-v1';
+  var msg = document.getElementById('msg');
+  var dump = document.getElementById('dump');
+  try {
+    var prev = localStorage.getItem(KEY);
+    if (prev) {
+      dump.textContent = 'cleared save was:\n' + prev;
+      localStorage.removeItem(KEY);
+      msg.className = 'ok';
+      msg.textContent = '✓ Save cleared. You are a new player.';
+    } else {
+      msg.className = 'none';
+      msg.textContent = 'No save was found here — already a clean slate.';
+      dump.style.display = 'none';
+    }
+  } catch (e) {
+    msg.textContent = 'Could not access storage: ' + e.message;
+  }
+</script>
+</body>
+</html>
