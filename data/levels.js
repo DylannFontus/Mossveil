@@ -67,7 +67,7 @@ G.LEVELS = {
    },
    {
     "type": "sign",
-    "x": 18.5,
+    "x": 18,
     "y": 11,
     "text": "Z or SPACE — jump\nhold to leap higher"
    },
@@ -86,15 +86,15 @@ G.LEVELS = {
    },
    {
     "rect": {
-     "x": 15,
-     "y": 14.5,
+     "x": 28.5,
+     "y": 15.5,
      "w": 3,
-     "h": 4
+     "h": 3.5
     },
     "to": "test",
     "spawn": "P",
-    "x": null,
-    "y": null
+    "x": 122,
+    "y": -11
    }
   ],
   "intro": "intro"
