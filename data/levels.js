@@ -85,7 +85,7 @@ G.LEVELS = {
     "spawn": "1"
    }
   ],
-  "intro": "intro"
+  "intro": "expressionsDemo"
  },
  "glade": {
   "id": "glade",
