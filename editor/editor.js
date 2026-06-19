@@ -1163,6 +1163,7 @@
   async function gh(api, opts, cfg) {
     const c = cfg || ghConfig();
     const res = await fetch('https://api.github.com' + api, Object.assign({
+      cache: 'no-store',                       // never read a stale branch tip
       headers: {
         'Authorization': 'Bearer ' + c.token,
         'Accept': 'application/vnd.github+json',
@@ -1182,22 +1183,37 @@
     if (!c.token) throw new Error('No GitHub token set — open "→ …" to configure.');
     const base = `/repos/${c.owner}/${c.repo}`;
     const br = encodeURIComponent(c.branch);
-    const ref = await gh(`${base}/git/ref/heads/${br}`);
-    const baseSha = ref.object.sha;
-    const baseCommit = await gh(`${base}/git/commits/${baseSha}`);
-    const tree = await gh(`${base}/git/trees`, {
-      method: 'POST',
-      body: JSON.stringify({
-        base_tree: baseCommit.tree.sha,
-        tree: files.map(f => ({ path: f.path, mode: '100644', type: 'blob', content: f.content }))
-      })
-    });
-    const commit = await gh(`${base}/git/commits`, {
-      method: 'POST',
-      body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] })
-    });
-    await gh(`${base}/git/refs/heads/${br}`, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha, force: false }) });
-    return commit.sha;
+    let lastErr;
+    // re-read the tip and rebuild on it each attempt, so a tip that moved
+    // under us (concurrent push / cache) self-heals instead of erroring
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const ref = await gh(`${base}/git/ref/heads/${br}`);
+      const baseSha = ref.object.sha;
+      const baseCommit = await gh(`${base}/git/commits/${baseSha}`);
+      const tree = await gh(`${base}/git/trees`, {
+        method: 'POST',
+        body: JSON.stringify({
+          base_tree: baseCommit.tree.sha,
+          tree: files.map(f => ({ path: f.path, mode: '100644', type: 'blob', content: f.content }))
+        })
+      });
+      const commit = await gh(`${base}/git/commits`, {
+        method: 'POST',
+        body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] })
+      });
+      try {
+        await gh(`${base}/git/refs/heads/${br}`, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha, force: false }) });
+        return commit.sha;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 3 && /fast forward|422|409|conflict/i.test(e.message)) {
+          await new Promise(r => setTimeout(r, 350 * (attempt + 1)));
+          continue;                            // someone moved the branch — re-read and redo
+        }
+        throw e;
+      }
+    }
+    throw lastErr;
   }
   async function saveToGithub() {
     const files = [
@@ -1283,24 +1299,31 @@
     if (!j.ok) alert('Save failed: ' + (j.error || res.status));
     return j.ok;
   }
+  let saving = false;
   async function save() {
-    if (effectiveMode() === 'github') {
-      try {
-        setSaveStatus('committing to GitHub…');
-        await saveToGithub();
-        dirty = false; csDirty = false; $('dirty').style.display = 'none';
-        setSaveStatus('saved to GitHub ✓', 3000);
-        return true;
-      } catch (e) {
-        setSaveStatus('');
-        alert('GitHub save failed: ' + e.message + '\n\nCheck the token / repo / branch under "→ …".');
-        return false;
+    if (saving) return false;                  // ignore overlapping saves (prevents commit races)
+    saving = true;
+    try {
+      if (effectiveMode() === 'github') {
+        try {
+          setSaveStatus('committing to GitHub…');
+          await saveToGithub();
+          dirty = false; csDirty = false; $('dirty').style.display = 'none';
+          setSaveStatus('saved to GitHub ✓', 3000);
+          return true;
+        } catch (e) {
+          setSaveStatus('');
+          alert('GitHub save failed: ' + e.message + '\n\nCheck the token / repo / branch under "→ …".');
+          return false;
+        }
       }
+      const a = await postData('/api/levels', G.LEVELS);
+      const b = await postData('/api/cutscenes', G.CUTSCENES || {});
+      if (a && b) { dirty = false; csDirty = false; $('dirty').style.display = 'none'; }
+      return a && b;
+    } finally {
+      saving = false;
     }
-    const a = await postData('/api/levels', G.LEVELS);
-    const b = await postData('/api/cutscenes', G.CUTSCENES || {});
-    if (a && b) { dirty = false; csDirty = false; $('dirty').style.display = 'none'; }
-    return a && b;
   }
   $('btnSave').addEventListener('click', save);
   $('btnSaveTarget').addEventListener('click', saveTargetModal);

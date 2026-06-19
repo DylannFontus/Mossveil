@@ -34,6 +34,7 @@ const log = (...a) => console.log(a.join(' '));
 
     // ---- phase 2: GitHub mode (mocked api.github.com) ----
     const ghCalls = [];
+    let patchCount = 0;
     await page.setRequestInterception(true);
     page.on('request', req => {
       const url = req.url();
@@ -42,14 +43,18 @@ const log = (...a) => console.log(a.join(' '));
         if (req.method() === 'OPTIONS') { req.respond({ status: 204, headers }); return; }
         const p = url.replace('https://api.github.com', '');
         ghCalls.push({ method: req.method(), path: p, body: req.postData() });
-        let body = {};
+        let status = 200, body = {};
         if (req.method() === 'GET' && /\/git\/ref\/heads\//.test(p)) body = { object: { sha: 'BASE_SHA' } };
         else if (req.method() === 'GET' && /\/git\/commits\/BASE_SHA$/.test(p)) body = { tree: { sha: 'BASE_TREE' } };
         else if (req.method() === 'POST' && /\/git\/trees$/.test(p)) body = { sha: 'NEW_TREE' };
         else if (req.method() === 'POST' && /\/git\/commits$/.test(p)) body = { sha: 'NEW_COMMIT' };
-        else if (req.method() === 'PATCH' && /\/git\/refs\/heads\//.test(p)) body = { ref: 'refs/heads/main', object: { sha: 'NEW_COMMIT' } };
+        else if (req.method() === 'PATCH' && /\/git\/refs\/heads\//.test(p)) {
+          // fail the first PATCH like a real "branch moved" conflict, succeed on retry
+          if (patchCount++ === 0) { status = 422; body = { message: 'Update is not a fast forward' }; }
+          else body = { ref: 'refs/heads/main', object: { sha: 'NEW_COMMIT' } };
+        }
         else if (req.method() === 'GET' && /^\/repos\/[^/]+\/[^/]+$/.test(p)) body = { permissions: { push: true } };
-        req.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(body) });
+        req.respond({ status, contentType: 'application/json', headers, body: JSON.stringify(body) });
         return;
       }
       req.continue();
@@ -64,7 +69,7 @@ const log = (...a) => console.log(a.join(' '));
     log('GITHUB MODE target button:', JSON.stringify(ghBtn), ghBtn === '→ GitHub' ? 'OK' : 'FAIL');
 
     await page.click('#btnSave');
-    await sleep(1500);
+    await sleep(2500);   // allow the 422 retry + backoff
 
     const seq = ghCalls.map(c => c.method + ' ' + c.path.replace(/\/repos\/[^/]+\/[^/]+/, ''));
     log('GITHUB API SEQUENCE:');
@@ -78,6 +83,11 @@ const log = (...a) => console.log(a.join(' '));
     const filesOk = expectFiles.every(f => filePaths.includes(f)) && filePaths.length === 4;
     const flowOk = seq.includes('GET /git/ref/heads/main') && seq.includes('POST /git/trees') &&
       seq.includes('POST /git/commits') && seq.includes('PATCH /git/refs/heads/main');
+    // the first PATCH was forced to 422 — verify it retried (2 PATCH + 2 ref re-reads) and still won
+    const patchN = seq.filter(s => s === 'PATCH /git/refs/heads/main').length;
+    const refReads = seq.filter(s => s === 'GET /git/ref/heads/main').length;
+    const retryOk = patchN >= 2 && refReads >= 2;
+    log('RETRY ON 422:', `${patchN} PATCH / ${refReads} ref-reads`, retryOk ? 'OK (self-healed)' : 'FAIL');
     const msg = await page.evaluate(() => document.getElementById('saveMsg').textContent.trim());
     log('SAVE STATUS:', JSON.stringify(msg));
     log('COMMIT FLOW:', flowOk ? 'OK' : 'FAIL', ' FILES:', filesOk ? 'OK' : 'FAIL', ' STATUS:', /saved to GitHub/.test(msg) ? 'OK' : 'FAIL');
