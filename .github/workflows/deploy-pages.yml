@@ -1,0 +1,39 @@
+name: Deploy to GitHub Pages
+
+on:
+  # deploy on every push to main (editor commits, code pushes)
+  push:
+    branches: [main]
+  # allow manual re-runs from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time. cancel-in-progress: true means a newer push CANCELS an
+# in-progress deploy instead of failing with "deployment already in progress" — so the
+# rapid commits the editor makes never collide; the latest one always wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload the whole site (repo root)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

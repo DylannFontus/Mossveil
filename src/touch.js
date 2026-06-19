@@ -19,14 +19,12 @@
       transition:background .05s, transform .05s; }
     #touch .b.show { display:flex; }
     #touch .b.on { background:rgba(74,150,104,0.62); border-color:rgba(210,245,220,0.85); transform:scale(0.94); }
-    #touch .dir { width:58px; height:58px; font-size:25px; }
-    #touch .act { width:72px; height:72px; font-size:12px; flex-direction:column; line-height:1.05; }
-    #touch .act .g { font-size:22px; }
-    #touch .mini { width:44px; height:44px; border-radius:13px; font-size:18px; }
-    #touch .ctx { width:auto; height:auto; padding:13px 30px; border-radius:30px; font-size:19px;
-      left:50%; transform:translateX(-50%); }
-    #touch .ctx.on { transform:translateX(-50%) scale(0.96); }
-    @media (max-height:480px){ #touch .dir{width:50px;height:50px} #touch .act{width:62px;height:62px} }
+    #touch .dir { width:72px; height:72px; font-size:32px; }
+    #touch .act { width:88px; height:88px; font-size:13px; flex-direction:column; line-height:1.05; }
+    #touch .act .g { font-size:27px; }
+    #touch .mini { width:54px; height:54px; border-radius:15px; font-size:23px; }
+    #touch .ctx { width:auto; height:auto; padding:14px 30px; border-radius:30px; font-size:20px; }
+    @media (max-height:520px){ #touch .dir{width:60px;height:60px} #touch .act{width:74px;height:74px} }
   `;
   document.head.appendChild(css);
 
@@ -65,24 +63,24 @@
 
   // ---- D-pad (bottom-left) ----
   const dShow = s => s === 'play' || s === 'map';
-  add({ cls: 'dir', html: '▲', action: 'up', show: dShow, css: { left: '74px', bottom: '128px' } });
-  add({ cls: 'dir', html: '◀', action: 'left', show: dShow, css: { left: '18px', bottom: '70px' } });
-  add({ cls: 'dir', html: '▶', action: 'right', show: dShow, css: { left: '130px', bottom: '70px' } });
-  add({ cls: 'dir', html: '▼', action: 'down', show: dShow, css: { left: '74px', bottom: '14px' } });
+  add({ cls: 'dir', html: '▲', action: 'up', show: dShow, css: { left: '82px', bottom: '144px' } });
+  add({ cls: 'dir', html: '◀', action: 'left', show: dShow, css: { left: '14px', bottom: '76px' } });
+  add({ cls: 'dir', html: '▶', action: 'right', show: dShow, css: { left: '150px', bottom: '76px' } });
+  add({ cls: 'dir', html: '▼', action: 'down', show: dShow, css: { left: '82px', bottom: '8px' } });
 
   // ---- action cluster (bottom-right) ----
-  add({ cls: 'act', html: '<span class="g">⤒</span><span>JUMP</span>', action: 'jump', show: PLAY, css: { right: '24px', bottom: '24px' } });
-  add({ cls: 'act', html: '<span class="g">✦</span><span>STRIKE</span>', action: 'attack', show: PLAY, css: { right: '108px', bottom: '60px' } });
-  add({ cls: 'act', html: '<span class="g">»</span><span>DASH</span>', action: 'dash', show: PLAY, css: { right: '34px', bottom: '124px' } });
-  add({ cls: 'act', html: '<span class="g">✺</span><span>FOCUS</span>', action: 'cast', show: PLAY, css: { right: '128px', bottom: '150px' } });
+  add({ cls: 'act', html: '<span class="g">⤒</span><span>JUMP</span>', action: 'jump', show: PLAY, css: { right: '22px', bottom: '22px' } });
+  add({ cls: 'act', html: '<span class="g">✦</span><span>STRIKE</span>', action: 'attack', show: PLAY, css: { right: '118px', bottom: '58px' } });
+  add({ cls: 'act', html: '<span class="g">»</span><span>DASH</span>', action: 'dash', show: PLAY, css: { right: '30px', bottom: '124px' } });
+  add({ cls: 'act', html: '<span class="g">✺</span><span>FOCUS</span>', action: 'cast', show: PLAY, css: { right: '126px', bottom: '160px' } });
 
   // ---- top-right: pause + map ----
-  add({ cls: 'mini', html: '⏸', tap: 'pause', show: s => s === 'play' || s === 'pause', css: { right: '16px', top: '16px' } });
-  add({ cls: 'mini', html: '🗺', tap: 'map', show: s => s === 'play' || s === 'map', css: { right: '70px', top: '16px' } });
+  add({ cls: 'mini', html: '⏸', tap: 'pause', show: s => s === 'play' || s === 'pause', css: { right: '14px', top: '14px' } });
+  add({ cls: 'mini', html: '🗺', tap: 'map', show: s => s === 'play' || s === 'map', css: { right: '80px', top: '14px' } });
 
-  // ---- context button: skip a cutscene / advance the ending ----
+  // ---- context button (top-right corner): skip a cutscene / advance the ending ----
   add({
-    cls: 'ctx', html: 'Skip ⏭', tap: 'confirm', css: { bottom: '38%' },
+    cls: 'ctx', html: 'Skip ⏭', tap: 'confirm', css: { top: '16px', right: '16px' },
     show: s => s === 'cutscene' || s === 'ending',
     label: s => s === 'ending' ? 'Continue' : 'Skip ⏭'
   });

@@ -246,7 +246,9 @@
     addEventListener('keydown', gesture);
     addEventListener('pointerdown', gesture);
 
-    // menu / slots mouse: hover to highlight, click to choose
+    // menu / slots: hover to highlight (desktop), tap/click to choose.
+    // Uses pointer events for the tap so it works with touch on iPad (iOS does not
+    // reliably synthesize mouse events for taps on the canvas).
     addEventListener('mousemove', e => {
       if (Main.confirm) return;
       if (Main.state === 'title') {
@@ -257,8 +259,8 @@
         if (hit && hit.index !== undefined) Main.slotIndex = hit.index;
       }
     });
-    addEventListener('mousedown', e => {
-      if (e.button !== 0) return;
+    addEventListener('pointerdown', e => {
+      if (e.button && e.button !== 0) return;
       if (Main.confirm) {
         const hit = pointerToConfirm(e);
         if (hit) { const ok = hit.confirm; const c = Main.confirm; Main.confirm = null; if (ok) c.onYes(); }

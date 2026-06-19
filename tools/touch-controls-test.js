@@ -19,8 +19,27 @@ const log = (...a) => console.log(a.join(' '));
     page.on('pageerror', e => errs.push('[err] ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errs.push('[con] ' + m.text()); });
 
+    const base = 'file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/');
+
+    // ---- Phase 0: title-menu tap works on touch (the iPad bug) ----
+    await page.goto(base, { waitUntil: 'load' });
+    await page.evaluate(() => ['mossveil-save-v1', 'mossveil-active-slot', 'mossveil-slot-0', 'mossveil-slot-1', 'mossveil-slot-2', 'mossveil-slot-3', 'mossveil-slot-4'].forEach(k => localStorage.removeItem(k)));
+    await page.reload({ waitUntil: 'load' });
+    await sleep(2200);
+    const st0 = await page.evaluate(() => G.Main.state);
+    const tapped = await page.evaluate(() => {
+      const b = (G.UI.titleButtons || []).find(x => x.index === 0);   // New Game
+      if (!b) return false;
+      const ev = new PointerEvent('pointerdown', { pointerId: 3, pointerType: 'touch', clientX: b.x + b.w / 2, clientY: b.y + b.h / 2, button: 0, buttons: 1, isPrimary: true, bubbles: true, cancelable: true });
+      window.dispatchEvent(ev);
+      return true;
+    });
+    await sleep(1500);
+    const st1 = await page.evaluate(() => G.Main.state);
+    log('MENU TAP (New Game):', st0, '->', st1, (tapped && st1 !== 'title') ? 'OK' : 'FAIL');
+
     // boot straight into a level (skips menu/intro)
-    const url = 'file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/') + '?level=steps&spawn=P';
+    const url = base + '?level=steps&spawn=P';
     await page.goto(url, { waitUntil: 'load' });
     await sleep(2500);
 
