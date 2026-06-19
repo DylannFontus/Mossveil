@@ -995,8 +995,8 @@ G.LEVELS = {
   "props": [
    {
     "type": "bossTrigger",
-    "x": 38,
-    "y": 7.5,
+    "x": 11,
+    "y": 8,
     "r": 6,
     "boss": "thornbackAlpha"
    }
