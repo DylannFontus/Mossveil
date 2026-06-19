@@ -83,6 +83,18 @@ G.LEVELS = {
     "side": "R",
     "to": "glade",
     "spawn": "1"
+   },
+   {
+    "rect": {
+     "x": 15,
+     "y": 14.5,
+     "w": 3,
+     "h": 4
+    },
+    "to": "test",
+    "spawn": "P",
+    "x": null,
+    "y": null
    }
   ],
   "intro": "intro"
