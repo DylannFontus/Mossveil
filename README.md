@@ -30,9 +30,20 @@ the editor in your browser. Close the server's console window to stop it.
 
 The map fills in as you discover rooms. Rest at benches to record your journey.
 
-The **title menu** has New Game, Continue (resume your latest save), Load Save (import a
-save `.json` from disk), and Exit — navigate with the arrows + Enter/Z, or the mouse.
-New Game asks before overwriting an existing save.
+The **title menu** has New Game, Continue, Load Save, and Exit — navigate with the
+arrows + Enter/Z, or the mouse.
+
+- **New Game** drops you into the first free **save slot** (there are five) and plays the
+  intro. If every slot is full it sends you to the slots screen to clear one first.
+- **Continue** resumes your most recently saved slot.
+- **Load Save** opens the **save slots** screen — up to five independent saves kept in your
+  browser, each showing where you rested, your progress and when. Pick one to load it,
+  pick an empty slot to start a fresh run there, or hit the **trash button** (top-right of
+  a slot, or the `Del` key) to delete it — with a confirm so you can't wipe one by accident.
+
+Saves are stored locally in your browser; resting at a bench records to whichever slot
+that run belongs to. (Open `reset-save.html` the same way you launch the game to wipe all
+slots at once.)
 
 ## The editor
 

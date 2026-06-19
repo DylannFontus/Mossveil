@@ -36,19 +36,24 @@
   </div>
 </div>
 <script>
-  var KEY = 'mossveil-save-v1';
+  // clears every save: the 5 slots, the active-slot pointer, and the legacy single save
+  var KEYS = ['mossveil-save-v1', 'mossveil-active-slot'];
+  for (var i = 0; i < 5; i++) KEYS.push('mossveil-slot-' + i);
   var msg = document.getElementById('msg');
   var dump = document.getElementById('dump');
   try {
-    var prev = localStorage.getItem(KEY);
-    if (prev) {
-      dump.textContent = 'cleared save was:\n' + prev;
-      localStorage.removeItem(KEY);
+    var found = [];
+    for (var k = 0; k < KEYS.length; k++) {
+      var v = localStorage.getItem(KEYS[k]);
+      if (v != null) { found.push(KEYS[k]); localStorage.removeItem(KEYS[k]); }
+    }
+    if (found.length) {
+      dump.textContent = 'cleared:\n' + found.join('\n');
       msg.className = 'ok';
-      msg.textContent = '✓ Save cleared. You are a new player.';
+      msg.textContent = '✓ All saves cleared. You are a new player.';
     } else {
       msg.className = 'none';
-      msg.textContent = 'No save was found here — already a clean slate.';
+      msg.textContent = 'No saves were found here — already a clean slate.';
       dump.style.display = 'none';
     }
   } catch (e) {

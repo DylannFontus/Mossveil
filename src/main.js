@@ -4,7 +4,10 @@
   const Main = G.Main = { state: 'title', endingT: 0 };
 
   const CAM_Z = 30, FOV = 32;
-  const SAVE_KEY = 'mossveil-save-v1';
+  const SAVE_KEY = 'mossveil-save-v1';     // legacy single-save key (migrated on boot)
+  const SLOT_PREFIX = 'mossveil-slot-';     // per-slot keys: mossveil-slot-0 .. -4
+  const ACTIVE_KEY = 'mossveil-active-slot';
+  const SLOT_COUNT = 5;
 
   let camX = 0, camY = 0;
   let titleDrift = 0;
@@ -12,20 +15,100 @@
   let seenRooms = {};
   let lastT = 0;
 
-  // ---------------- save ----------------
-  function loadSave() {
+  // ---------------- save slots ----------------
+  // Up to SLOT_COUNT independent saves live in localStorage. G.save is the active
+  // slot's data in memory; G.activeSlot is the index it persists back to.
+  G.activeSlot = null;
+
+  const slotKey = i => SLOT_PREFIX + i;
+
+  function readSlot(i) {
     try {
-      const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (s && typeof s === 'object') return s;
-    } catch (e) { /* corrupted save -> fresh */ }
-    return {};
+      const raw = localStorage.getItem(slotKey(i));
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (s && typeof s === 'object' && s.data && typeof s.data === 'object') return s;
+    } catch (e) { /* corrupted slot -> treat as empty */ }
+    return null;
   }
+  function readSlots() {
+    const out = [];
+    for (let i = 0; i < SLOT_COUNT; i++) out.push(readSlot(i));
+    return out;
+  }
+  function writeSlot(i, data, createdAt) {
+    const slot = { data, updatedAt: Date.now(), createdAt: createdAt || Date.now() };
+    try { localStorage.setItem(slotKey(i), JSON.stringify(slot)); } catch (e) { }
+    return slot;
+  }
+  function deleteSlot(i) {
+    try { localStorage.removeItem(slotKey(i)); } catch (e) { }
+    if (G.activeSlot === i) { G.activeSlot = null; try { localStorage.removeItem(ACTIVE_KEY); } catch (e) { } }
+  }
+  function setActiveSlot(i) {
+    G.activeSlot = i;
+    try { localStorage.setItem(ACTIVE_KEY, String(i)); } catch (e) { }
+  }
+  function firstEmptySlot() {
+    for (let i = 0; i < SLOT_COUNT; i++) if (!readSlot(i)) return i;
+    return -1;
+  }
+  function latestSlotIndex() {
+    let best = -1, bestT = -1;
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const s = readSlot(i);
+      if (s && s.updatedAt > bestT) { bestT = s.updatedAt; best = i; }
+    }
+    return best;
+  }
+  function anyOccupied() { return latestSlotIndex() >= 0; }
+
+  // boot-time setup: migrate any legacy single save into slot 0, then load the active slot
+  function initSaves() {
+    if (!anyOccupied()) {
+      try {
+        const legacy = JSON.parse(localStorage.getItem(SAVE_KEY));
+        if (legacy && typeof legacy === 'object') {
+          writeSlot(0, legacy);
+          localStorage.removeItem(SAVE_KEY);
+        }
+      } catch (e) { /* no/invalid legacy save */ }
+    }
+    let ai = parseInt(localStorage.getItem(ACTIVE_KEY), 10);
+    if (!(ai >= 0 && ai < SLOT_COUNT) || !readSlot(ai)) ai = latestSlotIndex();
+    if (ai >= 0) { G.activeSlot = ai; G.save = readSlot(ai).data; }
+    else { G.activeSlot = null; G.save = {}; }
+  }
+
   Main.persist = () => {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) { }
+    if (G.activeSlot == null) return;            // title backdrop / editor preview: nothing to write
+    const prev = readSlot(G.activeSlot);
+    writeSlot(G.activeSlot, G.save, prev && prev.createdAt);
   };
-  function eraseSave() {
-    G.save = {};
-    try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
+
+  // a friendly one-line summary of a slot, for the slots screen
+  Main.slotInfo = slot => {
+    if (!slot) return null;
+    const d = slot.data || {};
+    const roomId = d.bench ? d.bench.room : 'steps';
+    const def = G.LEVELS[roomId];
+    const place = (def && def.title) ? def.title : 'The Awakening';
+    let bosses = 0;
+    if (d.bosses) for (const k in d.bosses) { if (d.bosses[k]) bosses++; }
+    else if (d.bossDead) bosses = 1;
+    const parts = [];
+    if (d.wings) parts.push('Moth Wings');
+    parts.push(bosses + (bosses === 1 ? ' boss felled' : ' bosses felled'));
+    return { place, detail: parts.join('  ·  '), when: relTime(slot.updatedAt) };
+  };
+  function relTime(ms) {
+    if (!ms) return '';
+    const s = Math.max(0, (Date.now() - ms) / 1000);
+    if (s < 60) return 'moments ago';
+    if (s < 3600) { const m = Math.round(s / 60); return m + (m === 1 ? ' minute ago' : ' minutes ago'); }
+    if (s < 86400) { const hr = Math.round(s / 3600); return hr + (hr === 1 ? ' hour ago' : ' hours ago'); }
+    const d = new Date(ms);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   // ---------------- main menu ----------------
@@ -33,11 +116,14 @@
   Main.menuItems = [];
   Main.confirm = null;   // { message, onYes, sel }
 
+  Main.slotIndex = 0;
+  Main.slots = [];
+
   function buildMenu() {
     Main.menuItems = [
       { label: 'New Game', enabled: true, action: menuNewGame },
-      { label: 'Continue', enabled: !isNewSave(), action: () => startGame(false) },
-      { label: 'Load Save', enabled: true, action: loadSaveFromFile },
+      { label: 'Continue', enabled: anyOccupied(), action: continueGame },
+      { label: 'Load Save', enabled: true, action: openSlots },
       { label: 'Exit', enabled: true, action: exitGame }
     ];
     if (!Main.menuItems[Main.menuIndex] || !Main.menuItems[Main.menuIndex].enabled)
@@ -56,13 +142,25 @@
     const it = Main.menuItems[Main.menuIndex];
     if (it && it.enabled) { G.Audio.sfx('uiBell'); it.action(); }
   }
+  // resume the most recently saved slot
+  function continueGame() {
+    const i = latestSlotIndex();
+    if (i < 0) { menuNewGame(); return; }
+    setActiveSlot(i);
+    G.save = readSlot(i).data;
+    startGame(false);
+  }
+  // quick new game: drop into the first free slot, or send to the slots screen if full
   function menuNewGame() {
-    if (isNewSave()) { startGame(true); return; }
-    Main.confirm = {
-      message: 'Overwrite your existing save and start anew?',
-      sel: 1,                          // default to "No" for safety
-      onYes: () => startGame(true)
-    };
+    const i = firstEmptySlot();
+    if (i < 0) {
+      openSlots();
+      G.UI.toast('All slots full — delete one to begin anew');
+      return;
+    }
+    setActiveSlot(i);
+    G.save = {};
+    startGame(true);
   }
 
   function exitGame() {
@@ -70,43 +168,57 @@
     Main.state = 'exited';
   }
 
-  let fileInput = null;
-  function loadSaveFromFile() {
-    if (!fileInput) {
-      fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = '.json,application/json';
-      fileInput.style.display = 'none';
-      document.body.appendChild(fileInput);
-      fileInput.addEventListener('change', () => {
-        const f = fileInput.files && fileInput.files[0];
-        fileInput.value = '';
-        if (!f) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const data = JSON.parse(reader.result);
-            if (!data || typeof data !== 'object' || Array.isArray(data)) throw 0;
-            G.save = data;
-            Main.persist();
-            startGame(false);
-          } catch (e) { alert('That does not look like a valid MOSSVEIL save file.'); }
-        };
-        reader.readAsText(f);
-      });
-    }
-    fileInput.click();
+  // ---------------- save-slot screen ----------------
+  function openSlots() {
+    Main.slots = readSlots();
+    const last = latestSlotIndex();
+    Main.slotIndex = last >= 0 ? last : 0;
+    Main.state = 'slots';
+    G.Audio.sfx('uiBell');
+  }
+  function slotActivate(i) {
+    const s = Main.slots[i];
+    G.Audio.sfx('uiBell');
+    setActiveSlot(i);
+    if (s) { G.save = s.data || {}; startGame(false); }     // load existing
+    else { G.save = {}; startGame(true); }                  // begin a fresh run in this slot
+  }
+  function slotDelete(i) {
+    if (!Main.slots[i]) { G.Audio.sfx('clink'); return; }
+    Main.confirm = {
+      message: 'Delete this vessel forever? This cannot be undone.',
+      sel: 1,                          // default to "No"
+      onYes: () => { deleteSlot(i); Main.slots = readSlots(); G.Audio.sfx('quake'); }
+    };
   }
 
-  // pointer support for the title menu / confirm dialog
-  function pointerToMenu(e) {
-    if (Main.confirm) {
-      const btns = G.UI.confirmButtons || [];
-      for (const b of btns) if (e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h) return { confirm: b.yes };
-      return null;
+  // shared confirm-dialog input; returns true while a dialog is up (consuming input)
+  function handleConfirm(I) {
+    if (!Main.confirm) return false;
+    if (I.pressed('left') || I.pressed('right') || I.pressed('up') || I.pressed('down')) {
+      Main.confirm.sel ^= 1; G.Audio.sfx('clink');
     }
-    const btns = G.UI.titleButtons || [];
-    for (const b of btns) if (b.enabled && e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h) return { index: b.index };
+    if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) {
+      const c = Main.confirm; Main.confirm = null; G.Audio.sfx('uiBell');
+      if (c.sel === 0) c.onYes();
+    } else if (I.pressed('pause')) Main.confirm = null;
+    return true;
+  }
+
+  // ---------------- pointer helpers (title / confirm / slots) ----------------
+  function hitRect(e, b) { return e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h; }
+  function pointerToConfirm(e) {
+    for (const b of (G.UI.confirmButtons || [])) if (hitRect(e, b)) return { confirm: b.yes };
+    return null;
+  }
+  function pointerToMenu(e) {
+    for (const b of (G.UI.titleButtons || [])) if (b.enabled && hitRect(e, b)) return { index: b.index };
+    return null;
+  }
+  function pointerToSlot(e) {
+    for (const b of (G.UI.slotTrashButtons || [])) if (hitRect(e, b)) return { trash: b.index };
+    for (const b of (G.UI.slotButtons || [])) if (hitRect(e, b)) return { index: b.index };
+    if (G.UI.slotBack && hitRect(e, G.UI.slotBack)) return { back: true };
     return null;
   }
 
@@ -120,7 +232,7 @@
     const camera = G.camera = new THREE.PerspectiveCamera(FOV, innerWidth / innerHeight, 1, 300);
     camera.position.set(0, 0, CAM_Z);
 
-    G.save = loadSave();
+    initSaves();
     G.time = 0;
     G.hitStop = 0;
 
@@ -134,24 +246,34 @@
     addEventListener('keydown', gesture);
     addEventListener('pointerdown', gesture);
 
-    // title-menu mouse: hover to highlight, click to choose
+    // menu / slots mouse: hover to highlight, click to choose
     addEventListener('mousemove', e => {
-      if (Main.state !== 'title' || Main.confirm) return;
-      const hit = pointerToMenu(e);
-      if (hit && hit.index !== undefined) Main.menuIndex = hit.index;
+      if (Main.confirm) return;
+      if (Main.state === 'title') {
+        const hit = pointerToMenu(e);
+        if (hit && hit.index !== undefined) Main.menuIndex = hit.index;
+      } else if (Main.state === 'slots') {
+        const hit = pointerToSlot(e);
+        if (hit && hit.index !== undefined) Main.slotIndex = hit.index;
+      }
     });
     addEventListener('mousedown', e => {
       if (e.button !== 0) return;
-      if (Main.state === 'exited') { Main.state = 'title'; return; }
-      if (Main.state !== 'title') return;
-      const hit = pointerToMenu(e);
-      if (!hit) return;
       if (Main.confirm) {
-        const ok = hit.confirm; const c = Main.confirm; Main.confirm = null;
-        if (ok) c.onYes();
-      } else if (hit.index !== undefined) {
-        Main.menuIndex = hit.index;
-        menuActivate();
+        const hit = pointerToConfirm(e);
+        if (hit) { const ok = hit.confirm; const c = Main.confirm; Main.confirm = null; if (ok) c.onYes(); }
+        return;
+      }
+      if (Main.state === 'exited') { Main.state = 'title'; return; }
+      if (Main.state === 'title') {
+        const hit = pointerToMenu(e);
+        if (hit && hit.index !== undefined) { Main.menuIndex = hit.index; menuActivate(); }
+      } else if (Main.state === 'slots') {
+        const hit = pointerToSlot(e);
+        if (!hit) return;
+        if (hit.back) { Main.state = 'title'; G.Audio.sfx('clink'); }
+        else if (hit.trash !== undefined) slotDelete(hit.trash);
+        else if (hit.index !== undefined) slotActivate(hit.index);
       }
     });
 
@@ -208,7 +330,12 @@
   function startGame(fresh) {
     // any start from an empty save is a new game, so the intro plays even without pressing N
     const newGame = fresh || isNewSave();
-    if (newGame) eraseSave();
+    if (newGame) {
+      // a fresh run needs a slot to live in (e.g. ?new=1 or an editor preview with none set)
+      if (G.activeSlot == null) { const e = firstEmptySlot(); setActiveSlot(e >= 0 ? e : 0); }
+      G.save = {};
+      Main.persist();                 // create the save file immediately so the slot is occupied
+    }
     Main.state = 'transition';
     G.UI.setFade(1, 6, () => {
       let roomId = 'steps', sx, sy;
@@ -424,20 +551,22 @@
       case 'title':
         dt = rdt * 0.6;
         buildMenu();
-        if (Main.confirm) {
-          if (I.pressed('left') || I.pressed('right') || I.pressed('up') || I.pressed('down')) {
-            Main.confirm.sel ^= 1; G.Audio.sfx('clink');
-          }
-          if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) {
-            const c = Main.confirm; Main.confirm = null;
-            G.Audio.sfx('uiBell');
-            if (c.sel === 0) c.onYes();
-          } else if (I.pressed('pause')) Main.confirm = null;
-        } else {
+        if (!handleConfirm(I)) {
           if (I.pressed('up')) menuStep(-1);
           if (I.pressed('down')) menuStep(1);
           if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) menuActivate();
           if (I.pressed('newgame')) menuNewGame();
+        }
+        break;
+      case 'slots':
+        dt = rdt * 0.6;
+        Main.slots = readSlots();
+        if (!handleConfirm(I)) {
+          if (I.pressed('up')) { Main.slotIndex = (Main.slotIndex - 1 + SLOT_COUNT) % SLOT_COUNT; G.Audio.sfx('clink'); }
+          if (I.pressed('down')) { Main.slotIndex = (Main.slotIndex + 1) % SLOT_COUNT; G.Audio.sfx('clink'); }
+          if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) slotActivate(Main.slotIndex);
+          if (I.pressed('del')) slotDelete(Main.slotIndex);
+          if (I.pressed('pause')) { Main.state = 'title'; G.Audio.sfx('clink'); }
         }
         break;
       case 'exited':

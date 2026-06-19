@@ -16,7 +16,8 @@
     zoomIn: ['Equal', 'NumpadAdd'],
     zoomOut: ['Minus', 'NumpadSubtract'],
     confirm: ['Enter'],
-    newgame: ['KeyN']
+    newgame: ['KeyN'],
+    del: ['Delete', 'Backspace']
   };
   const codeToActions = {};
   for (const a in map) for (const c of map[a]) (codeToActions[c] = codeToActions[c] || []).push(a);

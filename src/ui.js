@@ -53,6 +53,7 @@
   UI.resetDeathText = () => { deathTextT = 0; };
 
   const serif = 'Georgia, "Times New Roman", serif';
+  const SLOT_VIEW = 5;   // number of save slots shown on the slots screen
 
   function maskPath(x, y, s) {
     cx.beginPath();
@@ -327,6 +328,143 @@
     cx.restore();
   }
 
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+  function drawTrashIcon(bx, by, s, color) {
+    // a small vector trash can centred in a box of side ~s at (bx,by)
+    cx.save();
+    cx.strokeStyle = color;
+    cx.lineWidth = 1.6;
+    cx.lineJoin = 'round';
+    cx.lineCap = 'round';
+    const w2 = s * 0.5, top = by - s * 0.42;
+    // lid
+    cx.beginPath();
+    cx.moveTo(bx - w2, top); cx.lineTo(bx + w2, top);
+    cx.stroke();
+    // handle
+    cx.beginPath();
+    cx.moveTo(bx - s * 0.18, top); cx.lineTo(bx - s * 0.12, top - s * 0.16);
+    cx.lineTo(bx + s * 0.12, top - s * 0.16); cx.lineTo(bx + s * 0.18, top);
+    cx.stroke();
+    // body
+    cx.beginPath();
+    cx.moveTo(bx - w2 * 0.82, top + s * 0.06);
+    cx.lineTo(bx - w2 * 0.62, by + s * 0.5);
+    cx.lineTo(bx + w2 * 0.62, by + s * 0.5);
+    cx.lineTo(bx + w2 * 0.82, top + s * 0.06);
+    cx.stroke();
+    // ribs
+    cx.beginPath();
+    for (const dx of [-s * 0.18, 0, s * 0.18]) { cx.moveTo(bx + dx, top + s * 0.22); cx.lineTo(bx + dx, by + s * 0.4); }
+    cx.stroke();
+    cx.restore();
+  }
+
+  function drawSlots() {
+    cx.save();
+    const bg = cx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(3,8,9,0.86)');
+    bg.addColorStop(0.5, 'rgba(3,8,9,0.7)');
+    bg.addColorStop(1, 'rgba(3,8,9,0.88)');
+    cx.fillStyle = bg;
+    cx.fillRect(0, 0, w, h);
+    const pulse = 0.5 + Math.sin(G.time * 1.5) * 0.5;
+
+    cx.textAlign = 'center';
+    cx.fillStyle = '#eaf2ee';
+    cx.shadowColor = 'rgba(160,240,200,0.4)';
+    cx.shadowBlur = 20;
+    cx.font = `46px ${serif}`;
+    cx.fillText('C H O O S E   A   V E S S E L', w / 2, h * 0.155);
+    cx.shadowBlur = 0;
+
+    const slots = G.Main.slots || [];
+    const bw = Math.min(580, w - 80), bh = 78, gap = 14;
+    const total = SLOT_VIEW * bh + (SLOT_VIEW - 1) * gap;
+    const x0 = w / 2 - bw / 2;
+    const y0 = Math.max(h * 0.22, h * 0.5 - total / 2 + 14);
+    G.UI.slotButtons = [];
+    G.UI.slotTrashButtons = [];
+
+    for (let i = 0; i < SLOT_VIEW; i++) {
+      const y = y0 + i * (bh + gap);
+      const sel = i === G.Main.slotIndex && !G.Main.confirm;
+      const slot = slots[i];
+      const info = slot ? G.Main.slotInfo(slot) : null;
+
+      roundRect(x0, y, bw, bh, 10);
+      cx.fillStyle = sel ? 'rgba(34,64,49,0.92)' : 'rgba(16,25,21,0.74)';
+      cx.fill();
+      cx.lineWidth = sel ? 2.2 : 1;
+      cx.strokeStyle = sel ? `rgba(180,240,200,${0.7 + pulse * 0.3})` : 'rgba(110,140,125,0.4)';
+      cx.stroke();
+
+      // vessel numeral badge
+      cx.textAlign = 'center';
+      cx.fillStyle = sel ? 'rgba(180,240,200,0.95)' : 'rgba(150,180,165,0.7)';
+      cx.font = `italic 30px ${serif}`;
+      cx.textBaseline = 'middle';
+      cx.fillText(ROMAN[i], x0 + 40, y + bh / 2);
+      cx.beginPath();
+      cx.moveTo(x0 + 76, y + 16); cx.lineTo(x0 + 76, y + bh - 16);
+      cx.strokeStyle = 'rgba(140,170,155,0.25)'; cx.lineWidth = 1; cx.stroke();
+
+      cx.textAlign = 'left';
+      const tx = x0 + 96;
+      if (info) {
+        cx.fillStyle = sel ? '#eafff0' : '#cad8d0';
+        cx.font = `22px ${serif}`;
+        cx.fillText(info.place, tx, y + 28);
+        cx.fillStyle = 'rgba(170,195,182,0.75)';
+        cx.font = `14px ${serif}`;
+        cx.fillText(info.detail, tx, y + 50);
+        cx.fillStyle = 'rgba(140,165,153,0.6)';
+        cx.font = `italic 13px ${serif}`;
+        cx.fillText('rested ' + info.when, tx, y + 68);
+        // trash button (top-right)
+        const tbx = x0 + bw - 30, tby = y + 26, tbox = 34;
+        drawTrashIcon(tbx, tby, 18, sel ? 'rgba(235,170,165,0.95)' : 'rgba(180,150,148,0.6)');
+        G.UI.slotTrashButtons.push({ x: tbx - tbox / 2, y: y, w: tbox, h: bh, index: i });
+      } else {
+        cx.textAlign = 'center';
+        cx.fillStyle = sel ? 'rgba(210,225,216,0.85)' : 'rgba(150,170,160,0.6)';
+        cx.font = `italic 21px ${serif}`;
+        cx.fillText('— empty vessel —', x0 + bw / 2 + 20, y + bh / 2 - 6);
+        cx.fillStyle = 'rgba(150,180,165,0.5)';
+        cx.font = `13px ${serif}`;
+        cx.fillText('begin a new journey here', x0 + bw / 2 + 20, y + bh / 2 + 18);
+      }
+      if (sel) {
+        cx.fillStyle = 'rgba(180,240,200,0.9)';
+        cx.font = `20px ${serif}`;
+        cx.textAlign = 'center';
+        cx.fillText('‹', x0 + 12, y + bh / 2);
+      }
+      cx.textBaseline = 'alphabetic';
+      G.UI.slotButtons.push({ x: x0, y, w: bw, h: bh, index: i });
+    }
+
+    // back button
+    const back = { x: x0, y: y0 + SLOT_VIEW * (bh + gap) + 6, w: 120, h: 36 };
+    roundRect(back.x, back.y, back.w, back.h, 8);
+    cx.fillStyle = 'rgba(18,28,24,0.7)';
+    cx.fill();
+    cx.strokeStyle = 'rgba(120,150,135,0.45)'; cx.lineWidth = 1; cx.stroke();
+    cx.fillStyle = '#c6d4cc'; cx.font = `17px ${serif}`;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText('‹ Back', back.x + back.w / 2, back.y + back.h / 2 + 1);
+    cx.textBaseline = 'alphabetic';
+    G.UI.slotBack = back;
+
+    cx.font = `italic 13px ${serif}`;
+    cx.fillStyle = 'rgba(140,160,152,0.55)';
+    cx.textAlign = 'center';
+    cx.fillText('↑ ↓ select · Enter / Z choose · Del delete · Esc back — empty slots start a new run', w / 2, h - 22);
+    cx.restore();
+
+    if (G.Main.confirm) drawConfirm();
+  }
+
   function drawGoodbye() {
     cx.save();
     cx.fillStyle = '#04070a';
@@ -441,6 +579,7 @@
     cx.drawImage(vignette, 0, 0, w, h);
 
     if (st === 'title') drawTitleScreen();
+    if (st === 'slots') { drawSlots(); drawToasts(dt); }
     if (st === 'pause') drawPause();
     if (st === 'dead') drawDeath(dt);
     if (st === 'ending') drawEnding(G.Main.endingT);
