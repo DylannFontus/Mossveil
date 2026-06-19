@@ -97,7 +97,7 @@ G.LEVELS = {
     "y": null
    }
   ],
-  "intro": "intro"
+  "intro": "expressionsDemo"
  },
  "glade": {
   "id": "glade",
