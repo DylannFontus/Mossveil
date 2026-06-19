@@ -76,6 +76,14 @@ G.LEVELS = {
     "x": 33.5,
     "y": 7,
     "text": "X — strike  ·  C — dash\ndown-strike in the air to bounce off foes"
+   },
+   {
+    "type": "readable",
+    "x": 11.5,
+    "y": 13.5,
+    "title": "Old inscription",
+    "text": "Words worn by time...",
+    "style": "totem"
    }
   ],
   "transitions": [
