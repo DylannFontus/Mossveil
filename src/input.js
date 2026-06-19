@@ -46,6 +46,9 @@
     released: a => !!wasReleased[a],
     axisX: () => (isDown.right ? 1 : 0) - (isDown.left ? 1 : 0),
     anyPressed: () => any,
+    // on-screen touch controls feed input through these (mirror keydown/keyup)
+    virtualDown(a) { if (!isDown[a]) { isDown[a] = true; wasPressed[a] = true; any = true; } },
+    virtualUp(a) { if (isDown[a]) { isDown[a] = false; wasReleased[a] = true; } },
     // call at end of frame
     update() {
       for (const a in wasPressed) wasPressed[a] = false;

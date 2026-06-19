@@ -1302,6 +1302,9 @@
   let saving = false;
   async function save() {
     if (saving) return false;                  // ignore overlapping saves (prevents commit races)
+    // nothing changed since the last save — don't make a redundant commit/redeploy.
+    // (this is why "From Start" right after a Save no longer re-commits)
+    if (!dirty && !csDirty) { setSaveStatus('already saved ✓', 1500); return true; }
     saving = true;
     try {
       if (effectiveMode() === 'github') {

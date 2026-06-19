@@ -79,7 +79,25 @@ only in that device's browser. Revoke/rotate it anytime from GitHub's token sett
   while code/features touch `src/`, `editor/`, etc. — different files merge cleanly. Just
   avoid editing the **same** level data both locally and online without pulling in between.
 - After a hosted Save, the *deployed* game (the `▶ Test` buttons) reflects the change once the
-  host finishes its redeploy (seconds).
+  host finishes its redeploy.
+
+**Why a hosted edit can take a minute or two to show up:**
+
+- The host has to **rebuild and redeploy** after each push (GitHub Pages is typically
+  ~1–2 min; you can watch it in the repo's **Actions** tab). That's the main delay, and it's
+  inherent to the host — there's no way around the build itself.
+- **Caching is handled automatically.** `index.html` / `editor.html` load all the code and
+  data with a per-visit cache-buster when served over http(s), so **a normal reload always
+  pulls the freshest deployed version** — no hard-refresh needed, and **your saved progress
+  is untouched** (it lives in `localStorage`, which caching never affects). The big vendored
+  `three.js` is the one file left cached since it never changes. (Double-clicking the local
+  file still loads normally — no busting there, since there's no cache problem locally.)
+- The editor no longer makes a **redundant commit** when nothing changed: if you Save and then
+  hit *Test* / *From Start* without further edits, it won't re-commit (it shows "already saved").
+  So one round of edits = one commit = one redeploy, not several.
+
+> So the realistic flow after a hosted edit: Save → wait ~1–2 min for the Pages build → reload
+> the page (which now auto-fetches the fresh version). The only unavoidable wait is the build.
 
 ## Game controls
 
@@ -96,6 +114,12 @@ only in that device's browser. Revoke/rotate it anytime from GitHub's token sett
 | Pause / Mute | `ESC` / `U` |
 
 The map fills in as you discover rooms. Rest at benches to record your journey.
+
+**On a touch device (iPad), on-screen controls appear automatically:** a directional pad
+on the bottom-left, an action cluster (Jump / Strike / Dash / Focus) on the bottom-right,
+and Pause + Map buttons top-right. Hold the D-pad up (▲) to interact / rest at a bench, hold
+down (▼) + Jump to drop through platforms, and cutscenes show a **Skip** button. The controls
+are hidden on desktop/keyboard. (Menus respond to taps directly.)
 
 The **title menu** has New Game, Continue, Load Save, and Exit — navigate with the
 arrows + Enter/Z, or the mouse.

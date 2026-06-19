@@ -208,19 +208,26 @@
 
 <div id="modal"><div id="modalBox"></div></div>
 
-<script src="../lib/three.min.js"></script>
-<script src="../data/levels.js"></script>
-<script src="../data/cutscenes.js"></script>
-<script src="../src/util.js"></script>
-<script src="../src/audio.js"></script>
-<script src="../src/physics.js"></script>
-<script src="../src/fx.js"></script>
-<script src="../src/world.js"></script>
-<script src="../src/map.js"></script>
-<script src="../src/player.js"></script>
-<script src="../src/enemies.js"></script>
-<script src="../src/bosses.js"></script>
-<script src="../src/cutscene.js"></script>
-<script src="editor.js"></script>
+<script>
+// Cache-buster: when served over http(s) (GitHub Pages / the local server), load editor
+// code + data FRESH every visit so new deploys and your latest committed levels show up
+// immediately. Editor settings (GitHub token, etc.) live in localStorage and are unaffected.
+(function () {
+  var bust = (location.protocol === 'file:') ? '' : '?v=' + Date.now();
+  var scripts = [
+    '../lib/three.min.js',
+    '../data/levels.js', '../data/cutscenes.js',
+    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js',
+    '../src/world.js', '../src/map.js', '../src/player.js', '../src/enemies.js',
+    '../src/bosses.js', '../src/cutscene.js', 'editor.js'
+  ];
+  scripts.forEach(function (src) {
+    var s = document.createElement('script');
+    s.src = src.indexOf('../lib/') === 0 ? src : src + bust;   // keep three.js cached
+    s.async = false;            // preserve execution order
+    document.head.appendChild(s);
+  });
+})();
+</script>
 </body>
 </html>
