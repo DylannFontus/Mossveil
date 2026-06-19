@@ -992,7 +992,15 @@ G.LEVELS = {
    }
   },
   "enemies": [],
-  "props": [],
+  "props": [
+   {
+    "type": "bossTrigger",
+    "x": 38,
+    "y": 7.5,
+    "r": 6,
+    "boss": "thornbackAlpha"
+   }
+  ],
   "transitions": [
    {
     "rect": {
