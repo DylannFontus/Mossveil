@@ -1126,6 +1126,157 @@
   $('ltabL').addEventListener('click', () => setLeftTab('L'));
   $('ltabS').addEventListener('click', () => setLeftTab('S'));
 
+  // ================= save destination: local server vs GitHub =================
+  // Local mode posts to the Node server (writes files on this PC). GitHub mode commits
+  // straight to the repo via the GitHub API — for when the editor is hosted statically
+  // (e.g. opened on an iPad). The "local editor then push" workflow is unchanged.
+  const GH_KEY = 'mossveil-gh';
+  const MODE_KEY = 'mossveil-savemode';
+  let serverPresent = false;                                   // is the local file-server here?
+  let saveModeOverride = localStorage.getItem(MODE_KEY) || 'auto';   // 'auto' | 'local' | 'github'
+  function ghConfig() {
+    let c = {};
+    try { c = JSON.parse(localStorage.getItem(GH_KEY)) || {}; } catch (_) { }
+    return Object.assign({ owner: 'DylannFontus', repo: 'Mossveil', branch: 'main', token: '' }, c);
+  }
+  function setGhConfig(c) { localStorage.setItem(GH_KEY, JSON.stringify(c)); }
+  function effectiveMode() {
+    if (saveModeOverride === 'local' || saveModeOverride === 'github') return saveModeOverride;
+    return serverPresent ? 'local' : 'github';                 // auto
+  }
+  let saveMsgTimer = null;
+  function setSaveStatus(msg, ms) {
+    const e2 = $('saveMsg'); if (!e2) return;
+    e2.textContent = msg || '';
+    if (saveMsgTimer) { clearTimeout(saveMsgTimer); saveMsgTimer = null; }
+    if (ms) saveMsgTimer = setTimeout(() => { e2.textContent = ''; }, ms);
+  }
+
+  // exact mirror of the server's data/<name>.js generator (keeps git diffs clean)
+  function jsonText(obj) { return JSON.stringify(obj, null, 1); }
+  function mirrorJs(name, global, obj) {
+    return `// generated from data/${name}.json - do not edit by hand (use the editor)\n` +
+      'window.G = window.G || {};\nG.' + global + ' = ' + jsonText(obj) + ';\n';
+  }
+
+  // ---- GitHub REST helpers (atomic commit of all four data files via the Git Data API) ----
+  async function gh(api, opts, cfg) {
+    const c = cfg || ghConfig();
+    const res = await fetch('https://api.github.com' + api, Object.assign({
+      headers: {
+        'Authorization': 'Bearer ' + c.token,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      }
+    }, opts || {}));
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status;
+      try { const j = await res.json(); if (j && j.message) msg = (j.status ? j.status + ' ' : '') + j.message; } catch (_) { }
+      throw new Error(msg);
+    }
+    return res.status === 204 ? {} : res.json();
+  }
+  async function githubCommit(files, message) {
+    const c = ghConfig();
+    if (!c.token) throw new Error('No GitHub token set — open "→ …" to configure.');
+    const base = `/repos/${c.owner}/${c.repo}`;
+    const br = encodeURIComponent(c.branch);
+    const ref = await gh(`${base}/git/ref/heads/${br}`);
+    const baseSha = ref.object.sha;
+    const baseCommit = await gh(`${base}/git/commits/${baseSha}`);
+    const tree = await gh(`${base}/git/trees`, {
+      method: 'POST',
+      body: JSON.stringify({
+        base_tree: baseCommit.tree.sha,
+        tree: files.map(f => ({ path: f.path, mode: '100644', type: 'blob', content: f.content }))
+      })
+    });
+    const commit = await gh(`${base}/git/commits`, {
+      method: 'POST',
+      body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] })
+    });
+    await gh(`${base}/git/refs/heads/${br}`, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha, force: false }) });
+    return commit.sha;
+  }
+  async function saveToGithub() {
+    const files = [
+      { path: 'data/levels.json', content: jsonText(G.LEVELS) },
+      { path: 'data/levels.js', content: mirrorJs('levels', 'LEVELS', G.LEVELS) },
+      { path: 'data/cutscenes.json', content: jsonText(G.CUTSCENES || {}) },
+      { path: 'data/cutscenes.js', content: mirrorJs('cutscenes', 'CUTSCENES', G.CUTSCENES || {}) }
+    ];
+    const n = Object.keys(G.LEVELS).length;
+    return githubCommit(files, `Edit levels & cutscenes (${n} levels) via MOSSVEIL editor`);
+  }
+
+  function refreshSaveTarget() {
+    const btn = $('btnSaveTarget'); if (!btn) return;
+    const c = ghConfig();
+    if (effectiveMode() === 'github') {
+      btn.textContent = '→ GitHub';
+      btn.classList.toggle('warn', !c.token);
+      btn.title = c.token
+        ? `Save commits to ${c.owner}/${c.repo} @ ${c.branch}`
+        : 'Save will commit to GitHub — no token set yet, click to configure';
+    } else {
+      btn.textContent = '→ local';
+      btn.classList.remove('warn');
+      btn.title = 'Save writes to your local project files (push to GitHub yourself)';
+    }
+  }
+  function saveTargetModal() {
+    const box = $('modalBox'); box.innerHTML = '';
+    el('h3', {}, box, 'Save destination');
+    el('div', { class: 'insNote' }, box, serverPresent
+      ? 'A local editor server is running, so "Auto" saves to the project files on this PC.'
+      : 'No local server detected, so "Auto" commits straight to GitHub.');
+    const r0 = el('div', { class: 'frow' }, box);
+    el('label', {}, r0, 'When I Save');
+    const modeSel = el('select', {}, r0);
+    [['auto', 'Auto (detect)'], ['local', 'Local files (server)'], ['github', 'GitHub commit']].forEach(([v, t]) => {
+      const o = el('option', { value: v }, modeSel, t); if (v === saveModeOverride) o.selected = true;
+    });
+    el('div', { class: 'insNote', style: 'margin-top:10px;font-weight:600;color:var(--txt)' }, box, 'GitHub (for hosted / iPad use)');
+    const c = ghConfig();
+    const f = {};
+    const mkRow = (label, type, val, ph) => {
+      const r = el('div', { class: 'frow' }, box);
+      el('label', {}, r, label);
+      const inp = el('input', { type, placeholder: ph || '' }, r); inp.value = val || '';
+      return inp;
+    };
+    f.owner = mkRow('Owner', 'text', c.owner, 'github username');
+    f.repo = mkRow('Repo', 'text', c.repo, 'Mossveil');
+    f.branch = mkRow('Branch', 'text', c.branch, 'main');
+    f.token = mkRow('Token', 'password', c.token, 'fine-grained PAT · Contents: read/write');
+    el('div', { class: 'insNote' }, box, 'The token is stored only in this browser on this device. Use a fine-grained token scoped to just this repo with Contents read/write.');
+    const status = el('div', { class: 'insNote', style: 'min-height:16px' }, box);
+    const read = () => ({ owner: f.owner.value.trim(), repo: f.repo.value.trim(), branch: f.branch.value.trim() || 'main', token: f.token.value.trim() });
+    const btns = el('div', { id: 'modalBtns' }, box);
+    el('button', {
+      class: 'tbtn', onclick: async () => {
+        const tmp = read(); status.textContent = 'Testing…';
+        try {
+          const repo = await gh(`/repos/${tmp.owner}/${tmp.repo}`, {}, tmp);
+          status.textContent = (repo.permissions && repo.permissions.push)
+            ? '✓ Connected — write access OK.'
+            : '⚠ Connected, but this token may lack write access.';
+        } catch (e) { status.textContent = '✗ ' + e.message; }
+      }
+    }, btns, 'Test connection');
+    el('button', { class: 'tbtn', onclick: () => { $('modal').style.display = 'none'; } }, btns, 'Cancel');
+    el('button', {
+      class: 'tbtn play', onclick: () => {
+        saveModeOverride = modeSel.value; localStorage.setItem(MODE_KEY, saveModeOverride);
+        setGhConfig(read());
+        $('modal').style.display = 'none';
+        refreshSaveTarget();
+      }
+    }, btns, 'Save settings');
+    $('modal').style.display = 'flex';
+  }
+
   async function postData(api, obj) {
     const res = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
     const j = await res.json().catch(() => ({ ok: false }));
@@ -1133,22 +1284,37 @@
     return j.ok;
   }
   async function save() {
+    if (effectiveMode() === 'github') {
+      try {
+        setSaveStatus('committing to GitHub…');
+        await saveToGithub();
+        dirty = false; csDirty = false; $('dirty').style.display = 'none';
+        setSaveStatus('saved to GitHub ✓', 3000);
+        return true;
+      } catch (e) {
+        setSaveStatus('');
+        alert('GitHub save failed: ' + e.message + '\n\nCheck the token / repo / branch under "→ …".');
+        return false;
+      }
+    }
     const a = await postData('/api/levels', G.LEVELS);
     const b = await postData('/api/cutscenes', G.CUTSCENES || {});
     if (a && b) { dirty = false; csDirty = false; $('dirty').style.display = 'none'; }
     return a && b;
   }
   $('btnSave').addEventListener('click', save);
+  $('btnSaveTarget').addEventListener('click', saveTargetModal);
   $('btnTest').addEventListener('click', async () => {
     if (await save()) {
-      if (csMode && csCurrent) { window.open(`/index.html?cutscene=${csCurrent}`, 'mossveil-test'); return; }
+      // relative path (../index.html) so it works under a hosting subpath too (e.g. GitHub Pages /<repo>/)
+      if (csMode && csCurrent) { window.open(`../index.html?cutscene=${csCurrent}`, 'mossveil-test'); return; }
       const L = lvl();
       const sp = L.spawns && (L.spawns.P ? 'P' : Object.keys(L.spawns)[0]);
-      window.open(`/index.html?level=${currentId}${sp ? '&spawn=' + sp : ''}`, 'mossveil-test');
+      window.open(`../index.html?level=${currentId}${sp ? '&spawn=' + sp : ''}`, 'mossveil-test');
     }
   });
   $('btnTestStart').addEventListener('click', async () => {
-    if (await save()) window.open('/index.html', 'mossveil-test');
+    if (await save()) window.open('../index.html', 'mossveil-test');
   });
 
   // ---------------- keyboard ----------------
@@ -1214,6 +1380,12 @@
 
   // ---------------- boot ----------------
   async function boot() {
+    // detect the local file-saving server (absent when hosted statically)
+    try {
+      const p = await fetch('/api/ping', { cache: 'no-store' });
+      const j = p.ok ? await p.json() : null;
+      serverPresent = !!(j && j.app === 'mossveil-editor');
+    } catch (_) { serverPresent = false; }
     try {
       const res = await fetch('/api/levels');
       if (res.ok) G.LEVELS = await res.json();
@@ -1226,6 +1398,7 @@
     csCurrent = Object.keys(G.CUTSCENES)[0] || null;
     resize();
     refreshToolbar();
+    refreshSaveTarget();
     refreshAssets();
     refreshLevels();
     setTab('scene');

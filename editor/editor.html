@@ -38,8 +38,10 @@
   .tbtn.on { background:var(--acc); color:#0c1014; border-color:var(--acc); }
   .tbtn.play { background:#2f7d4f; border-color:#2f7d4f; color:#eafff0; font-weight:600; }
   .tbtn.play:hover { background:#379159; }
+  .tbtn.warn { border-color:var(--warn); color:var(--warn); }
   .tsep { width:1px; height:22px; background:#46464e; margin:0 4px; }
   #dirty { color:var(--warn); display:none; margin-left:4px; }
+  #saveMsg { color:#7fd6a0; margin-left:4px; font-size:11px; }
 
   /* left panel */
   #left { grid-area:left; background:var(--bg1); border-right:1px solid var(--line);
@@ -162,9 +164,11 @@
     <button class="tbtn" id="btnRedo" title="Redo (Ctrl+Y)">↪</button>
     <span class="tsep"></span>
     <button class="tbtn" id="btnSave" title="Save all levels (Ctrl+S)">💾 Save</button>
+    <button class="tbtn" id="btnSaveTarget" title="Choose where Save writes: local files or GitHub">→ …</button>
     <button class="tbtn play" id="btnTest" title="Save & play this level">▶ Test Level</button>
     <button class="tbtn" id="btnTestStart" title="Save & play from the title screen">▶ From Start</button>
     <span id="dirty">● unsaved</span>
+    <span id="saveMsg"></span>
   </div>
 
   <div id="left">

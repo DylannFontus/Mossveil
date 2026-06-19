@@ -52,6 +52,12 @@ function saveCutscenes(cs) { saveData('cutscenes', 'CUTSCENES', cs); }
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
+  // lets the editor detect that the local file-saving server is present
+  if (url.pathname === '/api/ping') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end('{"ok":true,"app":"mossveil-editor"}');
+    return;
+  }
   if (url.pathname === '/api/levels' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(fs.readFileSync(path.join(ROOT, 'data', 'levels.json')));

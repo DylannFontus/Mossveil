@@ -38,6 +38,49 @@ files (the device is just the screen + touch input).
   checked for Private. Both devices must be on the same network, and "client isolation"/
   guest Wi-Fi must be off.)
 
+### Edit from anywhere — host the editor online (no PC needed)
+
+The editor can also run as a **static site** (GitHub Pages / Cloudflare Pages / Netlify —
+all free, permanent HTTPS), so you can open it from any device, anywhere, with your PC off.
+There's no server in that case, so **Save commits straight to your GitHub repo** instead of
+writing local files.
+
+**The editor auto-detects where to save:**
+
+| You open it via… | "Save" does… |
+|---|---|
+| `MOSSVEIL Editor.cmd` / `localhost` / your Wi-Fi IP | writes to local project files (then you `git push`) — unchanged |
+| the hosted static URL (no local server) | commits `data/levels.*` + `data/cutscenes.*` to GitHub in one commit |
+
+You can also force a mode with the **`→ …`** button in the toolbar (Auto / Local / GitHub).
+
+**One-time setup to host it:**
+
+1. Push this repo to GitHub (already done if you followed the steps above).
+2. Turn on a static host pointed at the repo's production branch (`main`):
+   - **GitHub Pages:** repo *Settings → Pages →* Deploy from branch → `main` / root. Your
+     URLs become `https://<user>.github.io/<repo>/editor/editor.html` (and `/index.html`
+     for the game). A `.nojekyll` file is included so every folder serves as-is.
+   - **Cloudflare Pages / Netlify:** "Add project → connect repo", no build command, output
+     directory = repo root. You get `https://<name>.pages.dev/…` (or `.netlify.app`).
+   - Either way, **every push to `main` auto-redeploys** the site.
+3. On the device, open the hosted `…/editor/editor.html`, click **`→ …`**, and enter your
+   **owner / repo / branch** and a **GitHub token**. Use **Test connection** to confirm.
+
+**The token** is a *fine-grained* [Personal Access Token](https://github.com/settings/personal-access-tokens/new)
+scoped to **only this repo** with **Contents: Read and write** (nothing else). It's stored
+only in that device's browser. Revoke/rotate it anytime from GitHub's token settings.
+
+**Workflow notes (so local + hosted stay in sync):**
+
+- A hosted Save lands as a commit on GitHub. To see those edits on your PC, run **`git pull`**
+  (it doesn't sync automatically). Setting `git.autofetch` in VS Code flags when you're behind.
+- Genuine merge conflicts are unlikely: the editor only ever writes the four `data/` files,
+  while code/features touch `src/`, `editor/`, etc. — different files merge cleanly. Just
+  avoid editing the **same** level data both locally and online without pulling in between.
+- After a hosted Save, the *deployed* game (the `▶ Test` buttons) reflects the change once the
+  host finishes its redeploy (seconds).
+
 ## Game controls
 
 | Action | Keys |
