@@ -269,10 +269,40 @@
   let panning = false, painting = false, dragging = null;
   let lastMouse = { x: 0, y: 0 };
 
-  $('viewportWrap').addEventListener('contextmenu', e => e.preventDefault());
-  $('viewportWrap').addEventListener('mousedown', e => {
+  // ---- viewport input: Pointer Events unify mouse, touch and Apple Pencil ----
+  // one finger / pen / left-click = act (place·select·drag·paint); two fingers = pan + pinch-zoom
+  const vpEl = $('viewportWrap');
+  const pointers = new Map();   // pointerId -> { x, y }
+  let pinch = null;             // { dist, cx, cy } sampled during a 2-finger gesture
+  let gesturing = false;        // true while a 2-finger pan/zoom is in progress
+
+  function pinchSample() {
+    const p = [...pointers.values()];
+    const dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+    return { dist: Math.hypot(dx, dy) || 1, cx: (p[0].x + p[1].x) / 2, cy: (p[0].y + p[1].y) / 2 };
+  }
+  function abortSingle() {           // drop any in-progress single-pointer action
+    dragging = null; painting = false; panning = false; mapDrag = null;
+  }
+
+  vpEl.addEventListener('contextmenu', e => e.preventDefault());
+  vpEl.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button > 2) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { vpEl.setPointerCapture(e.pointerId); } catch (_) { }
+
+    // a second touch/pen contact starts a pan/zoom gesture
+    if (pointers.size === 2 && e.pointerType !== 'mouse') {
+      abortSingle(); gesturing = true; pinch = pinchSample(); return;
+    }
+    if (pointers.size > 1) return;       // ignore extra fingers
+    if (gesturing) return;
+
     if (tab === 'map') return mapMouseDown(e);
-    if (e.button === 1 || e.button === 2) { panning = true; lastMouse = { x: e.clientX, y: e.clientY }; return; }
+    // mouse middle/right button pans
+    if (e.pointerType === 'mouse' && (e.button === 1 || e.button === 2)) {
+      panning = true; lastMouse = { x: e.clientX, y: e.clientY }; return;
+    }
     const w = mouseWorld(e);
     if (placing) { placeAsset(w.x, w.y); return; }
     if (tool === 'select') {
@@ -289,17 +319,19 @@
       paintAt(w);
     }
   });
-  addEventListener('mousemove', e => {
-    if (tab === 'map') return mapMouseMove(e);
+  addEventListener('pointermove', e => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gesturing && pointers.size >= 2) { updateGesture(); return; }
+    if (tab === 'map') { if (mapDrag) mapMouseMove(e); return; }
     if (panning) {
-      const r = $('viewportWrap').getBoundingClientRect();
+      const r = vpEl.getBoundingClientRect();
       const worldPerPx = (2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * camZ) / r.height;
       camX -= (e.clientX - lastMouse.x) * worldPerPx;
       camY += (e.clientY - lastMouse.y) * worldPerPx;
       lastMouse = { x: e.clientX, y: e.clientY };
       return;
     }
-    const overViewport = e.target === glCanvas || e.target === overlay || e.target === $('viewportWrap');
+    const overViewport = e.target === glCanvas || e.target === overlay || e.target === vpEl;
     if (!overViewport && !dragging && !painting) return;
     const w = mouseWorld(e);
     const t = worldToTile(w.x, w.y);
@@ -315,11 +347,34 @@
       }
     } else if (painting) paintAt(w);
   });
-  addEventListener('mouseup', () => {
-    panning = false;
-    if (dragging || painting) { dragging = null; painting = false; needsRebuild = true; }
-    mapDrag = null;
-  });
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    try { vpEl.releasePointerCapture(e.pointerId); } catch (_) { }
+    if (pointers.size < 2) { pinch = null; gesturing = false; }
+    if (pointers.size === 0) {
+      panning = false;
+      if (dragging || painting) { dragging = null; painting = false; needsRebuild = true; }
+      mapDrag = null;
+    }
+  }
+  addEventListener('pointerup', endPointer);
+  addEventListener('pointercancel', endPointer);
+
+  function updateGesture() {
+    const now = pinchSample();
+    const r = vpEl.getBoundingClientRect();
+    if (tab === 'map') {
+      mapView.pan.x -= (now.cx - pinch.cx) / mapView.zoom;
+      mapView.pan.y -= (now.cy - pinch.cy) / mapView.zoom;
+      mapView.zoom = U.clamp(mapView.zoom * (now.dist / pinch.dist), 0.4, 12);
+    } else {
+      const worldPerPx = (2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * camZ) / r.height;
+      camX -= (now.cx - pinch.cx) * worldPerPx;
+      camY += (now.cy - pinch.cy) * worldPerPx;
+      camZ = U.clamp(camZ * (pinch.dist / now.dist), 8, 110);
+    }
+    pinch = now;
+  }
   $('viewportWrap').addEventListener('wheel', e => {
     e.preventDefault();
     if (tab === 'map') {
@@ -823,16 +878,23 @@
   // ---------------- map tab ----------------
   const mapView = { pan: { x: 200, y: 10 }, zoom: 2.2 };
   let mapDrag = null;
+  let lastMapTap = { t: 0, x: 0, y: 0 };
   function mapMouseDown(e) {
     const r = $('viewportWrap').getBoundingClientRect();
     const px = e.clientX - r.left, py = e.clientY - r.top;
     const view = { w: r.width, h: r.height, pan: mapView.pan, zoom: mapView.zoom };
     const hit = G.MapView.roomAt(px, py, view);
-    if (e.button === 0 && hit) {
+    const primary = e.pointerType === 'mouse' ? e.button === 0 : true;
+    if (primary && hit) {
+      // open on double-click (mouse) or double-tap (touch/pen) within ~350ms
+      const now = performance.now();
+      const dbl = (e.pointerType === 'mouse' && e.detail === 2) ||
+        (now - lastMapTap.t < 350 && Math.abs(px - lastMapTap.x) < 24 && Math.abs(py - lastMapTap.y) < 24);
+      lastMapTap = { t: now, x: px, y: py };
+      if (dbl) { openLevel(hit); setTab('scene'); return; }
       pushUndo();
       const L = G.LEVELS[hit];
       mapDrag = { id: hit, sx: px, sy: py, mx: L.mapPos.mx, my: L.mapPos.my };
-      if (e.detail === 2) { openLevel(hit); setTab('scene'); }
     } else {
       mapDrag = { pan: true, sx: px, sy: py, px: mapView.pan.x, py: mapView.pan.y };
     }

@@ -3,9 +3,23 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = 7707;
+const HOST = '0.0.0.0';   // listen on every interface so other Wi-Fi devices can reach it
+
+// all non-internal IPv4 addresses (the ones an iPad/phone on the same Wi-Fi would use)
+function lanAddresses() {
+  const out = [];
+  const ifaces = os.networkInterfaces();
+  for (const name in ifaces) {
+    for (const ni of ifaces[name] || []) {
+      if (ni.family === 'IPv4' && !ni.internal) out.push(ni.address);
+    }
+  }
+  return out;
+}
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -79,9 +93,44 @@ const server = http.createServer((req, res) => {
   res.end(fs.readFileSync(file));
 });
 
-server.listen(PORT, () => {
-  console.log('MOSSVEIL Editor running.');
-  console.log(`  Editor:  http://localhost:${PORT}/editor/editor.html`);
-  console.log(`  Game:    http://localhost:${PORT}/index.html`);
-  console.log('Close this window to stop.');
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    console.log('========================================================');
+    console.log(`  The MOSSVEIL Editor is ALREADY running on port ${PORT}.`);
+    console.log('  No need to start it again — just open:');
+    console.log(`    http://localhost:${PORT}/editor/editor.html`);
+    console.log('');
+    console.log('  (If you think it is stuck, close every "MOSSVEIL Editor');
+    console.log('   Server" window, then launch again.)');
+    console.log('========================================================');
+    process.exitCode = 0;          // a clean, expected exit — not a crash
+    return;
+  }
+  console.error('Editor server error:', err);
+  process.exitCode = 1;
+});
+
+server.listen(PORT, HOST, () => {
+  console.log('========================================================');
+  console.log('  MOSSVEIL Editor is running.');
+  console.log('--------------------------------------------------------');
+  console.log('  On THIS computer:');
+  console.log(`    Editor : http://localhost:${PORT}/editor/editor.html`);
+  console.log(`    Game   : http://localhost:${PORT}/index.html`);
+  const ips = lanAddresses();
+  if (ips.length) {
+    console.log('');
+    console.log('  On your iPad / phone / other device (same Wi-Fi):');
+    for (const ip of ips) console.log(`    http://${ip}:${PORT}/editor/editor.html`);
+    console.log('');
+    console.log('  If a device cannot connect the first time, allow Node.js');
+    console.log('  through the Windows Firewall on PRIVATE networks (a prompt');
+    console.log('  usually appears on first run). See README for details.');
+  } else {
+    console.log('  (No Wi-Fi/LAN address detected — connect to a network to');
+    console.log('   reach the editor from other devices.)');
+  }
+  console.log('--------------------------------------------------------');
+  console.log('  Close this window to stop the server.');
+  console.log('========================================================');
 });

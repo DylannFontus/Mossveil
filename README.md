@@ -14,6 +14,30 @@ original and generated procedurally in code. No image or audio files exist in th
 [Node.js](https://nodejs.org), which you already have if you can run `node`) and opens
 the editor in your browser. Close the server's console window to stop it.
 
+### Edit from your iPad (or any device on the same Wi-Fi)
+
+The server listens on your whole network, so you can run the editor on the PC and
+**work from an iPad, phone or laptop** on the same Wi-Fi. When it starts, the console
+window prints the address to open, e.g.:
+
+```
+On your iPad / phone / other device (same Wi-Fi):
+  http://192.168.x.x:7707/editor/editor.html
+```
+
+Type that into Safari/Chrome on the other device. Saves still write to the PC's project
+files (the device is just the screen + touch input).
+
+- **The editor is fully touch-friendly.** One finger places / selects / drags / paints;
+  **two fingers pan and pinch-zoom** the viewport; double-tap a room on the Map tab to open
+  it. Buttons and fields are enlarged for touch, and an Apple Pencil works too.
+- **First-time connection:** if the iPad can't reach it, Windows Firewall is blocking
+  Node. Allow it once — when you first run the server Windows usually pops a *"Allow access"*
+  prompt; tick **Private networks** and accept. (If you dismissed it: Windows Security →
+  Firewall & network protection → *Allow an app through firewall* → ensure **Node.js** is
+  checked for Private. Both devices must be on the same network, and "client isolation"/
+  guest Wi-Fi must be off.)
+
 ## Game controls
 
 | Action | Keys |
