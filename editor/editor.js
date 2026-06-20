@@ -409,6 +409,10 @@
   vpEl.addEventListener('contextmenu', e => e.preventDefault());
   vpEl.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button > 2) return;
+    // The cutscene tab (timeline DOM + preview bar) handles its own input. Bail out
+    // BEFORE capturing the pointer — otherwise vpEl steals pointerup and clicks on the
+    // timeline's buttons (Preview, Add event…) never fire.
+    if (tab === 'cutscene') return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { vpEl.setPointerCapture(e.pointerId); } catch (_) { }
 
@@ -419,7 +423,6 @@
     if (pointers.size > 1) return;       // ignore extra fingers
     if (gesturing) return;
 
-    if (tab === 'cutscene') return;          // the cutscene timeline handles its own input
     if (tab === 'map') return mapMouseDown(e);
     // mouse middle/right button pans
     if (e.pointerType === 'mouse' && (e.button === 1 || e.button === 2)) {
