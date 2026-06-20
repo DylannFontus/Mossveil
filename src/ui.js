@@ -568,34 +568,198 @@
     cx.textAlign = 'center'; cx.fillStyle = '#eaf2ee'; cx.shadowColor = glow || 'rgba(160,240,200,0.4)'; cx.shadowBlur = 16;
     cx.font = `40px ${serif}`; cx.fillText(t, w / 2, y); cx.shadowBlur = 0;
   }
-  function drawPause() {
-    menuBackdrop();
-    const pulse = 0.5 + Math.sin(G.time * 1.5) * 0.5;
-    cx.textAlign = 'center';
-    cx.fillStyle = '#eaf2ee';
-    cx.shadowColor = 'rgba(160,240,200,0.4)'; cx.shadowBlur = 18;
-    cx.font = `52px ${serif}`;
-    cx.fillText('P A U S E D', w / 2, h * 0.28);
-    cx.shadowBlur = 0;
+  // ============ pause menu — Persona-3-Reload inspired, with a bat sweep ============
+  let pmOpen = 0, pmClosing = 0, pmSel = 0, pmTime = 0, pmAcc = '#6cf2b0';
+  const swp = { on: false, t: 0, dir: 1, bats: [] };
+  // The bat sweep has three beats (seconds): the swarm COVERs the screen, HOLDs it
+  // fully black while the menu swaps in/out behind it, then REVEALs the result.
+  const SWP_COVER = 0.32, SWP_HOLD = 0.40, SWP_REVEAL = 0.36;
+  const SWP_TOTAL = SWP_COVER + SWP_HOLD + SWP_REVEAL;   // ~1.08s
+  const menuFont = '"Arial Black", "Arial Bold", Impact, sans-serif';
+  // the pause menu's accent follows the biome the player is in
+  function biomeAccent() {
+    const gl = G.room && G.room.pal && G.room.pal.glow;
+    return gl ? '#' + gl.toString(16).padStart(6, '0') : '#6cf2b0';
+  }
+
+  UI.openPause = () => { pmOpen = 0; pmClosing = 0; pmSel = G.Main.pauseIndex || 0; pmAcc = biomeAccent(); startSweep(1); G.Audio.sfx('uiBell'); };
+  UI.closePause = () => { pmClosing = SWP_TOTAL + 0.05; startSweep(-1); };
+
+  function startSweep(dir) {
+    // dir > 0 = opening (bats sweep UP), dir < 0 = closing (bats sweep DOWN)
+    swp.on = true; swp.t = 0; swp.dir = dir; swp.bats = [];
+    for (let i = 0; i < 170; i++) {
+      const sp = U.rand(0.9, 2.3);
+      swp.bats.push({
+        px: U.rand(-0.06, 1.06),
+        // bias the swarm toward the edge it enters from so it reads as a wave
+        py: dir > 0 ? U.rand(0.35, 1.55) : U.rand(-0.55, 0.65),
+        vx: U.rand(-0.4, 0.4) * sp,
+        vy: (dir > 0 ? -1 : 1) * sp * U.rand(0.95, 1.7),
+        s: U.rand(0.8, 2.7), flap: U.rand(0, 6.28), flapSp: U.rand(14, 24), delay: U.rand(0, 0.12)
+      });
+    }
+  }
+  function drawBat(ctx, x, y, s, flap, alpha) {
+    if (alpha <= 0.01) return;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha = alpha;
+    const f = Math.sin(flap);
+    ctx.fillStyle = '#060a08';
+    ctx.shadowColor = pmAcc; ctx.shadowBlur = 7;
+    ctx.beginPath();
+    ctx.moveTo(0, -2);
+    ctx.bezierCurveTo(5, -6 - f * 5, 12, -3, 20, -7 - f * 7);
+    ctx.bezierCurveTo(16, 0, 11, 3, 4, 4);
+    ctx.bezierCurveTo(2, 7, -2, 7, -4, 4);
+    ctx.bezierCurveTo(-11, 3, -16, 0, -20, -7 - f * 7);
+    ctx.bezierCurveTo(-12, -3, -5, -6 - f * 5, 0, -2);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function updateSweep(dt) {
+    if (!swp.on) return;
+    swp.t += dt;
+    if (swp.t >= SWP_TOTAL) { swp.on = false; return; }
+    for (const b of swp.bats) { if (swp.t < b.delay) continue; b.px += b.vx * dt * 0.6; b.py += b.vy * dt * 0.6; b.flap += dt * b.flapSp; }
+  }
+  // 0 → 0.5 as the curtain slides on, held at 0.5 (fully covering) through the hold, 0.5 → 1 as it slides off
+  function sweepTravel(t) {
+    const ez = x => x * x * (3 - 2 * x);   // smoothstep
+    if (t < SWP_COVER) return 0.5 * ez(t / SWP_COVER);
+    if (t < SWP_COVER + SWP_HOLD) return 0.5;
+    return 0.5 + 0.5 * ez(U.clamp((t - SWP_COVER - SWP_HOLD) / SWP_REVEAL, 0, 1));
+  }
+  // true once the swarm has the screen fully blacked out (cover done) — the cue to swap the menu
+  function sweepCovered() { return swp.on && swp.t >= SWP_COVER; }
+  function drawSweep(ctx) {
+    if (!swp.on) return;
+    const sc = (w / 1280) * 2.2;
+    // A dark curtain rides with the swarm: it slides on to fully black out the screen,
+    // HOLDS there while the menu swaps behind it, then slides off to reveal the result —
+    // so the game<->pause transition underneath is never visible. The band is taller than
+    // the screen and travels up on open / down on close.
+    const Hb = 1.8;
+    const travel = sweepTravel(swp.t);
+    const bt = U.lerp(swp.dir > 0 ? 1.0 : -1.8, swp.dir > 0 ? -1.8 : 1.0, travel);
+    const y0 = bt * h, y1 = (bt + Hb) * h;
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, 'rgba(3,6,5,0)');
+    g.addColorStop(0.14, 'rgba(3,6,5,1)');
+    g.addColorStop(0.86, 'rgba(3,6,5,1)');
+    g.addColorStop(1, 'rgba(3,6,5,0)');
+    ctx.save();
+    ctx.fillStyle = g;
+    ctx.fillRect(0, Math.min(y0, y1), w, Math.abs(y1 - y0));
+    ctx.restore();
+    // bats fade in over the cover, stay through the hold, fade out over the reveal
+    const fade = swp.t < SWP_COVER ? U.clamp(swp.t / (SWP_COVER * 0.6), 0, 1)
+      : swp.t > SWP_COVER + SWP_HOLD ? U.clamp(1 - (swp.t - SWP_COVER - SWP_HOLD) / SWP_REVEAL, 0, 1)
+        : 1;
+    for (const b of swp.bats) {
+      if (swp.t < b.delay) continue;
+      const fin = swp.dir > 0 ? U.clamp((swp.t - b.delay) / 0.12, 0, 1) : 1;
+      drawBat(ctx, b.px * w, b.py * h, b.s * sc, b.flap, 0.96 * fade * fin);
+    }
+  }
+  function drawWanderer(ctx, x, y, s, alpha) {
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#0b171b';
+    ctx.beginPath();
+    ctx.moveTo(0, -175); ctx.bezierCurveTo(-122, -118, -150, 70, -108, 235);
+    ctx.lineTo(108, 235); ctx.bezierCurveTo(150, 70, 122, -118, 0, -175); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#16282f';
+    ctx.beginPath();
+    ctx.moveTo(0, -148); ctx.bezierCurveTo(-72, -100, -92, 70, -62, 224);
+    ctx.lineTo(62, 224); ctx.bezierCurveTo(92, 70, 72, -100, 0, -148); ctx.closePath(); ctx.fill();
+    // horns
+    ctx.fillStyle = '#e9e4d4';
+    ctx.beginPath(); ctx.moveTo(-24, -120); ctx.bezierCurveTo(-72, -150, -104, -214, -82, -150); ctx.bezierCurveTo(-62, -118, -42, -110, -24, -116); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(24, -120); ctx.bezierCurveTo(72, -150, 104, -214, 82, -150); ctx.bezierCurveTo(62, -118, 42, -110, 24, -116); ctx.closePath(); ctx.fill();
+    // mask
+    ctx.shadowColor = 'rgba(120,255,190,0.4)'; ctx.shadowBlur = 26;
+    ctx.beginPath();
+    ctx.moveTo(0, -132); ctx.bezierCurveTo(-58, -126, -64, -58, -34, -34);
+    ctx.bezierCurveTo(-14, -20, 14, -20, 34, -34); ctx.bezierCurveTo(64, -58, 58, -126, 0, -132); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#17110b';
+    ctx.beginPath(); ctx.ellipse(-20, -72, 9, 17, 0, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(20, -72, 9, 17, 0, 0, 6.28); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPause(open) {
     const items = G.Main.pauseItems || [];
-    const bw = 300, bh = 48, gap = 12, x0 = w / 2 - bw / 2, y0 = h * 0.4;
+    if (G.Main.state === 'pause') pmAcc = biomeAccent();
+    cx.save();
+    // background
+    cx.globalAlpha = U.clamp(open, 0, 1);
+    const g = cx.createLinearGradient(0, 0, w * 0.7, h);
+    g.addColorStop(0, 'rgba(5,18,15,0.97)'); g.addColorStop(1, 'rgba(2,7,9,0.98)');
+    cx.fillStyle = g; cx.fillRect(0, 0, w, h);
+    cx.globalAlpha = open * 0.08;
+    cx.fillStyle = pmAcc;
+    cx.beginPath(); cx.moveTo(w * 0.52, 0); cx.lineTo(w * 0.66, 0); cx.lineTo(w * 0.44, h); cx.lineTo(w * 0.3, h); cx.closePath(); cx.fill();
+    cx.restore();
+    // drifting ambient bats
+    for (let i = 0; i < 7; i++) {
+      const ph = pmTime * 0.16 + i * 1.7;
+      drawBat(cx, ((Math.sin(ph) * 0.5 + 0.5) * 0.9 + 0.05) * w, (((i * 0.137 + pmTime * 0.025) % 1)) * h, 0.5 + (i % 3) * 0.22, pmTime * 7 + i, open * 0.16);
+    }
+    // vertical decorative title
+    cx.save(); cx.globalAlpha = open * 0.09; cx.translate(w * 0.045, h * 0.5); cx.rotate(-Math.PI / 2);
+    cx.textAlign = 'center'; cx.fillStyle = '#cfeede'; cx.font = `900 ${Math.round(h * 0.15)}px ${menuFont}`;
+    cx.fillText('MOSSVEIL', 0, 0); cx.restore();
+    // wanderer art
+    drawWanderer(cx, w * 0.3, h * 0.62, (h / 720) * 0.8, open * 0.92);
+    // info box (Glimmer)
+    cx.save(); cx.globalAlpha = open;
+    const bx = 36, by = 34;
+    roundRect(bx, by, 178, 44, 4);
+    cx.fillStyle = 'rgba(8,16,13,0.85)'; cx.fill();
+    cx.strokeStyle = pmAcc; cx.lineWidth = 1.5; cx.stroke();
+    cx.textAlign = 'left'; cx.textBaseline = 'middle';
+    cx.fillStyle = '#ffe28a'; cx.font = `bold 19px ${serif}`;
+    cx.fillText('◇ ' + (G.Main.glimmer ? G.Main.glimmer() : 0), bx + 14, by + 15);
+    cx.fillStyle = 'rgba(190,210,200,0.7)'; cx.font = `10px ${serif}`;
+    cx.fillText('GLIMMER', bx + 15, by + 32);
+    cx.restore();
+    // diagonal italic menu list with slash highlight
     G.UI.pauseButtons = [];
-    items.forEach((it, i) => {
-      const y = y0 + i * (bh + gap);
-      const sel = i === G.Main.pauseIndex;
-      roundRect(x0, y, bw, bh, 9);
-      cx.fillStyle = sel ? 'rgba(38,72,54,0.92)' : 'rgba(18,28,24,0.7)'; cx.fill();
-      cx.lineWidth = sel ? 2.2 : 1;
-      cx.strokeStyle = sel ? `rgba(180,240,200,${0.7 + pulse * 0.3})` : 'rgba(120,150,135,0.45)'; cx.stroke();
-      cx.fillStyle = sel ? '#eafff0' : '#c6d4cc';
-      cx.font = `${sel ? 23 : 21}px ${serif}`; cx.textBaseline = 'middle';
-      cx.fillText(it, w / 2, y + bh / 2 + 1);
-      if (sel) { cx.fillStyle = 'rgba(180,240,200,0.9)'; cx.fillText('‹', x0 + 22, y + bh / 2 + 1); cx.fillText('›', x0 + bw - 22, y + bh / 2 + 1); }
-      G.UI.pauseButtons.push({ x: x0, y, w: bw, h: bh, index: i });
-    });
-    cx.textBaseline = 'alphabetic';
-    cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)';
-    cx.fillText('↑ ↓ select · Enter / Z choose · ESC resume', w / 2, h - 26);
+    const ang = -0.05, lx = w * 0.56, ly = h * 0.3, step = h * 0.082, fs = Math.round(h * 0.05);
+    const cos = Math.cos(ang), sin = Math.sin(ang);
+    cx.save(); cx.translate(lx, ly); cx.rotate(ang);
+    cx.font = `900 ${fs}px ${menuFont}`; cx.textAlign = 'left'; cx.textBaseline = 'middle';
+    for (let i = 0; i < items.length; i++) {
+      const ip = U.clamp((open - i * 0.05) / 0.4, 0, 1);
+      const e = U.ease.outCubic(ip);
+      const sel = U.clamp(1 - Math.abs(pmSel - i), 0, 1);
+      const yy = i * step, xx = -sel * 34 + (1 - e) * 90;
+      const label = items[i].replace(' to Title', '').toUpperCase();
+      if (sel > 0.02) {
+        const sw = fs * 6.6, sh = fs * 1.12;
+        cx.save(); cx.globalAlpha = e * sel; cx.fillStyle = pmAcc;
+        cx.beginPath();
+        cx.moveTo(xx - 16, yy - sh * 0.5); cx.lineTo(xx + sw, yy - sh * 0.55);
+        cx.lineTo(xx + sw + sh * 0.7, yy + sh * 0.5); cx.lineTo(xx - 16 + sh * 0.35, yy + sh * 0.5);
+        cx.closePath(); cx.fill(); cx.restore();
+      }
+      cx.globalAlpha = e;
+      if (sel <= 0.5) { cx.lineWidth = 1; cx.strokeStyle = 'rgba(120,180,160,0.28)'; cx.strokeText(label, xx + 6, yy); }
+      cx.fillStyle = sel > 0.5 ? '#06120e' : 'rgba(202,226,216,0.9)';
+      cx.fillText(label, xx + 6, yy);
+      const scx = lx + xx * cos - yy * sin, scy = ly + xx * sin + yy * cos;
+      G.UI.pauseButtons.push({ x: scx - 8, y: scy - fs * 0.7, w: fs * 8, h: fs * 1.4, index: i });
+    }
+    cx.restore();
+    // description + prompts
+    cx.save(); cx.globalAlpha = open; cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    const desc = (G.Main.pauseDescs && G.Main.pauseDescs[items[Math.round(U.clamp(pmSel, 0, items.length - 1))]]) || '';
+    cx.fillStyle = 'rgba(222,236,229,0.92)'; cx.font = `italic 16px ${serif}`;
+    cx.fillText(desc, w - 32, h - 56);
+    cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  select        Enter  confirm        Esc  resume', w - 32, h - 32);
     cx.restore();
   }
 
@@ -784,7 +948,23 @@
 
     if (st === 'title') drawTitleScreen();
     if (st === 'slots') { drawSlots(); drawToasts(dt); }
-    if (st === 'pause') drawPause();
+    // pause menu: the bats COVER the screen first, then the menu opens/closes behind
+    // the blackout, so you never see the raw transition (P3R-style).
+    pmTime += dt; updateSweep(dt);
+    if (st === 'pause') {
+      pmSel = U.damp(pmSel, G.Main.pauseIndex, 16, dt);
+      // hold the menu hidden until the swarm has covered the screen, then reveal it
+      const target = (swp.on && swp.dir > 0 && !sweepCovered()) ? 0 : 1;
+      pmOpen = U.damp(pmOpen, target, 14, dt);
+      pmClosing = 0;
+      drawPause(pmOpen);
+    } else if (pmClosing > 0) {
+      pmClosing -= dt;
+      // keep the menu up until the swarm covers it, then drop it behind the blackout
+      const target = (swp.on && swp.dir < 0 && !sweepCovered()) ? 1 : 0;
+      pmOpen = U.damp(pmOpen, target, 14, dt);
+      drawPause(pmOpen);
+    }
     if (st === 'charms') drawCharms();
     if (st === 'settings') drawSettings();
     if (st === 'bench') drawBench();
@@ -796,6 +976,8 @@
     if (st === 'cutscene') G.Cutscene.drawHUD(cx, w, h);
     if (st === 'prologue' && G.Prologue) G.Prologue.drawHUD(cx, w, h);
     if (st === 'exited') drawGoodbye();
+
+    drawSweep(cx);   // the bat sweep rides over the pause open/close transition
 
     // fade
     fade.val = U.damp(fade.val, fade.target, fade.speed, dt);

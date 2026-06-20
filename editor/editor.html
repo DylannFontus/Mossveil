@@ -17,7 +17,7 @@
     font:12px "Segoe UI", system-ui, sans-serif; overflow:hidden; user-select:none;
     -webkit-user-select:none; -webkit-touch-callout:none; touch-action:manipulation;
     -webkit-text-size-adjust:100%; }
-  #app { display:grid; height:100%;
+  #app { display:grid; height:100%; position:relative;
     grid-template-rows: 38px 1fr 210px 24px;
     grid-template-columns: 250px 1fr 300px;
     grid-template-areas:
@@ -25,6 +25,11 @@
       "left viewport inspector"
       "left assets inspector"
       "status status status"; }
+  /* draggable panel splitters (session-only, reset on reload) */
+  .vsplit { position:absolute; top:38px; bottom:24px; width:8px; z-index:18;
+    cursor:col-resize; touch-action:none; }
+  .vsplit:hover, .vsplit.drag { background:rgba(110,200,160,0.3); }
+  #vsplitL { left:246px; } #vsplitR { right:296px; }
 
   /* toolbar */
   #toolbar { grid-area:toolbar; background:var(--bg2); border-bottom:1px solid var(--line);
@@ -79,6 +84,10 @@
   #gl, #overlay, #mapCanvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
   #overlay { pointer-events:none; }
   #mapCanvas { display:none; }
+  #csView { position:absolute; inset:0; display:none; background:#0e0e13; overflow:auto; padding:16px 18px; }
+  #csView.on { display:block; }
+  #csView .cshead { color:#9fd8b8; font-size:15px; margin:2px 0 12px; }
+  #csView .cstl { min-height:120px; }
   #viewportHint { position:absolute; left:10px; bottom:8px; color:rgba(220,230,225,.45);
     font-size:11px; pointer-events:none; text-shadow:0 1px 2px #000; }
   /* in-editor playtest overlay */
@@ -171,6 +180,7 @@
     <span class="logo">MOSSVEIL EDITOR</span>
     <button class="tbtn" id="tabScene">Scene</button>
     <button class="tbtn" id="tabMap">Map</button>
+    <button class="tbtn" id="tabCutscene">Cutscene</button>
     <span class="tsep"></span>
     <button class="tbtn tool" data-tool="select" title="Select / move (1)">⬚ Select</button>
     <button class="tbtn tool" data-tool="solid" title="Paint solid tiles (2)">▦ Solid</button>
@@ -209,6 +219,7 @@
     <canvas id="gl"></canvas>
     <canvas id="overlay"></canvas>
     <canvas id="mapCanvas"></canvas>
+    <div id="csView"></div>
     <div id="viewportHint"></div>
     <div id="playFrame">
       <div id="playBar"><span id="playLabel">▶ Playtest</span><button id="playClose" title="Stop & close (Esc)">✕ Stop</button></div>
@@ -231,6 +242,8 @@
     <span class="hintDesktop">drag empty = marquee select · Shift+click = add · Ctrl+C/V copy/paste · Ctrl+G prefab · L align · Del delete</span>
     <span class="hintTouch">one finger — place / move / paint · two fingers — pan &amp; pinch-zoom · double-tap a room to open</span>
   </div>
+  <div class="vsplit" id="vsplitL" title="Drag to resize the left panel"></div>
+  <div class="vsplit" id="vsplitR" title="Drag to resize the inspector"></div>
 </div>
 
 <div id="modal"><div id="modalBox"></div></div>

@@ -116,7 +116,14 @@
   Main.menuItems = [];
   Main.confirm = null;   // { message, onYes, sel }
   Main.pauseIndex = 0;
-  Main.pauseItems = ['Resume', 'Charms', 'Settings', 'Quit to Title'];
+  Main.pauseItems = ['Resume', 'Charms', 'Map', 'Settings', 'Quit to Title'];
+  Main.pauseDescs = {
+    'Resume': 'Return to the dream.',
+    'Charms': 'Equip and inspect your charms.',
+    'Map': "Open the wanderer's map.",
+    'Settings': 'Sound, screen shake, visual quality.',
+    'Quit to Title': 'Leave to the title screen.'
+  };
   Main.charmIndex = 0;
   Main.settingsIndex = 0;
 
@@ -142,10 +149,11 @@
   function pauseSelect() {
     G.Audio.sfx('uiBell');
     const it = Main.pauseItems[Main.pauseIndex];
-    if (it === 'Resume') Main.state = 'play';
+    if (it === 'Resume') { if (G.UI.closePause) G.UI.closePause(); Main.state = 'play'; }
     else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'pause'; Main.state = 'charms'; }
+    else if (it === 'Map') { Main.mapView = Main.mapView || { pan: { x: 0, y: 0 }, zoom: 3 }; G.MapView.centerOn(G.room.id, Main.mapView); Main.state = 'map'; }
     else if (it === 'Settings') { Main.settingsIndex = 0; Main.state = 'settings'; }
-    else if (it === 'Quit to Title') { G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; Main.state = 'title'; }
+    else if (it === 'Quit to Title') { if (G.UI.closePause) G.UI.closePause(); G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; Main.state = 'title'; }
   }
 
   Main.slotIndex = 0;
@@ -728,7 +736,7 @@
         if (I.pressed('up')) { Main.pauseIndex = (Main.pauseIndex - 1 + Main.pauseItems.length) % Main.pauseItems.length; G.Audio.sfx('clink'); }
         if (I.pressed('down')) { Main.pauseIndex = (Main.pauseIndex + 1) % Main.pauseItems.length; G.Audio.sfx('clink'); }
         if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) pauseSelect();
-        else if (I.pressed('pause')) Main.state = 'play';
+        else if (I.pressed('pause')) { if (G.UI.closePause) G.UI.closePause(); Main.state = 'play'; }
         break;
       case 'charms': {
         dt = 0;
@@ -790,7 +798,7 @@
         break;
       }
       case 'play':
-        if (I.pressed('pause')) { Main.state = 'pause'; }
+        if (I.pressed('pause')) { Main.state = 'pause'; if (G.UI.openPause) G.UI.openPause(); }
         else if (I.pressed('map')) {
           Main.state = 'map';
           Main.mapView = Main.mapView || { pan: { x: 0, y: 0 }, zoom: 3 };

@@ -32,6 +32,8 @@
   let csCurrent = null;          // current cutscene id
   let csSel = -1;                // selected event index (-1 = cutscene-level props)
   let csDirty = false;
+  let csDrag = null;             // active timeline block drag
+  let csPreview = null;          // in-viewport cutscene preview { id, restoreId, sx, sy, lastCam, done }
   const csCur = () => G.CUTSCENES && G.CUTSCENES[csCurrent];
 
   // event type schema: default params + inspector fields. t & dur are implicit on every event.
@@ -106,6 +108,49 @@
     if (G.Post) G.Post.resize();
   }
   addEventListener('resize', resize);
+
+  // ---- resizable panels (session only — resets on reload) ----
+  let edLeftW = 250, edRightW = 300;
+  function applyLayout() {
+    $('app').style.gridTemplateColumns = edLeftW + 'px 1fr ' + edRightW + 'px';
+    $('vsplitL').style.left = (edLeftW - 4) + 'px';
+    $('vsplitR').style.right = (edRightW - 4) + 'px';
+    resize();
+  }
+  (function () {
+    let drag = null;
+    const onDown = which => e => { drag = which; e.preventDefault(); try { e.target.setPointerCapture(e.pointerId); } catch (_) { } e.target.classList.add('drag'); };
+    $('vsplitL').addEventListener('pointerdown', onDown('L'));
+    $('vsplitR').addEventListener('pointerdown', onDown('R'));
+    addEventListener('pointermove', e => {
+      if (!drag) return;
+      const W = window.innerWidth;
+      if (drag === 'L') edLeftW = Math.max(150, Math.min(W * 0.42, e.clientX));
+      else edRightW = Math.max(190, Math.min(W * 0.42, W - e.clientX));
+      applyLayout();
+    });
+    addEventListener('pointerup', () => { if (drag) { drag = null; $('vsplitL').classList.remove('drag'); $('vsplitR').classList.remove('drag'); } });
+  })();
+  // Window-level retime drag for the central cutscene timeline blocks (started in
+  // refreshCsTab). Listening on the window keeps the drag alive when the cursor
+  // slides off a narrow block.
+  (function () {
+    addEventListener('pointermove', ev => {
+      if (!csDrag) return;
+      let nt = Math.max(0, csDrag.startT + (ev.clientX - csDrag.startX) / csDrag.scale);
+      nt = Math.round(nt * 10) / 10;
+      if (Math.abs(nt - csDrag.e.t) > 1e-6) {
+        csDrag.moved = true; csDrag.e.t = nt;
+        csDrag.blk.style.left = (nt * csDrag.scale) + 'px';
+        csDrag.blk.title = `${csDrag.e.type} — ${nt.toFixed(2)}s for ${(csDrag.e.dur || 0)}s`;
+      }
+    });
+    addEventListener('pointerup', () => {
+      if (!csDrag) return;
+      const moved = csDrag.moved; csDrag = null;
+      if (moved) { markCsDirty(); refreshCsTab(); refreshInspector(); }
+    });
+  })();
 
   // mouse → world position on the z=0 plane
   function mouseWorld(e) {
@@ -374,6 +419,7 @@
     if (pointers.size > 1) return;       // ignore extra fingers
     if (gesturing) return;
 
+    if (tab === 'cutscene') return;          // the cutscene timeline handles its own input
     if (tab === 'map') return mapMouseDown(e);
     // mouse middle/right button pans
     if (e.pointerType === 'mouse' && (e.button === 1 || e.button === 2)) {
@@ -413,6 +459,7 @@
   addEventListener('pointermove', e => {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (gesturing && pointers.size >= 2) { updateGesture(); return; }
+    if (tab === 'cutscene') return;
     if (tab === 'map') { if (mapDrag) mapMouseMove(e); return; }
     if (panning) {
       const r = vpEl.getBoundingClientRect();
@@ -1186,12 +1233,16 @@
   }
 
   function setTab(t) {
+    if (csPreview) stopCsPreview();
     tab = t;
     $('tabScene').classList.toggle('on', t === 'scene');
     $('tabMap').classList.toggle('on', t === 'map');
+    $('tabCutscene').classList.toggle('on', t === 'cutscene');
     mapCanvas.style.display = t === 'map' ? 'block' : 'none';
     glCanvas.style.display = t === 'scene' ? 'block' : 'none';
+    $('csView').classList.toggle('on', t === 'cutscene');
     $('viewportHint').textContent = '';
+    if (t === 'cutscene') { setLeftTab('S'); refreshCsTab(); }
   }
 
   // ---------------- cutscene editor ----------------
@@ -1233,35 +1284,42 @@
       el('small', {}, d, `${id} · ${(c.events || []).length} events · level ${c.level || '—'}`);
       d.addEventListener('click', () => { csCurrent = id; csSel = -1; refreshScenes(); refreshInspector(); });
     }
-    if (!csCurrent) return;
+    el('div', { class: 'insNote', style: 'padding:8px' }, box,
+      csCurrent ? 'Open the Cutscene tab (top) to edit the timeline.' : 'Make a cutscene to begin.');
+    refreshCsTab();
+  }
 
-    // event timeline for the current cutscene
+  // the big interactive timeline lives in the central "Cutscene" tab
+  function refreshCsTab() {
+    const box = $('csView');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!csCurrent || !G.CUTSCENES[csCurrent]) { el('div', { class: 'cshead' }, box, 'No cutscene selected — pick or make one in the Scenes panel (left).'); return; }
     const c = G.CUTSCENES[csCurrent];
     c.events = c.events || [];
-    el('div', { class: 'hgroup' }, box, 'Timeline (events)');
-    const addRow = el('div', { class: 'lvlbtns' }, box);
-    const typeSel = el('select', { style: 'flex:1;background:#15151a;color:#cfd2d6;border:1px solid #3c3c44;border-radius:3px;padding:3px' }, addRow);
+    el('div', { class: 'cshead' }, box, '▦  ' + (c.name || csCurrent) + '  —  timeline  (' + c.events.length + ' events · plays over level "' + (c.level || '—') + '")');
+    // add-event + preview row
+    const addRow = el('div', { class: 'lvlbtns', style: 'padding:0 0 10px' }, box);
+    const typeSel = el('select', { style: 'background:#15151a;color:#cfd2d6;border:1px solid #3c3c44;border-radius:3px;padding:4px;min-width:160px' }, addRow);
     for (const ty in CS_EVENTS) el('option', { value: ty }, typeSel, ty);
     el('button', {
       class: 'tbtn', onclick: () => {
-        const ty = typeSel.value;
-        const spec = CS_EVENTS[ty];
+        const spec = CS_EVENTS[typeSel.value];
         const lastEnd = c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0);
-        const ev = Object.assign({ t: +lastEnd.toFixed(2), dur: spec.dur, type: ty }, JSON.parse(JSON.stringify(spec.def)));
-        c.events.push(ev);
+        c.events.push(Object.assign({ t: +lastEnd.toFixed(2), dur: spec.dur, type: typeSel.value }, JSON.parse(JSON.stringify(spec.def))));
         csSel = c.events.length - 1;
-        markCsDirty(); refreshScenes(); refreshInspector();
+        markCsDirty(); refreshCsTab(); refreshScenes(); refreshInspector();
       }
     }, addRow, '+ Add event');
-    el('button', { class: 'tbtn play', onclick: async () => { if (await save()) openPlay(); } }, addRow, '▶ Preview');
+    el('button', { class: 'tbtn play', onclick: () => startCsPreview(csCurrent) }, addRow, '▶ Preview');
+    el('button', { class: 'tbtn', onclick: async () => { if (await save()) openPlay(); }, title: 'Save & run the whole cutscene inside the actual game' }, addRow, '▶ Playtest in game');
 
-    // ---- visual timeline (drag blocks to retime) ----
-    const SCALE = 30;            // px per second
+    // ---- visual timeline (drag blocks horizontally to retime) ----
+    const SCALE = 64;            // px per second (roomy in the central view)
     const SCREEN = new Set(['fade', 'letterbox', 'blur', 'text', 'camera', 'cameraRestore', 'shakePulse', 'sfx', 'flash']);
-    const total = Math.max(2, c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0)) + 1;
-    // pack events into non-overlapping lanes
+    const total = Math.max(3, c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0)) + 1;
     const evs = c.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t);
-    const laneEnds = []; const lane = {};
+    const laneEnds = [], lane = {};
     for (const { e, i } of evs) {
       let ln = laneEnds.findIndex(end => end <= e.t + 1e-6);
       if (ln < 0) { ln = laneEnds.length; laneEnds.push(0); }
@@ -1269,43 +1327,27 @@
       lane[i] = ln;
     }
     const lanes = Math.max(1, laneEnds.length);
-    const tl = el('div', { class: 'cstl', style: `height:${lanes * 22 + 18}px` }, box);
-    const inner = el('div', { style: `position:relative;width:${Math.max(tl.clientWidth || 220, total * SCALE + 20)}px;height:100%` }, tl);
-    // ruler ticks (every second)
-    const ruler = el('div', { class: 'ruler', style: `width:${total * SCALE + 20}px` }, inner);
-    for (let s = 0; s <= total; s++) el('div', { class: 'tick', style: `left:${s * SCALE}px;width:${SCALE}px` }, ruler, s % 1 === 0 ? s + 's' : '');
-    // blocks
-    let drag = null;
+    const LH = 30;
+    const tl = el('div', { class: 'cstl', style: `height:${lanes * LH + 22}px` }, box);
+    const inner = el('div', { style: `position:relative;width:${total * SCALE + 24}px;height:100%` }, tl);
+    const ruler = el('div', { class: 'ruler', style: `width:${total * SCALE + 24}px;height:18px` }, inner);
+    for (let s = 0; s <= total; s++) el('div', { class: 'tick', style: `left:${s * SCALE}px;width:${SCALE}px` }, ruler, s + 's');
     for (const { e, i } of evs) {
       const blk = el('div', {
         class: 'cstlblk ' + (SCREEN.has(e.type) ? 'screen' : 'actor') + (csSel === i ? ' sel' : ''),
-        style: `left:${e.t * SCALE}px;top:${lane[i] * 22 + 16}px;width:${Math.max(12, (e.dur || 0.2) * SCALE)}px`,
+        style: `left:${e.t * SCALE}px;top:${lane[i] * LH + 20}px;height:24px;line-height:24px;font-size:11px;width:${Math.max(16, (e.dur || 0.2) * SCALE)}px`,
         title: `${e.type} — ${e.t.toFixed(2)}s for ${(e.dur || 0)}s`
       }, inner, e.type);
+      // Block-level drag start; the window-level handlers (set up once) continue
+      // the drag even when the cursor leaves a narrow block.
       blk.addEventListener('pointerdown', ev => {
         ev.preventDefault();
         csSel = i; refreshInspector();
-        document.querySelectorAll('.cstlblk.sel').forEach(b => b.classList.remove('sel')); blk.classList.add('sel');
-        drag = { i, startX: ev.clientX, startT: e.t, blk, moved: false };
-        try { blk.setPointerCapture(ev.pointerId); } catch (_) { }
+        document.querySelectorAll('#csView .cstlblk.sel').forEach(b => b.classList.remove('sel')); blk.classList.add('sel');
+        csDrag = { e, blk, startX: ev.clientX, startT: e.t, scale: SCALE, moved: false };
       });
-      blk.addEventListener('pointermove', ev => {
-        if (!drag || drag.i !== i) return;
-        const dt = (ev.clientX - drag.startX) / SCALE;
-        let nt = Math.max(0, drag.startT + dt);
-        nt = Math.round(nt * 10) / 10;
-        if (Math.abs(nt - e.t) > 1e-6) { drag.moved = true; e.t = nt; blk.style.left = (e.t * SCALE) + 'px'; blk.title = `${e.type} — ${e.t.toFixed(2)}s for ${(e.dur || 0)}s`; }
-      });
-      blk.addEventListener('pointerup', () => { if (drag && drag.moved) { markCsDirty(); refreshScenes(); refreshInspector(); } drag = null; });
     }
-
-    // precise text list below (click to select)
-    el('div', { class: 'hgroup' }, box, 'Events (click to edit)');
-    for (const { e, i } of evs) {
-      const d = el('div', { class: 'hitem' + (csSel === i ? ' sel' : '') }, box);
-      d.textContent = `${e.t.toFixed(1)}s +${(e.dur || 0)}s  ${e.type}`;
-      d.addEventListener('click', () => { csSel = i; refreshScenes(); refreshInspector(); });
-    }
+    el('div', { class: 'insNote', style: 'margin-top:10px' }, box, 'Drag a block sideways to retime it · click to edit its fields in the Inspector → · screen events are blue, protagonist events green.');
   }
 
   function newCutscene() {
@@ -1338,7 +1380,8 @@
       selectField(body, 'Level', Object.keys(G.LEVELS).map(id => ({ v: id, t: id })), () => c.level || currentId, v => { c.level = v; markCsDirty(); });
       checkField(body, 'Skippable', () => c.skippable !== false, v => { c.skippable = v; markCsDirty(); });
       el('div', { class: 'insNote' }, body,
-        'Add events in the Scenes panel, then click one to edit it here. "▶ Test" previews this cutscene in the game. ' +
+        'Edit the timeline above. "▶ Preview" plays it live here in the viewport with the real character rig; ' +
+        '"▶ Playtest in game" runs it inside the actual game. ' +
         'To play it automatically, set it as a level\'s Intro cutscene (Hierarchy tab → deselect → Level settings).');
       const tot = (c.events || []).reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0);
       el('div', { class: 'insNote' }, body, `Total duration: ${tot.toFixed(1)}s · ${(c.events || []).length} events`);
@@ -1414,6 +1457,7 @@
   $('btnRedo').addEventListener('click', doRedo);
   $('tabScene').addEventListener('click', () => setTab('scene'));
   $('tabMap').addEventListener('click', () => setTab('map'));
+  $('tabCutscene').addEventListener('click', () => setTab('cutscene'));
   function setLeftTab(which) {
     csMode = which === 'S';
     $('ltabH').classList.toggle('on', which === 'H');
@@ -1666,13 +1710,76 @@
   $('btnPlayHere').addEventListener('click', async () => { if (await save()) openPlay(); });
   $('playClose').addEventListener('click', closePlay);
 
+  // ---------------- in-editor cutscene preview ----------------
+  // Plays the cutscene live in the 3D viewport with a real player rig, so you can
+  // watch the protagonist perform the animations without launching the whole game.
+  let csBarEl = null, csBarLabel = null, csBarTime = null;
+  function ensureCsBar() {
+    if (csBarEl) return;
+    csBarEl = el('div', {
+      style: 'position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:23;display:none;' +
+        'align-items:center;gap:10px;padding:7px 12px;background:rgba(8,12,14,0.86);border:1px solid #2a3a33;' +
+        'border-radius:9px;color:#cfe7dc;font:600 12px system-ui;box-shadow:0 6px 22px rgba(0,0,0,0.5)'
+    }, $('viewportWrap'));
+    csBarLabel = el('span', {}, csBarEl, '▶ Preview');
+    csBarTime = el('span', { style: 'color:#7fdcb0;min-width:78px;font-variant-numeric:tabular-nums' }, csBarEl, '');
+    el('button', { class: 'tbtn', onclick: () => replayCsPreview() }, csBarEl, '⟲ Replay');
+    el('button', { class: 'tbtn', onclick: () => stopCsPreview() }, csBarEl, '✕ Stop (Esc)');
+  }
+  function showCsBar(on, name) {
+    ensureCsBar();
+    csBarEl.style.display = on ? 'flex' : 'none';
+    if (name !== undefined) csBarLabel.textContent = '▶ Previewing — ' + name;
+  }
+
+  function startCsPreview(id) {
+    const cs = G.CUTSCENES && G.CUTSCENES[id];
+    if (!cs || !cs.events || !cs.events.length) { alert('This cutscene has no events yet — add some in the timeline first.'); return; }
+    if (csPreview) stopCsPreview();
+    const lvId = (cs.level && G.LEVELS[cs.level]) ? cs.level : currentId;
+    let sp;
+    try { sp = G.World.load(lvId, 'P'); } catch (err) { console.error(err); alert('Could not load the level this cutscene plays over.'); return; }
+    if (G.player && G.player.root) G.scene.remove(G.player.root);
+    const p = G.Player.create(sp.x, sp.y);
+    p.cinematic = true;
+    csPreview = { id, restoreId: currentId, sx: sp.x, sy: sp.y, lastCam: { x: sp.x, y: sp.y + 1.4, z: 30 }, done: false };
+    $('csView').classList.remove('on');   // reveal the GL viewport behind the timeline
+    glCanvas.style.display = 'block';     // the cutscene tab normally hides it
+    showCsBar(true, cs.name || id);
+    runCsFromStart();
+  }
+  function runCsFromStart() {
+    const cp = csPreview; if (!cp) return;
+    if (G.player) { G.player.body.x = cp.sx; G.player.body.y = cp.sy; }
+    cp.done = false;
+    G.Cutscene.start(cp.id, {
+      spawnX: cp.sx, spawnY: cp.sy,
+      gameplayCam: () => ({ x: cp.sx + 1.7, y: cp.sy + 1.2, z: 30 }),
+      onDone: () => { if (csPreview) csPreview.done = true; }
+    });
+  }
+  function replayCsPreview() { if (csPreview) { if (G.Cutscene.active) G.Cutscene.finish(); runCsFromStart(); } }
+  function stopCsPreview() {
+    if (!csPreview) return;
+    if (G.Cutscene.active) G.Cutscene.finish();
+    if (G.player && G.player.root) G.scene.remove(G.player.root);
+    G.player = null;
+    if (G.renderer) G.renderer.domElement.style.filter = '';
+    showCsBar(false);
+    csPreview = null;
+    rebuild();                       // restore the editor's working level
+    glCanvas.style.display = (tab === 'scene') ? 'block' : 'none';
+    if (tab === 'cutscene') $('csView').classList.add('on');
+  }
+
   // ---------------- keyboard ----------------
   addEventListener('keydown', e => {
+    if (csPreview) { if (e.code === 'Escape') stopCsPreview(); else if (e.code === 'KeyR') replayCsPreview(); return; }
     if ($('playFrame').classList.contains('on')) { if (e.code === 'Escape') closePlay(); return; }
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
     if (e.ctrlKey && e.code === 'KeyS') { e.preventDefault(); save(); return; }
     if (typing) return;
-    if (csMode) return; // Scenes tab: edit events via the inspector, not level shortcuts
+    if (csMode || tab === 'cutscene') return; // cutscene editing: no level shortcuts
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
     if (e.ctrlKey && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) { e.preventDefault(); doRedo(); return; }
     if (e.ctrlKey && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
@@ -1700,7 +1807,7 @@
     lastT = t;
     G.time += dt;
 
-    if (needsRebuild) {
+    if (needsRebuild && !csPreview) {
       rebuildTimer -= dt;
       if (rebuildTimer <= 0) {
         rebuildTimer = 0.12;
@@ -1709,7 +1816,29 @@
       }
     }
 
-    if (tab === 'scene') {
+    if (csPreview) {
+      // live cutscene playback in the viewport
+      G.World.update(dt);
+      if (G.room) {
+        for (const e of G.room.entities) {
+          if (e.type === 'lamp' || e.type === 'crystal' || e.type === 'shrine' || e.type === 'light' || e.type === 'ray' || e.type === 'gate')
+            try { e.update(dt); } catch (_) { }
+        }
+      }
+      if (G.Cutscene.active) { G.Cutscene.update(dt); csPreview.lastCam = { x: G.Cutscene.active.cam.x, y: G.Cutscene.active.cam.y, z: G.Cutscene.active.cam.z }; }
+      G.FX.update(dt);
+      const cam = csPreview.lastCam;
+      camera.position.set(cam.x, cam.y, cam.z);
+      if (postOn && G.Post && G.Post.enabled) G.Post.render(dt);
+      else renderer.render(scene, camera);
+      // cinematic HUD (letterbox / caption / fade) on the overlay
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      octx.clearRect(0, 0, G.viewW, G.viewH);
+      G.Cutscene.drawHUD(octx, G.viewW, G.viewH);
+      const cur = G.Cutscene.active;
+      if (csBarTime) csBarTime.textContent = cur ? cur.time.toFixed(1) + ' / ' + cur.total.toFixed(1) + 's' : 'done — ⟲ to replay';
+    } else if (tab === 'scene') {
       // animate ambience but keep AI frozen: update only decorative entity types
       G.World.update(dt);
       if (G.room) {
@@ -1728,9 +1857,10 @@
       if (postOn && G.Post && G.Post.enabled) G.Post.render(dt);
       else renderer.render(scene, camera);
       drawOverlay();
-    } else {
+    } else if (tab === 'map') {
       drawMapTab();
     }
+    // tab === 'cutscene' renders nothing in 3D — the #csView DOM covers the viewport
   }
 
   // ---------------- boot ----------------
