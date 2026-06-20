@@ -15,11 +15,11 @@
   // grade state (per-biome target + smoothed current), plus transient "punch"/flash
   const grade = {
     exposure: 1.05, contrast: 1.05, saturation: 1.14, bloom: 0.6, vignette: 0.46,
-    grain: 0.04, tint: new THREE.Color(1, 1, 1)
+    grain: 0, tint: new THREE.Color(1, 1, 1)
   };
   const target = {
     exposure: 1.05, contrast: 1.05, saturation: 1.14, bloom: 0.6, vignette: 0.46,
-    grain: 0.04, tint: new THREE.Color(1, 1, 1)
+    grain: 0, tint: new THREE.Color(1, 1, 1)
   };
   let aberr = 0, flash = 0;
   const flashCol = new THREE.Color(1, 1, 1);

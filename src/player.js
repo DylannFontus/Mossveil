@@ -436,9 +436,7 @@
         if (p.dashT <= 0) G.Audio.sfx('drop');
         p.landAnim = 0.18;
         p.stretch = 0.72 - impact * 0.12;
-        if (impact > 0.45) {        // hard landing — kick the camera + extra dust
-          G.FX.shake(0.13 * impact, 0.16);
-          if (G.Main.camPunch) G.Main.camPunch(0.7 * impact);
+        if (impact > 0.45) {        // hard landing — just a bit of extra dust (no screen shake/jolt)
           G.FX.burst('dust', b.x, b.y - 0.6, { n: Math.round(4 + impact * 6) });
         }
       }

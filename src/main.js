@@ -392,26 +392,33 @@
       G.save = {};
       Main.persist();                 // create the save file immediately so the slot is occupied
     }
+    // a new game opens with the prologue cinematic, then flows into the normal intro
+    if (newGame && G.Prologue) {
+      Main.state = 'prologue';
+      G.Prologue.start(() => loadIntoWorld(true, true));
+      return;
+    }
     Main.state = 'transition';
-    G.UI.setFade(1, 6, () => {
-      let roomId = 'steps', sx, sy;
-      if (!newGame && G.save.bench) {
-        roomId = G.save.bench.room;
-        sx = G.save.bench.x; sy = G.save.bench.y;
-      }
-      const sp = G.World.load(roomId, 'P');
-      if (sx === undefined) { sx = sp.x; sy = sp.y; }
-      G.player.reset(sx, sy);
-      snapCamera();
-      const def = G.LEVELS[roomId];
-      if (newGame && def.intro && G.CUTSCENES && G.CUTSCENES[def.intro]) {
-        beginCutscene(def.intro, sx, sy);
-      } else {
-        showAreaTitle();
-        Main.state = 'play';
-        G.UI.setFade(0, 4);
-      }
-    });
+    G.UI.setFade(1, 6, () => loadIntoWorld(newGame, false));
+  }
+  function loadIntoWorld(newGame, fromPrologue) {
+    let roomId = 'steps', sx, sy;
+    if (!newGame && G.save.bench) {
+      roomId = G.save.bench.room;
+      sx = G.save.bench.x; sy = G.save.bench.y;
+    }
+    const sp = G.World.load(roomId, 'P');
+    if (sx === undefined) { sx = sp.x; sy = sp.y; }
+    G.player.reset(sx, sy);
+    snapCamera();
+    const def = G.LEVELS[roomId];
+    if (newGame && def.intro && G.CUTSCENES && G.CUTSCENES[def.intro]) {
+      beginCutscene(def.intro, sx, sy);     // begins black (fadeAlpha 1) — seamless from the prologue
+    } else {
+      showAreaTitle();
+      Main.state = 'play';
+      G.UI.setFade(0, 4);
+    }
   }
 
   // play a cutscene over the already-loaded room, then drop into gameplay seamlessly
@@ -635,6 +642,7 @@
 
   function updateCamera(dt, rdt) {
     const p = G.player;
+    if (Main.state === 'prologue') return;   // the prologue drives its own camera
     if (Main.state === 'cutscene' && G.Cutscene.active) {
       const c = G.Cutscene.active.cam;
       const sh = G.FX.camOffset();
@@ -795,13 +803,18 @@
           G.Cutscene.skip();
         }
         break;
+      case 'prologue':
+        dt = rdt;
+        if (I.pressed('pause') || I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) G.Prologue.skip();
+        break;
     }
 
     if (dt > 0) {
       G.time += dt;
       G.World.update(dt);
       if (Main.state === 'cutscene') G.Cutscene.update(dt);
-      else if (Main.state !== 'title' && G.player) G.player.update(dt);
+      else if (Main.state === 'prologue') G.Prologue.update(dt);
+      else if (Main.state !== 'title' && Main.state !== 'prologue' && G.player) G.player.update(dt);
       G.FX.update(dt);
     }
     G.Audio.update(rdt);

@@ -793,6 +793,7 @@
     if (st === 'ending') drawEnding(G.Main.endingT);
     if (st === 'map') drawMap();
     if (st === 'cutscene') G.Cutscene.drawHUD(cx, w, h);
+    if (st === 'prologue' && G.Prologue) G.Prologue.drawHUD(cx, w, h);
     if (st === 'exited') drawGoodbye();
 
     // fade

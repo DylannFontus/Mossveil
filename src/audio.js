@@ -29,7 +29,7 @@
     verb.connect(verbGain); verbGain.connect(master);
     sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9;
     sfxBus.connect(master); sfxBus.connect(verb);
-    ambBus = ctx.createGain(); ambBus.gain.value = 0.8;
+    ambBus = ctx.createGain(); ambBus.gain.value = 0.05;   // gentler ambient bed (less invasive)
     ambBus.connect(master); ambBus.connect(verb);
     startAmbience();
   }
@@ -123,6 +123,46 @@
     tone({ type: 'sine', f0: freq * 2.99, vol: vol * 0.12, t: dur * 0.35, a: 0.01 });
   }
 
+  // -------- prologue cinematic audio: rain + melancholic double bass --------
+  let proGain = null, proPlaying = false, proTimer = null, rainNode = null, rainGain = null;
+  function proVoice(freq, t0, dur, vol) {
+    if (!proGain) return;
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = freq;
+    const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = freq;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 430; lp.Q.value = 0.7;
+    const g = ctx.createGain(); g.gain.value = 0;
+    o.connect(lp); lp.connect(g); sub.connect(g); g.connect(proGain);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + Math.min(0.45, dur * 0.3));   // slow bowed swell
+    g.gain.setTargetAtTime(0.0001, t0 + dur * 0.62, dur * 0.34);
+    o.start(t0); sub.start(t0); o.stop(t0 + dur + 0.7); sub.stop(t0 + dur + 0.7);
+  }
+  function proSchedule() {
+    if (!proPlaying || !ctx) return;
+    const t0 = ctx.currentTime + 0.05;
+    const phrase = [55.0, 49.0, 43.65, 41.2];   // descending A-minor double-bass lament
+    const nlen = 1.95;
+    phrase.forEach((f, i) => proVoice(f, t0 + i * nlen, nlen * 1.05, 0.17));
+    proVoice(82.41, t0, nlen * 4, 0.05);        // soft sustained colour above
+    proTimer = setTimeout(proSchedule, nlen * phrase.length * 1000 - 70);
+  }
+  function startRain() {
+    const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    rainNode = ctx.createBufferSource(); rainNode.buffer = buf; rainNode.loop = true;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.4;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1100;
+    rainGain = ctx.createGain(); rainGain.gain.value = 0;
+    rainNode.connect(bp); bp.connect(hp); hp.connect(rainGain); rainGain.connect(master);
+    rainGain.gain.setTargetAtTime(0.085, ctx.currentTime, 1.2);
+    rainNode.start();
+  }
+  function stopRain() {
+    if (rainGain) rainGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.05);
+    if (rainNode) { const n = rainNode; setTimeout(() => { try { n.stop(); } catch (e) { } }, 250); }
+    rainNode = null; rainGain = null;
+  }
+
   const SFX = {
     jump() { tone({ type: 'sine', f0: 340, f1: 520, t: 0.13, vol: 0.10 }); noiseHit({ f0: 900, f1: 1600, t: 0.08, vol: 0.05 }); },
     wings() { tone({ type: 'sine', f0: 420, f1: 700, t: 0.18, vol: 0.12 }); noiseHit({ f0: 1800, f1: 3200, t: 0.16, vol: 0.07, q: 2 }); },
@@ -193,6 +233,44 @@
     setVolume(v) {
       volume = Math.max(0, Math.min(1, v));
       if (master) master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.08);
+    },
+    // ---- prologue cinematic ----
+    prologueStart() {
+      if (!started || proPlaying) return;
+      proPlaying = true;
+      proGain = ctx.createGain(); proGain.gain.value = 0;
+      proGain.connect(master); proGain.connect(verb);
+      proGain.gain.setTargetAtTime(1, ctx.currentTime, 1.6);
+      proSchedule();
+      startRain();
+    },
+    prologueResolve() {   // final long resolving bass note (starts when the cane is raised)
+      if (!proGain) return;
+      proPlaying = false;
+      if (proTimer) { clearTimeout(proTimer); proTimer = null; }
+      const t0 = ctx.currentTime;
+      proVoice(55.0, t0, 1.5, 0.22);    // root A1 resolves and decays to silence ~at the smash
+      proVoice(82.41, t0, 1.5, 0.09);
+    },
+    prologueStop() {      // clean cut at the smash — silence everything
+      proPlaying = false;
+      if (proTimer) { clearTimeout(proTimer); proTimer = null; }
+      stopRain();
+      if (proGain) { try { proGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.05); } catch (e) { } const g = proGain; setTimeout(() => { try { g.disconnect(); } catch (e) { } }, 400); proGain = null; }
+    },
+    thunder() {
+      if (!started) return;
+      noiseHit({ f0: 90, f1: 28, t: 1.5, vol: 0.3, ftype: 'lowpass', q: 0.7 });
+      noiseHit({ f0: 420, f1: 60, t: 0.55, vol: 0.16, ftype: 'lowpass' });
+      tone({ type: 'sine', f0: 46, f1: 27, t: 1.3, vol: 0.22 });
+      noiseHit({ f0: 2600, f1: 320, t: 0.16, vol: 0.12, q: 1.6, delay: 0.02 });
+    },
+    caneSmash() {
+      if (!started) return;
+      noiseHit({ f0: 3200, f1: 800, t: 0.12, vol: 0.22, q: 1.4 });    // metallic slash
+      bell(1400, 0.08, 0.5); bell(2100, 0.05, 0.4);                   // steel ring
+      tone({ type: 'sine', f0: 72, f1: 34, t: 0.5, vol: 0.36 });      // ground impact
+      noiseHit({ f0: 220, f1: 50, t: 0.42, vol: 0.26, ftype: 'lowpass' });
     },
     update(dt) {
       if (!started) return;

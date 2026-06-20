@@ -855,7 +855,7 @@
     const tint = new THREE.Color(1, 1, 1).lerp(c, 0.16);       // a gentle wash, not a heavy cast
     return {
       tint, exposure: 1.05, contrast: 1.05, saturation: 1.14,
-      bloom: pal.rays ? 0.72 : 0.56, vignette: 0.46, grain: 0.04
+      bloom: pal.rays ? 0.72 : 0.56, vignette: 0.46, grain: 0
     };
   }
 
