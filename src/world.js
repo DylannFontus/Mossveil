@@ -864,6 +864,9 @@
       G.scene.remove(G.room.group);
       U.disposeDeep(G.room.group);
       G.FX.clearAnims();
+      // leaving a room drops any boss bar / boss music from it (e.g. you fled the arena)
+      if (G.UI && G.UI.setBoss) G.UI.setBoss(null);
+      if (G.Audio && G.Audio.setBoss) G.Audio.setBoss(false);
     }
     const def = G.LEVELS[id];
     if (!def) throw new Error('No level: ' + id);

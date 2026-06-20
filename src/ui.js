@@ -53,6 +53,7 @@
     if (boss) { bossBar.boss = boss; bossBar.name = boss.cfg.name; bossBar.maxHp = boss.maxHp; bossBar.dispHp = boss.hp; bossBar.lagHp = boss.hp; }
     else { bossBar.boss = null; }
   };
+  UI.bossBarShown = () => bossBar.shown;   // for tests
   UI.onPlayerHurt = () => { maskFlash = 0.6; };
   UI.onHeal = () => { healFlash = 0.6; };
   UI.setFade = (target, speed, cb) => { fade.target = target; fade.speed = speed; fade.cb = cb || null; };
