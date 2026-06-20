@@ -296,6 +296,7 @@
     });
     addEventListener('pointerdown', e => {
       if (e.button && e.button !== 0) return;
+      if (transitioning) return;                  // ignore taps while a menu is fading to black
       if (Main.confirm) {
         const hit = pointerToConfirm(e);
         if (hit) { const ok = hit.confirm; const c = Main.confirm; Main.confirm = null; if (ok) c.onYes(); }
@@ -392,14 +393,20 @@
       G.save = {};
       Main.persist();                 // create the save file immediately so the slot is occupied
     }
-    // a new game opens with the prologue cinematic, then flows into the normal intro
+    // fade to black on the way in (New Game / Continue / loading a save), keeping the
+    // current menu on screen so it fades out cleanly; `transitioning` locks menu input
+    transitioning = true;
     if (newGame && G.Prologue) {
-      Main.state = 'prologue';
-      G.Prologue.start(() => loadIntoWorld(true, true));
+      // a new game: fade to black, then open the prologue cinematic
+      G.UI.setFade(1, 4, () => {
+        transitioning = false;
+        Main.state = 'prologue';
+        G.UI.setFade(0, 99);              // clear the UI black; the prologue handles its own slow reveal
+        G.Prologue.start(() => loadIntoWorld(true, true));
+      });
       return;
     }
-    Main.state = 'transition';
-    G.UI.setFade(1, 6, () => loadIntoWorld(newGame, false));
+    G.UI.setFade(1, 3.2, () => { transitioning = false; loadIntoWorld(newGame, false); });
   }
   function loadIntoWorld(newGame, fromPrologue) {
     let roomId = 'steps', sx, sy;
@@ -692,6 +699,7 @@
       case 'title':
         dt = rdt * 0.6;
         buildMenu();
+        if (transitioning) break;                 // fading to black after a selection — ignore input
         if (!handleConfirm(I)) {
           if (I.pressed('up')) menuStep(-1);
           if (I.pressed('down')) menuStep(1);
@@ -702,6 +710,7 @@
       case 'slots':
         dt = rdt * 0.6;
         Main.slots = readSlots();
+        if (transitioning) break;                 // fading to black after a selection — ignore input
         if (!handleConfirm(I)) {
           if (I.pressed('up')) { Main.slotIndex = (Main.slotIndex - 1 + SLOT_COUNT) % SLOT_COUNT; G.Audio.sfx('clink'); }
           if (I.pressed('down')) { Main.slotIndex = (Main.slotIndex + 1) % SLOT_COUNT; G.Audio.sfx('clink'); }

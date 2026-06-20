@@ -8,7 +8,7 @@
   const serif = 'Georgia, "Times New Roman", serif';
 
   const PHASES = [
-    { n: 'walkA', d: 6.0 }, { n: 'card1', d: 3.0 }, { n: 'walkB', d: 4.0 }, { n: 'card2', d: 3.0 },
+    { n: 'walkA', d: 8.0 }, { n: 'card1', d: 3.0 }, { n: 'walkB', d: 4.0 }, { n: 'card2', d: 3.0 },
     { n: 'walkC', d: 1.5 }, { n: 'raise', d: 1.5 }, { n: 'smash', d: 0.6 },
     { n: 'blackHold', d: 2.0 }, { n: 'titleIn', d: 2.0 }, { n: 'titleHold', d: 2.0 }, { n: 'titleOut', d: 2.2 }
   ];
@@ -185,7 +185,7 @@
     const ph = PHASES[phaseI] ? PHASES[phaseI].n : 'titleOut';
     if (VISIBLE.has(ph) && !hardBlack) {
       drawRain(ctx, w, h);
-      const fb = U.clamp(1 - visTime / 6, 0, 1);                  // slow 6s reveal from black
+      const fb = U.clamp(1 - visTime / 8, 0, 1);                  // slow 8s reveal from black
       if (fb > 0.001) { ctx.fillStyle = `rgba(2,4,7,${fb})`; ctx.fillRect(0, 0, w, h); }
       if (flashA > 0.01) { ctx.fillStyle = `rgba(205,222,255,${flashA * 0.45})`; ctx.fillRect(0, 0, w, h); }
     } else {
