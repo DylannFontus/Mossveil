@@ -47,6 +47,12 @@
   UI.toast = text => { toasts.push({ text, t: 0 }); G.Audio.sfx('uiBell'); };
   UI.areaTitle = text => { areaQ.push({ text, t: 0 }); };
   UI.bossTitle = text => { bossText = text; bossT = 0; };
+  // persistent boss health bar (Hollow Knight style)
+  const bossBar = { boss: null, name: '', maxHp: 1, dispHp: 0, lagHp: 0, shown: 0 };
+  UI.setBoss = boss => {
+    if (boss) { bossBar.boss = boss; bossBar.name = boss.cfg.name; bossBar.maxHp = boss.maxHp; bossBar.dispHp = boss.hp; bossBar.lagHp = boss.hp; }
+    else { bossBar.boss = null; }
+  };
   UI.onPlayerHurt = () => { maskFlash = 0.6; };
   UI.onHeal = () => { healFlash = 0.6; };
   UI.setFade = (target, speed, cb) => { fade.target = target; fade.speed = speed; fade.cb = cb || null; };
@@ -134,6 +140,17 @@
       cx.fillStyle = `rgba(120,10,10,${(maskFlash - 0.3) * 0.6})`;
       cx.fillRect(0, 0, w, h);
     }
+
+    // glimmer counter
+    const glim = G.Main.glimmer ? G.Main.glimmer() : 0;
+    cx.save();
+    cx.textAlign = 'left'; cx.textBaseline = 'middle';
+    cx.beginPath(); cx.arc(38, 110, 6, 0, U.TAU);
+    cx.fillStyle = '#ffe28a'; cx.shadowColor = 'rgba(255,226,138,0.7)'; cx.shadowBlur = 8; cx.fill();
+    cx.shadowBlur = 0;
+    cx.fillStyle = 'rgba(240,230,200,0.92)'; cx.font = `16px ${serif}`;
+    cx.fillText(String(glim), 52, 111);
+    cx.restore();
   }
 
   function drawPrompts() {
@@ -213,6 +230,45 @@
     cx.translate(w / 2, h * 0.68);
     cx.scale(sc, sc);
     cx.fillText(bossText, 0, 0);
+    cx.restore();
+  }
+
+  function drawBossBar(dt) {
+    const b = bossBar;
+    const targetShown = (b.boss && b.boss.alive) ? 1 : 0;
+    b.shown = U.damp(b.shown, targetShown, 5, dt);
+    if (b.shown < 0.01 && targetShown === 0) return;
+    if (b.boss) {
+      b.dispHp = U.damp(b.dispHp, Math.max(0, b.boss.hp), 16, dt);   // snappy fill
+      b.lagHp = U.damp(b.lagHp, Math.max(0, b.boss.hp), 3, dt);      // trailing "damage" ghost
+    }
+    const frac = U.clamp(b.dispHp / b.maxHp, 0, 1);
+    const lag = U.clamp(b.lagHp / b.maxHp, 0, 1);
+    const bw = Math.min(560, w * 0.6), bh = 11;
+    const bx = w / 2 - bw / 2, by = h - 46;
+    cx.save();
+    cx.globalAlpha = b.shown;
+    // name
+    cx.textAlign = 'center';
+    cx.font = `italic 19px ${serif}`;
+    cx.fillStyle = 'rgba(232,240,236,0.92)';
+    cx.shadowColor = 'rgba(0,0,0,0.7)'; cx.shadowBlur = 6;
+    cx.fillText(b.name, w / 2, by - 9);
+    cx.shadowBlur = 0;
+    // frame
+    cx.fillStyle = 'rgba(8,10,12,0.7)';
+    cx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+    // damage trail (the slowly-draining ghost)
+    cx.fillStyle = 'rgba(200,90,80,0.55)';
+    cx.fillRect(bx, by, bw * lag, bh);
+    // current health
+    const grad = cx.createLinearGradient(bx, 0, bx + bw, 0);
+    grad.addColorStop(0, '#d9e8df'); grad.addColorStop(1, '#f4fff8');
+    cx.fillStyle = grad;
+    cx.fillRect(bx, by, bw * frac, bh);
+    // border
+    cx.strokeStyle = 'rgba(220,235,225,0.5)'; cx.lineWidth = 1;
+    cx.strokeRect(bx - 2.5, by - 2.5, bw + 5, bh + 5);
     cx.restore();
   }
 
@@ -482,24 +538,170 @@
     cx.restore();
   }
 
-  function drawPause() {
+  function menuBackdrop() {
     cx.save();
-    cx.fillStyle = 'rgba(3,8,9,0.72)';
-    cx.fillRect(0, 0, w, h);
+    const bg = cx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(3,8,9,0.84)'); bg.addColorStop(0.5, 'rgba(3,8,9,0.7)'); bg.addColorStop(1, 'rgba(3,8,9,0.86)');
+    cx.fillStyle = bg; cx.fillRect(0, 0, w, h);
+  }
+  // shared vertical menu; items: { label, sub, right }. returns clickable rects.
+  function vmenu(items, sel, y0, bw, bh, gap) {
+    const x0 = w / 2 - bw / 2, rects = [];
+    items.forEach((it, i) => {
+      const y = y0 + i * (bh + gap), s = i === sel;
+      roundRect(x0, y, bw, bh, 9);
+      cx.fillStyle = s ? 'rgba(38,72,54,0.92)' : 'rgba(18,28,24,0.7)'; cx.fill();
+      cx.lineWidth = s ? 2.2 : 1; cx.strokeStyle = s ? 'rgba(180,240,200,0.8)' : 'rgba(120,150,135,0.45)'; cx.stroke();
+      cx.textAlign = 'left'; cx.textBaseline = 'middle';
+      cx.fillStyle = (it.dim ? 'rgba(140,150,145,0.6)' : (s ? '#eafff0' : '#c6d4cc')); cx.font = `${s ? 21 : 19}px ${serif}`;
+      cx.fillText(it.label, x0 + 22, y + (it.sub ? bh / 2 - 9 : bh / 2));
+      if (it.sub) { cx.fillStyle = 'rgba(175,195,182,0.62)'; cx.font = `13px ${serif}`; cx.fillText(it.sub, x0 + 22, y + bh / 2 + 11); }
+      if (it.right) { cx.textAlign = 'right'; cx.fillStyle = it.afford === false ? 'rgba(210,120,110,0.9)' : '#ffe28a'; cx.font = `15px ${serif}`; cx.fillText(it.right, x0 + bw - 18, y + bh / 2); }
+      rects.push({ x: x0, y, w: bw, h: bh, index: i });
+    });
+    cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
+    return rects;
+  }
+  function menuHint(t) { cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)'; cx.textAlign = 'center'; cx.fillText(t, w / 2, h - 24); }
+  function menuTitle(t, y, glow) {
+    cx.textAlign = 'center'; cx.fillStyle = '#eaf2ee'; cx.shadowColor = glow || 'rgba(160,240,200,0.4)'; cx.shadowBlur = 16;
+    cx.font = `40px ${serif}`; cx.fillText(t, w / 2, y); cx.shadowBlur = 0;
+  }
+  function drawPause() {
+    menuBackdrop();
+    const pulse = 0.5 + Math.sin(G.time * 1.5) * 0.5;
     cx.textAlign = 'center';
     cx.fillStyle = '#eaf2ee';
-    cx.font = `46px ${serif}`;
-    cx.fillText('paused', w / 2, h * 0.36);
-    cx.font = `17px ${serif}`;
-    cx.fillStyle = 'rgba(200,215,208,0.85)';
-    const lines = [
-      'A D / ← →  move          Z / SPACE  jump (hold = higher)',
-      'X / J  strike (with ↑ / ↓)          C / SHIFT  dash',
-      'F  hold to focus & mend · tap to cast          ↑ / E  interact · rest',
-      'M — map',
-      'ESC — resume          U — mute'
+    cx.shadowColor = 'rgba(160,240,200,0.4)'; cx.shadowBlur = 18;
+    cx.font = `52px ${serif}`;
+    cx.fillText('P A U S E D', w / 2, h * 0.28);
+    cx.shadowBlur = 0;
+    const items = G.Main.pauseItems || [];
+    const bw = 300, bh = 48, gap = 12, x0 = w / 2 - bw / 2, y0 = h * 0.4;
+    G.UI.pauseButtons = [];
+    items.forEach((it, i) => {
+      const y = y0 + i * (bh + gap);
+      const sel = i === G.Main.pauseIndex;
+      roundRect(x0, y, bw, bh, 9);
+      cx.fillStyle = sel ? 'rgba(38,72,54,0.92)' : 'rgba(18,28,24,0.7)'; cx.fill();
+      cx.lineWidth = sel ? 2.2 : 1;
+      cx.strokeStyle = sel ? `rgba(180,240,200,${0.7 + pulse * 0.3})` : 'rgba(120,150,135,0.45)'; cx.stroke();
+      cx.fillStyle = sel ? '#eafff0' : '#c6d4cc';
+      cx.font = `${sel ? 23 : 21}px ${serif}`; cx.textBaseline = 'middle';
+      cx.fillText(it, w / 2, y + bh / 2 + 1);
+      if (sel) { cx.fillStyle = 'rgba(180,240,200,0.9)'; cx.fillText('‹', x0 + 22, y + bh / 2 + 1); cx.fillText('›', x0 + bw - 22, y + bh / 2 + 1); }
+      G.UI.pauseButtons.push({ x: x0, y, w: bw, h: bh, index: i });
+    });
+    cx.textBaseline = 'alphabetic';
+    cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)';
+    cx.fillText('↑ ↓ select · Enter / Z choose · ESC resume', w / 2, h - 26);
+    cx.restore();
+  }
+
+  function drawCharms() {
+    menuBackdrop();
+    const C = G.Charms;
+    cx.textAlign = 'center';
+    cx.fillStyle = '#eaf2ee'; cx.shadowColor = 'rgba(160,240,200,0.4)'; cx.shadowBlur = 18;
+    cx.font = `40px ${serif}`; cx.fillText('C H A R M S', w / 2, h * 0.13); cx.shadowBlur = 0;
+    // notch meter
+    const used = C.usedNotches(), total = C.notches();
+    cx.font = `15px ${serif}`; cx.fillStyle = 'rgba(190,210,200,0.8)';
+    cx.fillText('Notches  ' + used + ' / ' + total, w / 2, h * 0.13 + 28);
+    const list = C.LIST, n = list.length;
+    const bw = Math.min(640, w - 80), bh = 56, gap = 8, x0 = w / 2 - bw / 2;
+    const y0 = h * 0.22;
+    G.UI.charmButtons = [];
+    list.forEach((c, i) => {
+      const y = y0 + i * (bh + gap);
+      const sel = i === G.Main.charmIndex;
+      const owned = C.isOwned(c.id);
+      const eq = C.isEquipped(c.id);
+      const affordable = eq || C.canEquip(c.id);
+      roundRect(x0, y, bw, bh, 9);
+      cx.fillStyle = sel ? 'rgba(36,64,50,0.94)' : 'rgba(16,25,21,0.74)'; cx.fill();
+      cx.lineWidth = sel ? 2.2 : 1;
+      cx.strokeStyle = eq ? 'rgba(150,240,180,0.85)' : (sel ? 'rgba(180,240,200,0.8)' : 'rgba(110,140,125,0.4)'); cx.stroke();
+      // equipped pip
+      cx.beginPath(); cx.arc(x0 + 22, y + bh / 2, 7, 0, Math.PI * 2);
+      cx.fillStyle = eq ? '#9bf0b8' : 'rgba(120,140,130,0.25)'; cx.fill();
+      cx.textAlign = 'left';
+      cx.fillStyle = !owned ? 'rgba(130,140,135,0.55)' : (affordable ? (sel ? '#eafff0' : '#cad8d0') : 'rgba(150,120,120,0.7)');
+      cx.font = `19px ${serif}`; cx.textBaseline = 'middle';
+      cx.fillText(owned ? c.name : '— locked —', x0 + 40, y + 19);
+      cx.fillStyle = 'rgba(175,195,182,0.62)'; cx.font = `13px ${serif}`;
+      cx.fillText(owned ? c.desc : 'Undiscovered — find it in the world or buy it from a vendor.', x0 + 40, y + 39);
+      cx.textAlign = 'right'; cx.fillStyle = 'rgba(200,220,190,0.75)'; cx.font = `13px ${serif}`;
+      cx.fillText('◆'.repeat(c.cost), x0 + bw - 16, y + bh / 2);
+      G.UI.charmButtons.push({ x: x0, y, w: bw, h: bh, index: i });
+    });
+    cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
+    cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)';
+    cx.fillText('↑ ↓ select · Enter / Z equip-unequip · ESC back', w / 2, h - 22);
+    cx.restore();
+  }
+
+  function drawSettings() {
+    menuBackdrop();
+    const s = G.settings || { volume: 0.8, shake: true, quality: 'high' };
+    cx.textAlign = 'center';
+    cx.fillStyle = '#eaf2ee'; cx.shadowColor = 'rgba(160,240,200,0.4)'; cx.shadowBlur = 18;
+    cx.font = `40px ${serif}`; cx.fillText('S E T T I N G S', w / 2, h * 0.2); cx.shadowBlur = 0;
+    const rows = [
+      ['Sound volume', Math.round(s.volume * 100) + '%'],
+      ['Screen shake', s.shake ? 'On' : 'Off'],
+      ['Visual quality', s.quality.charAt(0).toUpperCase() + s.quality.slice(1)]
     ];
-    lines.forEach((l, i) => cx.fillText(l, w / 2, h * 0.46 + i * 30));
+    const bw = 460, bh = 52, gap = 12, x0 = w / 2 - bw / 2, y0 = h * 0.34;
+    G.UI.settingsButtons = [];
+    rows.forEach((r, i) => {
+      const y = y0 + i * (bh + gap);
+      const sel = i === G.Main.settingsIndex;
+      roundRect(x0, y, bw, bh, 9);
+      cx.fillStyle = sel ? 'rgba(38,72,54,0.92)' : 'rgba(18,28,24,0.7)'; cx.fill();
+      cx.lineWidth = sel ? 2.2 : 1;
+      cx.strokeStyle = sel ? 'rgba(180,240,200,0.8)' : 'rgba(120,150,135,0.45)'; cx.stroke();
+      cx.textAlign = 'left'; cx.fillStyle = sel ? '#eafff0' : '#c6d4cc';
+      cx.font = `19px ${serif}`; cx.textBaseline = 'middle';
+      cx.fillText(r[0], x0 + 22, y + bh / 2);
+      cx.textAlign = 'right'; cx.fillStyle = '#eafff0';
+      cx.fillText('‹  ' + r[1] + '  ›', x0 + bw - 20, y + bh / 2);
+      G.UI.settingsButtons.push({ x: x0, y, w: bw, h: bh, index: i });
+    });
+    cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
+    cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)';
+    cx.fillText('↑ ↓ select · ← → adjust · ESC back', w / 2, h - 26);
+    cx.restore();
+  }
+
+  function drawBench() {
+    menuBackdrop();
+    menuTitle('R E S T E D', h * 0.3, 'rgba(255,230,180,0.4)');
+    cx.font = `italic 15px ${serif}`; cx.fillStyle = 'rgba(200,215,208,0.7)'; cx.textAlign = 'center';
+    cx.fillText('Your masks are mended; your journey is recorded.', w / 2, h * 0.3 + 30);
+    G.UI.benchButtons = vmenu(G.Main.benchItems.map(t => ({ label: t })), G.Main.benchIndex, h * 0.44, 300, 48, 12);
+    menuHint('↑ ↓ select · Enter choose · ESC leave');
+    cx.restore();
+  }
+  function drawTravel() {
+    menuBackdrop();
+    menuTitle('T R A V E L', h * 0.16);
+    const list = (G.save && G.save.benchList) || [];
+    const cur = G.room ? G.room.id : null;
+    const items = list.map(b => ({ label: b.name, sub: b.room === cur ? '— you are here —' : 'a bench you have rested at', dim: b.room === cur }));
+    G.UI.travelButtons = vmenu(items, G.Main.travelIndex, h * 0.26, Math.min(560, w - 80), 54, 8);
+    menuHint('↑ ↓ select · Enter travel · ESC back');
+    cx.restore();
+  }
+  function drawShop() {
+    menuBackdrop();
+    menuTitle('V E N D O R', h * 0.15, 'rgba(255,230,160,0.4)');
+    cx.font = `15px ${serif}`; cx.fillStyle = '#ffe28a'; cx.textAlign = 'center';
+    cx.fillText('Glimmer  ' + G.Main.glimmer(), w / 2, h * 0.15 + 28);
+    const sl = G.Main.shopList || [];
+    const items = sl.map(c => { const price = G.Main.charmPrice(c.id); return { label: c.name, sub: c.desc, right: price + ' ◇', afford: G.Main.glimmer() >= price }; });
+    G.UI.shopButtons = vmenu(items, G.Main.shopIndex, h * 0.25, Math.min(620, w - 80), 56, 8);
+    menuHint('↑ ↓ select · Enter buy · ESC leave');
     cx.restore();
   }
 
@@ -573,6 +775,7 @@
       drawHud(dt);
       drawPrompts();
       drawAreaTitle(dt);
+      drawBossBar(dt);
       drawBossTitle(dt);
       drawToasts(dt);
     }
@@ -581,6 +784,11 @@
     if (st === 'title') drawTitleScreen();
     if (st === 'slots') { drawSlots(); drawToasts(dt); }
     if (st === 'pause') drawPause();
+    if (st === 'charms') drawCharms();
+    if (st === 'settings') drawSettings();
+    if (st === 'bench') drawBench();
+    if (st === 'travel') { drawTravel(); drawToasts(dt); }
+    if (st === 'shop') { drawShop(); drawToasts(dt); }
     if (st === 'dead') drawDeath(dt);
     if (st === 'ending') drawEnding(G.Main.endingT);
     if (st === 'map') drawMap();

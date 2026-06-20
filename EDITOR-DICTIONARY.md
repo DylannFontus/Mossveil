@@ -9,6 +9,24 @@ the README; this file is the "what is this and what's it for" reference.
 > place it (hold **Shift** to place several). Selected objects show their fields in the
 > **Inspector** (right). On a touch device, one finger places/drags, two fingers pan/zoom.
 
+### Recent additions (quick reference)
+
+- **▶ Play here** — playtest the real game *inside* the editor (overlay), no new tab.
+- **⁂ Scatter** — when placing **Decor**, stamps a randomized cluster (varied scale/flip/seed).
+- **Multi-select** — drag over empty space for a **marquee**, or **Shift-click** to add/remove.
+  Then move/delete/copy the whole group.
+- **Copy/paste across rooms** — `Ctrl+C` / `Ctrl+V` (the clipboard persists between levels).
+- **Prefabs** — select a cluster, `Ctrl+G` to save it as a reusable prefab (in the **Prefabs**
+  asset tab); place it like any asset.
+- **Align** — `L` snaps the selection to the half-tile grid.
+- **Per-level look** — a **colour-grade override** in Level settings (Exposure/Bloom/Vignette/
+  Saturation/Contrast/Tint), shown live; the editor viewport now renders the game's
+  **post-processing** (WYSIWYG).
+- **Cutscene timeline** — the Scenes tab has a visual timeline: drag event blocks to retime.
+- **Map validation** — the Map tab shows **room thumbnails** and flags broken/one-way
+  transitions with ⚠ and a summary.
+- **New props** — **Vendor** (charm shop) and **Charm pickup** (see Props below).
+
 ---
 
 ## 1. Top toolbar
@@ -67,6 +85,8 @@ the README; this file is the "what is this and what's it for" reference.
 | **Moth Wings pickup** 🦋 | The **double-jump ability** pickup. Grant it once in your world. | X, Y |
 | **Ending shrine** 🛕 | Interacting here triggers the **ending sequence**. Place it at your finale. | X, Y |
 | **Boss gate** 🚪 | A door that seals an arena during a fight and opens when the boss falls. Pair its **Gate id** with a boss trigger's gates. | **Gate id** |
+| **Vendor (charm shop)** 🧙 | A cloaked vendor — the player interacts (E/↑) to open a shop and **buy charms with Glimmer**. | X, Y |
+| **Charm pickup** 🔆 | A found-in-the-world charm. The player collects it once and keeps it. | **Charm** (which one) |
 
 ---
 

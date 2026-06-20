@@ -271,7 +271,10 @@
   };
 
   // ---------------- camera shake & hit-stop ----------------
-  FX.shake = (amp, dur) => { shakeAmp = Math.max(shakeAmp, amp); shakeDur = shakeT = Math.max(shakeDur, dur); };
+  FX.shake = (amp, dur) => {
+    if (G.settings && G.settings.shake === false) return;   // respect the shake setting
+    shakeAmp = Math.max(shakeAmp, amp); shakeDur = shakeT = Math.max(shakeDur, dur);
+  };
   FX.camOffset = () => {
     if (shakeT <= 0) return { x: 0, y: 0 };
     const k = (shakeT / shakeDur) * shakeAmp;

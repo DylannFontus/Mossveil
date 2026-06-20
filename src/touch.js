@@ -75,7 +75,7 @@
   add({ cls: 'act', html: '<span class="g">✺</span><span>FOCUS</span>', action: 'cast', show: PLAY, css: { right: '126px', bottom: '160px' } });
 
   // ---- top-right: pause + map ----
-  add({ cls: 'mini', html: '⏸', tap: 'pause', show: s => s === 'play' || s === 'pause', css: { right: '14px', top: '14px' } });
+  add({ cls: 'mini', html: '⏸', tap: 'pause', show: s => s === 'play' || s === 'pause' || s === 'charms' || s === 'settings', css: { right: '14px', top: '14px' } });
   add({ cls: 'mini', html: '🗺', tap: 'map', show: s => s === 'play' || s === 'map', css: { right: '80px', top: '14px' } });
 
   // ---- context button (top-right corner): skip a cutscene / advance the ending ----

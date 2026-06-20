@@ -1,7 +1,8 @@
 // MOSSVEIL — audio.js : fully procedural WebAudio ambience + sfx
 (function () {
   let ctx = null, master = null, verb = null, verbGain = null, sfxBus = null, ambBus = null;
-  let muted = false, started = false;
+  let muted = false, started = false, volume = 0.8;
+  const masterLevel = () => (muted ? 0 : 0.55 * volume);
   let droneNodes = [], windGain = null;
   let dripT = 2, pluckT = 3, bossPulseT = 0;
   let areaRoot = 220, bossOn = false;
@@ -21,7 +22,7 @@
     if (started) return;
     started = true;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain(); master.gain.value = muted ? 0 : 0.55;
+    master = ctx.createGain(); master.gain.value = masterLevel();
     master.connect(ctx.destination);
     verb = ctx.createConvolver(); verb.buffer = impulse(2.4, 2.6);
     verbGain = ctx.createGain(); verbGain.gain.value = 0.4;
@@ -186,8 +187,12 @@
     },
     toggleMute() {
       muted = !muted;
-      if (master) master.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.1);
+      if (master) master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.1);
       return muted;
+    },
+    setVolume(v) {
+      volume = Math.max(0, Math.min(1, v));
+      if (master) master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.08);
     },
     update(dt) {
       if (!started) return;

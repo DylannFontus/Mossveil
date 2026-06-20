@@ -121,6 +121,22 @@ and Pause + Map buttons top-right. Hold the D-pad up (▲) to interact / rest at
 down (▼) + Jump to drop through platforms, and cutscenes show a **Skip** button. The controls
 are hidden on desktop/keyboard. (Menus respond to taps directly.)
 
+## Presentation, charms, currency & options
+
+- **Cinematic rendering** — a post-processing pass adds **bloom, per-biome colour grading,
+  vignette, film grain and chromatic aberration**, plus a living camera (look-ahead +
+  zoom-punch on impacts), squash-&-stretch juice, a lantern glow, and per-biome atmosphere
+  (drifting haze, fireflies, wind). Visual quality is adjustable in **Settings** (Low/Med/High).
+- **Bosses** get a named **health bar**, a cinematic intro/phase-transition, and attack
+  telegraphs.
+- **Charms** — equip up to your **notch** budget (which grows as you fell bosses) for effects
+  like extra masks, harder strikes, faster focus, quicker dashes. Find them in the world
+  (charm pickups) or **buy them from a Vendor** with Glimmer.
+- **Glimmer** — currency dropped by enemies and bosses (shown in the HUD).
+- **The pause screen is a menu:** Resume / **Charms** / **Settings** (volume, screen-shake,
+  visual quality) / Quit to Title. Rest at a **bench** to open its hub: **Travel** (fast-travel
+  to any bench you've rested at), **Charms**, or Leave.
+
 The **title menu** has New Game, Continue, Load Save, and Exit — navigate with the
 arrows + Enter/Z, or the mouse.
 

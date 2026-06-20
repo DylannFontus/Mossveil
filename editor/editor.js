@@ -10,9 +10,16 @@
   let currentId = Object.keys(G.LEVELS)[0] || null;
   let tool = 'select';
   let tab = 'scene';            // 'scene' | 'map'
-  let snap = true, gizmos = true;
+  let snap = true, gizmos = true, scatter = false;
   let dirty = false;
   let sel = null;               // {kind:'prop'|'enemy'|'zone'|'spawn', i | key}
+  let multi = [];               // additional multi-selection (array of sel descriptors)
+  let marquee = null;           // rubber-band box {x0,y0,x1,y1} in world coords
+  let clipboard = null;         // copied cluster {items,ox,oy}
+  let lastWorld = { x: 0, y: 0 };
+  let prefabs = {};             // name -> captured cluster
+  try { prefabs = JSON.parse(localStorage.getItem('mossveil-ed-prefabs')) || {}; } catch (e) { }
+  try { clipboard = JSON.parse(localStorage.getItem('mossveil-ed-clip')) || null; } catch (e) { }
   let placing = null;           // asset descriptor being placed
   let undoStack = [], redoStack = [];
   let rebuildTimer = 0, needsRebuild = false;
@@ -81,7 +88,9 @@
   const scene = G.scene = new THREE.Scene();
   const camera = G.camera = new THREE.PerspectiveCamera(FOV, 1, 1, 300);
   let camX = 20, camY = 10, camZ = 34;
+  let postOn = true;   // WYSIWYG: show the game's post-processing in the editor viewport
   G.FX.init(scene);
+  if (G.Post) G.Post.init();
 
   function resize() {
     const r = $('viewportWrap').getBoundingClientRect();
@@ -94,6 +103,7 @@
     mapCanvas.width = r.width * dpr; mapCanvas.height = r.height * dpr;
     G.pxScale = (renderer.domElement.height / 2) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
     G.FX.resize(renderer.domElement.height, FOV);
+    if (G.Post) G.Post.resize();
   }
   addEventListener('resize', resize);
 
@@ -202,7 +212,8 @@
   const PROP_SIZE = {
     bench: [2.6, 1.5], sign: [1.1, 1.4], readable: [1.1, 1.6], lamp: [0.8, 2.1],
     crystal: [1.3, 1.8], wings: [1.6, 1.2], shrine: [1.8, 2.8], gate: [1.1, 5],
-    bossTrigger: [2, 2], decor: [1.6, 1.6], light: [1.4, 1.4], ray: [2, 2], textTrigger: [3, 3]
+    bossTrigger: [2, 2], decor: [1.6, 1.6], light: [1.4, 1.4], ray: [2, 2], textTrigger: [3, 3],
+    vendor: [1.2, 2], charmPickup: [1, 1]
   };
   function propRect(p) {
     if (p.type === 'textTrigger' || p.type === 'cutsceneTrigger') return { x: p.x, y: p.y, w: p.w || 3, h: p.h || 3 };
@@ -239,15 +250,17 @@
     return null;
   }
   function deleteSelected() {
-    const it = selectedItem();
-    if (!it) return;
+    const all = selAll();
+    if (!all.length) return;
     pushUndo();
     const L = lvl();
-    if (it.kind === 'prop') L.props.splice(it.i, 1);
-    else if (it.kind === 'enemy') L.enemies.splice(it.i, 1);
-    else if (it.kind === 'zone') L.transitions.splice(it.i, 1);
-    else if (it.kind === 'spawn') delete L.spawns[it.key];
-    sel = null;
+    // splice indices high-to-low per kind so earlier removals don't shift later ones
+    const idx = k => all.filter(s => s.kind === k).map(s => s.i).sort((a, b) => b - a);
+    idx('prop').forEach(i => L.props.splice(i, 1));
+    idx('enemy').forEach(i => L.enemies.splice(i, 1));
+    idx('zone').forEach(i => L.transitions.splice(i, 1));
+    all.filter(s => s.kind === 'spawn').forEach(s => { delete L.spawns[s.key]; });
+    sel = null; multi = [];
     queueRebuild();
     refreshHierarchy(); refreshInspector();
   }
@@ -263,6 +276,69 @@
     else if (it.kind === 'zone') { L.transitions.push(copy); sel = { kind: 'zone', i: L.transitions.length - 1 }; }
     queueRebuild();
     refreshHierarchy(); refreshInspector();
+  }
+
+  // ---------------- multi-select / clipboard / prefabs ----------------
+  function sameSel(a, b) { return a && b && a.kind === b.kind && (a.kind === 'spawn' ? a.key === b.key : a.i === b.i); }
+  function selAll() { const out = []; const add = s => { if (s && !out.some(o => sameSel(o, s))) out.push(s); }; multi.forEach(add); add(sel); return out; }
+  function moveTarget(s) {   // the object carrying x/y for a selection
+    const L = lvl();
+    if (s.kind === 'prop') return L.props[s.i];
+    if (s.kind === 'enemy') return L.enemies[s.i];
+    if (s.kind === 'spawn') return L.spawns[s.key];
+    if (s.kind === 'zone') { const z = L.transitions[s.i]; return z && z.rect ? z.rect : z; }
+    return null;
+  }
+  function selectInBox(box) {
+    const L = lvl(), res = [];
+    const x0 = Math.min(box.x0, box.x1), x1 = Math.max(box.x0, box.x1), y0 = Math.min(box.y0, box.y1), y1 = Math.max(box.y0, box.y1);
+    const inb = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    (L.props || []).forEach((p, i) => { if (inb(p.x, p.y)) res.push({ kind: 'prop', i }); });
+    (L.enemies || []).forEach((p, i) => { if (inb(p.x, p.y)) res.push({ kind: 'enemy', i }); });
+    (L.transitions || []).forEach((z, i) => { const r = z.rect || z; if (inb(r.x, r.y)) res.push({ kind: 'zone', i }); });
+    for (const k in (L.spawns || {})) { const s = L.spawns[k]; if (inb(s.x, s.y)) res.push({ kind: 'spawn', key: k }); }
+    return res;
+  }
+  function captureSelection() {
+    const L = lvl(), items = [];
+    for (const s of selAll()) {
+      if (s.kind === 'spawn') continue;
+      const ref = s.kind === 'prop' ? L.props[s.i] : s.kind === 'enemy' ? L.enemies[s.i] : L.transitions[s.i];
+      if (!ref) continue;
+      const t = s.kind === 'zone' ? (ref.rect || ref) : ref;
+      items.push({ kind: s.kind, data: JSON.parse(JSON.stringify(ref)), x: t.x || 0, y: t.y || 0 });
+    }
+    if (!items.length) return null;
+    const ox = items.reduce((a, b) => a + b.x, 0) / items.length, oy = items.reduce((a, b) => a + b.y, 0) / items.length;
+    return { items, ox, oy };
+  }
+  function stampCapture(cap, wx, wy) {
+    if (!cap || !cap.items || !cap.items.length) return;
+    const L = lvl(); multi = [];
+    for (const it of cap.items) {
+      const d = JSON.parse(JSON.stringify(it.data));
+      const nx = +(wx + (it.x - cap.ox)).toFixed(2), ny = +(wy + (it.y - cap.oy)).toFixed(2);
+      if (it.kind === 'prop') { d.x = nx; d.y = ny; L.props = L.props || []; L.props.push(d); multi.push({ kind: 'prop', i: L.props.length - 1 }); }
+      else if (it.kind === 'enemy') { d.x = nx; d.y = ny; L.enemies = L.enemies || []; L.enemies.push(d); multi.push({ kind: 'enemy', i: L.enemies.length - 1 }); }
+      else if (it.kind === 'zone') { if (d.rect) { d.rect.x = nx; d.rect.y = ny; } else { d.x = nx; d.y = ny; } L.transitions = L.transitions || []; L.transitions.push(d); multi.push({ kind: 'zone', i: L.transitions.length - 1 }); }
+    }
+    sel = multi[0] || null;
+  }
+  function copySelection() { const c = captureSelection(); if (!c) return; clipboard = c; try { localStorage.setItem('mossveil-ed-clip', JSON.stringify(c)); } catch (e) { } }
+  function pasteClipboard() { if (!clipboard) return; pushUndo(); stampCapture(clipboard, lastWorld.x, lastWorld.y); queueRebuild(); refreshHierarchy(); refreshInspector(); }
+  function savePrefab(nameArg) {
+    const c = captureSelection(); if (!c) { if (typeof nameArg !== 'string') alert('Select one or more objects first (marquee-drag, or Shift-click to add).'); return; }
+    const name = (typeof nameArg === 'string' ? nameArg : (prompt('Prefab name:', 'cluster') || '')).trim(); if (!name) return;
+    prefabs[name] = c;
+    try { localStorage.setItem('mossveil-ed-prefabs', JSON.stringify(prefabs)); } catch (e) { }
+    refreshAssets();
+  }
+  function deletePrefab(name) { delete prefabs[name]; try { localStorage.setItem('mossveil-ed-prefabs', JSON.stringify(prefabs)); } catch (e) { } refreshAssets(); }
+  function stampPrefab(name, x, y) { const pf = prefabs[name]; if (pf) stampCapture(pf, x, y); }
+  function alignSelected() {   // snap every selected object to the half-tile grid
+    const all = selAll(); if (!all.length) return; pushUndo();
+    for (const s of all) { const t = moveTarget(s); if (t && t.x !== undefined) { t.x = Math.round(t.x * 2) / 2; t.y = Math.round(t.y * 2) / 2; } }
+    queueRebuild(); refreshInspector();
   }
 
   // ---------------- viewport input ----------------
@@ -304,15 +380,30 @@
       panning = true; lastMouse = { x: e.clientX, y: e.clientY }; return;
     }
     const w = mouseWorld(e);
+    lastWorld = w;
     if (placing) { placeAsset(w.x, w.y); return; }
     if (tool === 'select') {
       const hit = pickAt(w.x, w.y);
       if (hit) {
-        sel = hit.kind === 'spawn' ? { kind: 'spawn', key: hit.key } : { kind: hit.kind, i: hit.i };
-        pushUndo();
-        dragging = { off: { x: hit.ref.x - w.x, y: hit.ref.y - w.y } };
-      } else sel = null;
-      refreshHierarchy(); refreshInspector();
+        const hs = hit.kind === 'spawn' ? { kind: 'spawn', key: hit.key } : { kind: hit.kind, i: hit.i };
+        if (keepPlacing) {                          // Shift-click: toggle in the multi-selection
+          const k = multi.findIndex(m => sameSel(m, hs));
+          if (k >= 0) multi.splice(k, 1); else multi.push(hs);
+          sel = hs;
+        } else {
+          if (!selAll().some(s => sameSel(s, hs))) { sel = hs; multi = []; }   // fresh pick clears the group
+          else sel = hs;                                                       // clicked an already-grouped item: keep group
+          pushUndo();
+          const primary = moveTarget(sel);
+          const others = selAll().filter(s => !sameSel(s, sel)).map(moveTarget).filter(t => t && t.x !== undefined);
+          dragging = { off: { x: (primary ? primary.x : hit.ref.x) - w.x, y: (primary ? primary.y : hit.ref.y) - w.y }, others, px: primary ? primary.x : 0, py: primary ? primary.y : 0 };
+        }
+        refreshHierarchy(); refreshInspector();
+      } else {
+        if (!keepPlacing) { sel = null; multi = []; }
+        marquee = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
+        refreshHierarchy(); refreshInspector();
+      }
     } else {
       pushUndo();
       painting = true;
@@ -332,19 +423,24 @@
       return;
     }
     const overViewport = e.target === glCanvas || e.target === overlay || e.target === vpEl;
-    if (!overViewport && !dragging && !painting) return;
+    if (!overViewport && !dragging && !painting && !marquee) return;
     const w = mouseWorld(e);
+    lastWorld = w;
     const t = worldToTile(w.x, w.y);
     $('stMouse').textContent = `x ${w.x.toFixed(1)}  y ${w.y.toFixed(1)}  ·  tile ${t.c},${t.r}`;
-    if (dragging) {
-      const it = selectedItem();
-      if (it) {
-        let nx = w.x + dragging.off.x, ny = w.y + dragging.off.y;
-        if (snap) { nx = Math.round(nx * 2) / 2; ny = Math.round(ny * 2) / 2; }
-        it.ref.x = +nx.toFixed(2); it.ref.y = +ny.toFixed(2);
-        queueRebuild();
-        refreshInspector();
-      }
+    if (marquee) { marquee.x1 = w.x; marquee.y1 = w.y; }
+    else if (dragging) {
+      let nx = w.x + dragging.off.x, ny = w.y + dragging.off.y;
+      if (snap) { nx = Math.round(nx * 2) / 2; ny = Math.round(ny * 2) / 2; }
+      nx = +nx.toFixed(2); ny = +ny.toFixed(2);
+      const primary = moveTarget(sel);
+      if (primary && primary.x !== undefined) {
+        const dx = nx - primary.x, dy = ny - primary.y;
+        primary.x = nx; primary.y = ny;
+        for (const t2 of (dragging.others || [])) { t2.x = +((t2.x || 0) + dx).toFixed(2); t2.y = +((t2.y || 0) + dy).toFixed(2); }
+      } else { const it = selectedItem(); if (it) { it.ref.x = nx; it.ref.y = ny; } }
+      queueRebuild();
+      refreshInspector();
     } else if (painting) paintAt(w);
   });
   function endPointer(e) {
@@ -353,6 +449,17 @@
     if (pointers.size < 2) { pinch = null; gesturing = false; }
     if (pointers.size === 0) {
       panning = false;
+      if (marquee) {
+        const area = Math.abs(marquee.x1 - marquee.x0) + Math.abs(marquee.y1 - marquee.y0);
+        if (area > 0.4) {
+          const found = selectInBox(marquee);
+          if (keepPlacing) { for (const f of found) if (!multi.some(m => sameSel(m, f))) multi.push(f); }
+          else multi = found;
+          sel = multi[0] || null;
+          refreshHierarchy(); refreshInspector();
+        }
+        marquee = null;
+      }
       if (dragging || painting) { dragging = null; painting = false; needsRebuild = true; }
       mapDrag = null;
     }
@@ -397,6 +504,27 @@
     if (snap) { x = Math.round(x * 2) / 2; y = Math.round(y * 2) / 2; }
     x = +x.toFixed(2); y = +y.toFixed(2);
     const a = placing;
+    // prefab: stamp a saved cluster of objects
+    if (a.cat === 'prefab') { stampPrefab(a.prefab, x, y); if (!keepPlacing) setPlacing(null); queueRebuild(); refreshHierarchy(); refreshInspector(); return; }
+    // scatter brush: stamp a randomized cluster of this decor
+    if (scatter && a.id === 'decor') {
+      L.props = L.props || [];
+      const n = 4 + (Math.random() * 4 | 0);
+      let last;
+      for (let i = 0; i < n; i++) {
+        const r = Math.random() * 2.6, ang = Math.random() * Math.PI * 2;
+        const px = +(x + Math.cos(ang) * r).toFixed(2), py = +(y + Math.sin(ang) * r * 0.5).toFixed(2);
+        const p = Object.assign({ type: 'decor', kind: a.kind || 'tree', x: px, y: py }, JSON.parse(JSON.stringify(a.defaults || {})));
+        p.scale = +(0.7 + Math.random() * 0.9).toFixed(2);
+        p.flip = Math.random() < 0.5;
+        p.seed = Math.random() * 999 | 0;
+        L.props.push(p); last = L.props.length - 1;
+      }
+      sel = { kind: 'prop', i: last };
+      if (!keepPlacing) setPlacing(null);
+      queueRebuild(); refreshHierarchy(); refreshInspector();
+      return;
+    }
     if (a.cat === 'enemy') {
       L.enemies = L.enemies || [];
       L.enemies.push({ type: a.id, x, y });
@@ -450,6 +578,7 @@
       const p1 = U.toScreen(r.x - r.w / 2, r.y + r.h / 2);
       const p2 = U.toScreen(r.x + r.w / 2, r.y - r.h / 2);
       const isSel = item && it.kind === item.kind && (it.kind === 'spawn' ? it.key === item.key : it.i === item.i);
+      const inMulti = multi.some(m => sameSel(m, it.kind === 'spawn' ? { kind: 'spawn', key: it.key } : { kind: it.kind, i: it.i }));
       let col = '#7fb2e8';
       if (it.kind === 'enemy') col = '#e87f7f';
       if (it.kind === 'zone') col = '#7fe8c0';
@@ -457,8 +586,8 @@
       if (it.ref.type === 'textTrigger') col = '#e8b85f';
       if (it.ref.type === 'bossTrigger') col = '#e85fd0';
       if (it.ref.type === 'cutsceneTrigger') col = '#5fd0e8';
-      octx.strokeStyle = isSel ? '#ffd887' : col + 'aa';
-      octx.lineWidth = isSel ? 2.5 : 1.2;
+      octx.strokeStyle = isSel ? '#ffd887' : (inMulti ? '#7fe8ff' : col + 'aa');
+      octx.lineWidth = (isSel || inMulti) ? 2.5 : 1.2;
       if (it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger') octx.setLineDash([4, 4]);
       octx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
       octx.setLineDash([]);
@@ -470,6 +599,14 @@
       octx.font = '10px Segoe UI';
       octx.fillStyle = isSel ? '#ffd887' : col;
       octx.fillText(name, p1.x + 2, p1.y - 3);
+    }
+    if (marquee) {
+      const m1 = U.toScreen(Math.min(marquee.x0, marquee.x1), Math.max(marquee.y0, marquee.y1));
+      const m2 = U.toScreen(Math.max(marquee.x0, marquee.x1), Math.min(marquee.y0, marquee.y1));
+      octx.fillStyle = 'rgba(127,232,255,0.12)';
+      octx.fillRect(m1.x, m1.y, m2.x - m1.x, m2.y - m1.y);
+      octx.strokeStyle = '#7fe8ff'; octx.lineWidth = 1; octx.setLineDash([5, 4]);
+      octx.strokeRect(m1.x, m1.y, m2.x - m1.x, m2.y - m1.y); octx.setLineDash([]);
     }
     if (placing) {
       octx.fillStyle = 'rgba(255,255,255,0.75)';
@@ -544,6 +681,23 @@
       el('div', { class: 'insNote' }, body,
         'Intro cutscene plays once when a NEW game starts in this level. Author cutscenes in the Scenes tab. ' +
         'Paint terrain with the toolbar tools; pick assets below and click to place them.');
+
+      // ---- per-level look (post-processing grade override) ----
+      el('div', { class: 'hgroup' }, body, 'Look — colour grade');
+      const applyGrade = () => { if (L.grade && G.Post) G.Post.setGrade(L.grade); markDirty(); };
+      const gset = (k, v) => { L.grade = L.grade || {}; if (v === null || v === '' || isNaN(v)) delete L.grade[k]; else L.grade[k] = v; if (!Object.keys(L.grade).length) delete L.grade; applyGrade(); };
+      numField(body, 'Exposure', () => (L.grade && L.grade.exposure !== undefined) ? L.grade.exposure : 1.05, v => gset('exposure', +v.toFixed(2)), 0.05);
+      numField(body, 'Bloom', () => (L.grade && L.grade.bloom !== undefined) ? L.grade.bloom : 0.6, v => gset('bloom', +Math.max(0, v).toFixed(2)), 0.05);
+      numField(body, 'Vignette', () => (L.grade && L.grade.vignette !== undefined) ? L.grade.vignette : 0.46, v => gset('vignette', +U.clamp(v, 0, 1).toFixed(2)), 0.05);
+      numField(body, 'Saturation', () => (L.grade && L.grade.saturation !== undefined) ? L.grade.saturation : 1.14, v => gset('saturation', +Math.max(0, v).toFixed(2)), 0.05);
+      numField(body, 'Contrast', () => (L.grade && L.grade.contrast !== undefined) ? L.grade.contrast : 1.05, v => gset('contrast', +Math.max(0, v).toFixed(2)), 0.05);
+      colorField(body, 'Tint', () => (L.grade && L.grade.tint) || '#ffffff', v => {
+        L.grade = L.grade || {};
+        if (!v || v.toLowerCase() === '#ffffff') delete L.grade.tint; else L.grade.tint = v;
+        if (!Object.keys(L.grade).length) delete L.grade;
+        applyGrade();
+      });
+      el('div', { class: 'insNote' }, body, 'Overrides the biome’s automatic grade for this level. Leave at defaults to use the biome look. Shown live in the viewport.');
       return;
     }
     const p = it.ref;
@@ -649,6 +803,17 @@
           numField(body, 'Trigger radius', () => p.r || 6, v => { p.r = Math.max(2, v); }, 1);
           el('div', { class: 'insNote' }, body, 'Walking within the radius starts the fight and closes all gates in the room. The ghost shows the boss.');
           break;
+        case 'charmPickup': {
+          const chOpts = (G.Charms ? G.Charms.LIST : []).map(c => ({ v: c.id, t: c.name + ' (' + c.cost + ')' }));
+          if (!chOpts.length) chOpts.push({ v: 'stoneheart', t: 'stoneheart' });
+          if (!p.charm) p.charm = chOpts[0].v;
+          selectField(body, 'Charm', chOpts, () => p.charm || chOpts[0].v, v => { p.charm = v; });
+          el('div', { class: 'insNote' }, body, 'The player picks this charm up once and keeps it. It then vanishes for that save.');
+          break;
+        }
+        case 'vendor':
+          el('div', { class: 'insNote' }, body, 'A cloaked vendor. Interact (E / ↑) to open the charm shop — the player buys charms with Glimmer dropped by enemies.');
+          break;
       }
     }
     if (it.kind === 'spawn') {
@@ -688,7 +853,7 @@
     const mk = (label, kind, i, key) => {
       const isSel = item && item.kind === kind && (kind === 'spawn' ? item.key === key : item.i === i);
       const d = el('div', { class: 'hitem' + (isSel ? ' sel' : '') }, null, label);
-      d.addEventListener('click', () => { sel = kind === 'spawn' ? { kind, key } : { kind, i }; refreshHierarchy(); refreshInspector(); });
+      d.addEventListener('click', () => { sel = kind === 'spawn' ? { kind, key } : { kind, i }; multi = []; refreshHierarchy(); refreshInspector(); });
       d.addEventListener('dblclick', () => {
         const it2 = selectedItem();
         if (it2) { camX = it2.kind === 'zone' && it2.ref.rect ? it2.ref.rect.x : it2.ref.x; camY = (it2.ref.y !== undefined ? it2.ref.y : (it2.ref.rect ? it2.ref.rect.y : camY)); }
@@ -814,7 +979,8 @@
     { id: 'lights', label: 'Lights' },
     { id: 'enemies', label: 'Enemies' },
     { id: 'bosses', label: 'Bosses' },
-    { id: 'markers', label: 'Markers' }
+    { id: 'markers', label: 'Markers' },
+    { id: 'prefabs', label: 'Prefabs' }
   ];
   let assetCat = 'props';
   function assetList() {
@@ -828,7 +994,9 @@
         { cat: 'prop', id: 'crystal', label: 'Glow crystal', ico: '💎' },
         { cat: 'prop', id: 'wings', label: 'Moth Wings pickup', ico: '🦋' },
         { cat: 'prop', id: 'shrine', label: 'Ending shrine', ico: '🛕' },
-        { cat: 'prop', id: 'gate', label: 'Boss gate', ico: '🚪', defaults: { id: 0 } }
+        { cat: 'prop', id: 'gate', label: 'Boss gate', ico: '🚪', defaults: { id: 0 } },
+        { cat: 'prop', id: 'vendor', label: 'Vendor (charm shop)', ico: '🧙' },
+        { cat: 'prop', id: 'charmPickup', label: 'Charm pickup', ico: '🔆', defaults: { charm: 'stoneheart' } }
       ];
       case 'decor': {
         const out = [];
@@ -848,6 +1016,7 @@
         { cat: 'zone', id: 'portal', label: 'Portal / transition', ico: '🌀' },
         { cat: 'prop', id: 'cutsceneTrigger', label: 'Cutscene trigger', ico: '🎬', defaults: { w: 4, h: 4, once: true } }
       ];
+      case 'prefabs': return Object.keys(prefabs).map(name => ({ cat: 'prefab', prefab: name, label: name, ico: '🧩', n: (prefabs[name].items || []).length, del: true }));
     }
     return [];
   }
@@ -860,11 +1029,22 @@
     }
     const body = $('assetBody');
     body.innerHTML = '';
+    if (assetCat === 'prefabs') {
+      const save = el('div', { class: 'asset', style: 'border-style:dashed' }, body);
+      el('div', { class: 'ico' }, save, '＋');
+      el('div', { class: 'nm' }, save, 'Save selection (Ctrl+G)');
+      save.addEventListener('click', savePrefab);
+      if (!Object.keys(prefabs).length) { const note = el('div', { class: 'nm', style: 'width:100%;padding:8px;color:var(--txt2)' }, body, 'Marquee-drag or Shift-click objects, then save them as a reusable prefab.'); }
+    }
     for (const a of assetList()) {
       const d = el('div', { class: 'asset' + (placing && placing.label === a.label ? ' on' : '') }, body);
       el('div', { class: 'ico' }, d, a.ico);
-      el('div', { class: 'nm' }, d, a.label);
+      el('div', { class: 'nm' }, d, a.label + (a.n ? ' (' + a.n + ')' : ''));
       d.addEventListener('click', () => setPlacing(placing && placing.label === a.label ? null : a));
+      if (a.del) {
+        const x = el('div', { class: 'nm', style: 'position:absolute;top:1px;right:4px;color:#c66;cursor:pointer', title: 'Delete prefab' }, d, '✕');
+        x.addEventListener('click', ev => { ev.stopPropagation(); if (confirm('Delete prefab "' + a.prefab + '"?')) deletePrefab(a.prefab); });
+      }
     }
   }
   function setPlacing(a) {
@@ -916,6 +1096,48 @@
       markDirty();
     }
   }
+  // cached per-room tile-shape thumbnails (1px/tile)
+  const thumbCache = {};
+  function roomThumb(lvl) {
+    const key = lvl.id + ':' + lvl.w + 'x' + lvl.h + ':' + (lvl.tiles ? lvl.tiles.length : 0);
+    if (thumbCache[lvl.id] && thumbCache[lvl.id].key === key) return thumbCache[lvl.id].c;
+    const cv = document.createElement('canvas');
+    cv.width = lvl.w; cv.height = lvl.h;
+    const c = cv.getContext('2d');
+    const pal = (G.World.PAL[lvl.biome] || G.World.PAL.verdant);
+    const hx = '#' + ((pal.moss || 0x55b070).toString(16).padStart(6, '0'));
+    const tiles = lvl.tiles || [];
+    for (let r = 0; r < lvl.h; r++) {
+      const row = tiles[r] || '';
+      for (let col = 0; col < lvl.w; col++) {
+        const ch = row[col];
+        if (ch === '#') { c.fillStyle = hx; c.fillRect(col, r, 1, 1); }
+        else if (ch === '=') { c.fillStyle = 'rgba(180,200,170,0.6)'; c.fillRect(col, r, 1, 1); }
+        else if (ch === '^') { c.fillStyle = '#d06060'; c.fillRect(col, r, 1, 1); }
+      }
+    }
+    thumbCache[lvl.id] = { key, c: cv };
+    return cv;
+  }
+
+  // validate transitions across the whole world
+  function validateWorld() {
+    const warns = [], bad = {};
+    for (const id in G.LEVELS) {
+      const L = G.LEVELS[id];
+      const trs = (L.transitions || []);
+      for (const tz of trs) {
+        const to = tz.to;
+        if (!to || !G.LEVELS[to]) { warns.push({ id, msg: `${id}: exit points to missing level "${to || '∅'}"` }); bad[id] = 1; continue; }
+        const sp = tz.spawn;
+        if (sp && G.LEVELS[to].spawns && !G.LEVELS[to].spawns[sp]) { warns.push({ id, msg: `${id} → ${to}: arrival spawn "${sp}" not found in ${to}` }); bad[id] = 1; }
+        const back = (G.LEVELS[to].transitions || []).some(t2 => t2.to === id);
+        if (!back) { warns.push({ id, msg: `${id} → ${to}: no return exit from ${to} (one-way)` }); bad[id] = 1; bad[to] = 1; }
+      }
+    }
+    return { warns, bad };
+  }
+
   function drawMapTab() {
     const dpr = Math.min(2, devicePixelRatio || 1);
     mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -923,10 +1145,44 @@
       w: G.viewW, h: G.viewH, pan: mapView.pan, zoom: mapView.zoom,
       visitedOnly: false, current: null, selected: currentId, showLabels: true
     });
-    mctx.font = '12px Segoe UI';
+    const view = { w: G.viewW, h: G.viewH, pan: mapView.pan, zoom: mapView.zoom };
+    // room thumbnails
+    mctx.save();
+    mctx.globalAlpha = 0.5;
+    mctx.imageSmoothingEnabled = false;
+    for (const id in G.LEVELS) {
+      const L = G.LEVELS[id];
+      const r = G.MapView.roomScreenRect(L, view);
+      if (r.w < 6 || r.h < 6) continue;
+      try { mctx.drawImage(roomThumb(L), r.x, r.y, r.w, r.h); } catch (e) { }
+    }
+    mctx.restore();
+    // validation markers + summary
+    const { warns, bad } = validateWorld();
+    for (const id in bad) {
+      const L = G.LEVELS[id]; if (!L) continue;
+      const r = G.MapView.roomScreenRect(L, view);
+      mctx.font = '16px Segoe UI'; mctx.textAlign = 'center'; mctx.fillStyle = '#ffcf4a';
+      mctx.fillText('⚠', r.x + r.w - 10, r.y + 16);
+    }
     mctx.textAlign = 'left';
+    if (warns.length) {
+      const pad = 8, lh = 15, n = Math.min(warns.length, 8);
+      const bw = 420, bh = 24 + n * lh + (warns.length > n ? lh : 0);
+      mctx.fillStyle = 'rgba(20,12,8,0.82)'; mctx.fillRect(10, 10, bw, bh);
+      mctx.strokeStyle = 'rgba(255,200,80,0.5)'; mctx.strokeRect(10, 10, bw, bh);
+      mctx.fillStyle = '#ffcf4a'; mctx.font = 'bold 12px Segoe UI';
+      mctx.fillText(`⚠ ${warns.length} world issue${warns.length > 1 ? 's' : ''}`, 18, 28);
+      mctx.font = '11px Segoe UI'; mctx.fillStyle = 'rgba(240,225,200,0.9)';
+      for (let i = 0; i < n; i++) mctx.fillText('· ' + warns[i].msg, 18, 28 + (i + 1) * lh);
+      if (warns.length > n) mctx.fillText(`  …and ${warns.length - n} more`, 18, 28 + (n + 1) * lh);
+    } else {
+      mctx.fillStyle = 'rgba(120,220,150,0.85)'; mctx.font = 'bold 12px Segoe UI';
+      mctx.fillText('✓ world connections look valid', 14, 26);
+    }
+    mctx.font = '12px Segoe UI';
     mctx.fillStyle = 'rgba(200,215,210,0.6)';
-    mctx.fillText('Drag rooms to arrange the world map · double-click to open · wheel to zoom · drag empty space to pan', 12, G.viewH - 12);
+    mctx.fillText('Drag rooms to arrange · double-click to open · wheel to zoom · ⚠ = transition issue', 12, G.viewH - 12);
   }
 
   function setTab(t) {
@@ -997,9 +1253,55 @@
         markCsDirty(); refreshScenes(); refreshInspector();
       }
     }, addRow, '+ Add event');
+    el('button', { class: 'tbtn play', onclick: async () => { if (await save()) openPlay(); } }, addRow, '▶ Preview');
 
-    const sorted = c.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t);
-    for (const { e, i } of sorted) {
+    // ---- visual timeline (drag blocks to retime) ----
+    const SCALE = 30;            // px per second
+    const SCREEN = new Set(['fade', 'letterbox', 'blur', 'text', 'camera', 'cameraRestore', 'shakePulse', 'sfx', 'flash']);
+    const total = Math.max(2, c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0)) + 1;
+    // pack events into non-overlapping lanes
+    const evs = c.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t);
+    const laneEnds = []; const lane = {};
+    for (const { e, i } of evs) {
+      let ln = laneEnds.findIndex(end => end <= e.t + 1e-6);
+      if (ln < 0) { ln = laneEnds.length; laneEnds.push(0); }
+      laneEnds[ln] = e.t + Math.max(0.1, e.dur || 0.1);
+      lane[i] = ln;
+    }
+    const lanes = Math.max(1, laneEnds.length);
+    const tl = el('div', { class: 'cstl', style: `height:${lanes * 22 + 18}px` }, box);
+    const inner = el('div', { style: `position:relative;width:${Math.max(tl.clientWidth || 220, total * SCALE + 20)}px;height:100%` }, tl);
+    // ruler ticks (every second)
+    const ruler = el('div', { class: 'ruler', style: `width:${total * SCALE + 20}px` }, inner);
+    for (let s = 0; s <= total; s++) el('div', { class: 'tick', style: `left:${s * SCALE}px;width:${SCALE}px` }, ruler, s % 1 === 0 ? s + 's' : '');
+    // blocks
+    let drag = null;
+    for (const { e, i } of evs) {
+      const blk = el('div', {
+        class: 'cstlblk ' + (SCREEN.has(e.type) ? 'screen' : 'actor') + (csSel === i ? ' sel' : ''),
+        style: `left:${e.t * SCALE}px;top:${lane[i] * 22 + 16}px;width:${Math.max(12, (e.dur || 0.2) * SCALE)}px`,
+        title: `${e.type} — ${e.t.toFixed(2)}s for ${(e.dur || 0)}s`
+      }, inner, e.type);
+      blk.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        csSel = i; refreshInspector();
+        document.querySelectorAll('.cstlblk.sel').forEach(b => b.classList.remove('sel')); blk.classList.add('sel');
+        drag = { i, startX: ev.clientX, startT: e.t, blk, moved: false };
+        try { blk.setPointerCapture(ev.pointerId); } catch (_) { }
+      });
+      blk.addEventListener('pointermove', ev => {
+        if (!drag || drag.i !== i) return;
+        const dt = (ev.clientX - drag.startX) / SCALE;
+        let nt = Math.max(0, drag.startT + dt);
+        nt = Math.round(nt * 10) / 10;
+        if (Math.abs(nt - e.t) > 1e-6) { drag.moved = true; e.t = nt; blk.style.left = (e.t * SCALE) + 'px'; blk.title = `${e.type} — ${e.t.toFixed(2)}s for ${(e.dur || 0)}s`; }
+      });
+      blk.addEventListener('pointerup', () => { if (drag && drag.moved) { markCsDirty(); refreshScenes(); refreshInspector(); } drag = null; });
+    }
+
+    // precise text list below (click to select)
+    el('div', { class: 'hgroup' }, box, 'Events (click to edit)');
+    for (const { e, i } of evs) {
       const d = el('div', { class: 'hitem' + (csSel === i ? ' sel' : '') }, box);
       d.textContent = `${e.t.toFixed(1)}s +${(e.dur || 0)}s  ${e.type}`;
       d.addEventListener('click', () => { csSel = i; refreshScenes(); refreshInspector(); });
@@ -1100,12 +1402,14 @@
     document.querySelectorAll('.tool').forEach(b2 => b2.classList.toggle('on', b2.dataset.tool === tool && !placing));
     $('btnSnap').classList.toggle('on', snap);
     $('btnGizmos').classList.toggle('on', gizmos);
+    $('btnScatter').classList.toggle('on', scatter);
   }
   document.querySelectorAll('.tool').forEach(b2 => {
     b2.addEventListener('click', () => { tool = b2.dataset.tool; setPlacing(null); refreshToolbar(); });
   });
   $('btnSnap').addEventListener('click', () => { snap = !snap; refreshToolbar(); });
   $('btnGizmos').addEventListener('click', () => { gizmos = !gizmos; refreshToolbar(); });
+  $('btnScatter').addEventListener('click', () => { scatter = !scatter; refreshToolbar(); });
   $('btnUndo').addEventListener('click', doUndo);
   $('btnRedo').addEventListener('click', doRedo);
   $('tabScene').addEventListener('click', () => setTab('scene'));
@@ -1343,8 +1647,28 @@
     if (await save()) window.open('../index.html', 'mossveil-test');
   });
 
+  // ---------------- in-editor playtest (iframe overlay) ----------------
+  function playUrl() {
+    if (csMode && csCurrent) return `../index.html?cutscene=${csCurrent}`;
+    const L = lvl();
+    const sp = L.spawns && (L.spawns.P ? 'P' : Object.keys(L.spawns)[0]);
+    return `../index.html?level=${currentId}${sp ? '&spawn=' + sp : ''}`;
+  }
+  function openPlay() {
+    $('playLabel').textContent = csMode && csCurrent ? '▶ Playtest — ' + csCurrent : '▶ Playtest — ' + currentId;
+    $('playIframe').src = playUrl();
+    $('playFrame').classList.add('on');
+  }
+  function closePlay() {
+    $('playFrame').classList.remove('on');
+    $('playIframe').src = 'about:blank';   // unload the game so it stops running
+  }
+  $('btnPlayHere').addEventListener('click', async () => { if (await save()) openPlay(); });
+  $('playClose').addEventListener('click', closePlay);
+
   // ---------------- keyboard ----------------
   addEventListener('keydown', e => {
+    if ($('playFrame').classList.contains('on')) { if (e.code === 'Escape') closePlay(); return; }
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
     if (e.ctrlKey && e.code === 'KeyS') { e.preventDefault(); save(); return; }
     if (typing) return;
@@ -1352,9 +1676,13 @@
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
     if (e.ctrlKey && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) { e.preventDefault(); doRedo(); return; }
     if (e.ctrlKey && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
+    if (e.ctrlKey && e.code === 'KeyC') { e.preventDefault(); copySelection(); return; }
+    if (e.ctrlKey && e.code === 'KeyV') { e.preventDefault(); pasteClipboard(); return; }
+    if (e.ctrlKey && e.code === 'KeyG') { e.preventDefault(); savePrefab(); return; }
     if (e.code === 'Delete' || e.code === 'Backspace') { deleteSelected(); return; }
-    if (e.code === 'Escape') { setPlacing(null); sel = null; refreshInspector(); refreshHierarchy(); return; }
-    if (e.code === 'KeyG') { gizmos = !gizmos; refreshToolbar(); return; }
+    if (e.code === 'Escape') { setPlacing(null); sel = null; multi = []; marquee = null; refreshInspector(); refreshHierarchy(); return; }
+    if (e.code === 'KeyG' && !e.ctrlKey) { gizmos = !gizmos; refreshToolbar(); return; }
+    if (e.code === 'KeyL') { alignSelected(); return; }
     if (e.code === 'KeyF') {
       const it = selectedItem();
       if (it && it.ref) { camX = it.ref.x !== undefined ? it.ref.x : camX; camY = it.ref.y !== undefined ? it.ref.y : camY; }
@@ -1397,7 +1725,8 @@
         camY = U.clamp(camY, -6, L.h + 10);
       }
       camera.position.set(camX, camY, camZ);
-      renderer.render(scene, camera);
+      if (postOn && G.Post && G.Post.enabled) G.Post.render(dt);
+      else renderer.render(scene, camera);
       drawOverlay();
     } else {
       drawMapTab();
@@ -1431,5 +1760,14 @@
     openLevel(currentId);
     requestAnimationFrame(loop);
   }
+
+  // small hook for headless tests
+  G.__ed = {
+    copySelection, pasteClipboard, savePrefab, stampPrefab, alignSelected, captureSelection, selectInBox,
+    setSel: v => { sel = v; }, setMulti: v => { multi = v; }, getMulti: () => multi, getSel: () => sel,
+    getClip: () => clipboard, getPrefabs: () => prefabs, setLastWorld: (x, y) => { lastWorld = { x, y }; },
+    openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t)
+  };
+
   boot();
 })();

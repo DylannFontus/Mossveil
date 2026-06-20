@@ -102,6 +102,8 @@
       hp: MAX_HP, maxHp: MAX_HP, soul: 0,
       facing: 1, dead: false,
       hasWings: !!G.save.wings,
+      // charm-derived stats (recomputed by G.Charms.apply)
+      nailDmg: 1, dashCdMul: 1, focusMul: 1, soulMul: 1,
       // timers
       coyoteT: 0, jumpBufT: 0, jumpCut: false, wallLockT: 0,
       dashT: 0, dashCdT: 0, dashDir: 1, ghostT: 0,
@@ -126,6 +128,8 @@
         G.FX.burst('spark', this.body.x, this.body.y + 0.3, { n: 14, color: 0xffffff });
         G.FX.ring(this.body.x, this.body.y + 0.3, { r1: 2.6, life: 0.3, color: 0xffffff });
         U.flashGroup(this.root, 0.1);
+        if (G.Main.camPunch) G.Main.camPunch(1.4);
+        if (G.Post) { G.Post.flash(0.34, 0xff5a4a); G.Post.punch(1.2); }
         if (this.hp <= 0) { this.die(); return true; }
         G.Audio.sfx('hurt');
         this.invulnT = INVULN;
@@ -149,6 +153,7 @@
         this.focusing = false; this.focusT = 0;
       },
       reset(x2, y2) {
+        if (G.Charms) G.Charms.apply(this);
         this.body.x = x2; this.body.y = y2;
         this.body.vx = 0; this.body.vy = 0;
         this.hp = this.maxHp;
@@ -164,6 +169,7 @@
     p.root.position.set(x, y, 0);
     G.scene.add(p.root);
     G.player = p;
+    if (G.Charms) { G.Charms.apply(p); p.hp = p.maxHp; }
 
     p.update = dt => update(p, dt);
     return p;
@@ -207,10 +213,10 @@
       if (e.isEnemy && e.alive && !p.atkHit.has(e) && U.overlap(hb, e.body)) {
         p.atkHit.add(e);
         const kdir = p.atkDir === 'side' ? p.facing : (e.body.x >= p.body.x ? 1 : -1);
-        e.hurt(1, kdir, p.atkDir);
+        e.hurt(p.nailDmg || 1, kdir, p.atkDir);
         landed = true;
         if (p.atkDir === 'down') pogo = true;
-        p.gainSoul(SOUL_HIT);
+        p.gainSoul(SOUL_HIT * (p.soulMul || 1));
         G.FX.burst('spark', (hb.x + e.body.x) / 2, e.body.y + 0.2, { n: 9, dir: kdir });
         G.FX.burst('soul', e.body.x, e.body.y + 0.3, { n: 5 });
       }
@@ -231,8 +237,10 @@
     }
     if (landed) {
       G.Audio.sfx('hit');
-      G.FX.hitStop(0.06);
-      G.FX.shake(0.07, 0.1);
+      G.FX.hitStop(pogo ? 0.1 : 0.07);
+      G.FX.shake(0.12, 0.14);
+      if (G.Main.camPunch) G.Main.camPunch(0.85);
+      if (G.Post) G.Post.punch(0.5);
       if (p.atkDir === 'side') p.body.vx -= p.facing * 1.5;
     } else if (p.atkT >= ATK_ACTIVE0 && p.atkT - dt < ATK_ACTIVE0 && p.atkDir === 'side') {
       // clink on walls
@@ -360,13 +368,15 @@
 
     // dash
     if (I.pressed('dash') && p.dashCdT <= 0 && p.hurtT <= 0) {
-      p.dashT = DASH_T; p.dashCdT = DASH_CD;
+      p.dashT = DASH_T; p.dashCdT = DASH_CD * (p.dashCdMul || 1);
       p.dashDir = ax !== 0 ? ax : p.facing;
       p.facing = p.dashDir;
       p.jumpCut = true;
       p.cancelFocus();
       G.Audio.sfx('dash');
       G.FX.burst('dust', b.x, b.y - 0.4, { n: 5, dir: -p.dashDir });
+      if (G.Main.camPunch) G.Main.camPunch(0.5);
+      if (G.Post) G.Post.punch(0.8);
     }
 
     // attack
@@ -400,8 +410,9 @@
       } else {
         p.focusT += dt;
         if (U.chance(dt * 22)) G.FX.burst('heal', b.x, b.y + 0.3);
-        p.glow.material.opacity = 0.22 + (p.focusT / FOCUS_TIME) * 0.5;
-        if (p.focusT >= FOCUS_TIME) {
+        const focusTime = FOCUS_TIME * (p.focusMul || 1);
+        p.glow.material.opacity = 0.22 + (p.focusT / focusTime) * 0.5;
+        if (p.focusT >= focusTime) {
           p.cancelFocus();
           p.spendSoul(FOCUS_COST);
           p.hp = Math.min(p.maxHp, p.hp + 1);
@@ -420,11 +431,16 @@
       p.coyoteT = COYOTE;
       p.wingUsed = false;
       if (!wasGround) {
-        const impact = Math.min(1, -b.vyLand / 25 || 0.4);
+        const impact = Math.min(1, -b.vyLand / 22 || 0.4);
         G.FX.burst('land', b.x, b.y - 0.62);
         if (p.dashT <= 0) G.Audio.sfx('drop');
         p.landAnim = 0.18;
-        p.stretch = 0.72;
+        p.stretch = 0.72 - impact * 0.12;
+        if (impact > 0.45) {        // hard landing — kick the camera + extra dust
+          G.FX.shake(0.13 * impact, 0.16);
+          if (G.Main.camPunch) G.Main.camPunch(0.7 * impact);
+          G.FX.burst('dust', b.x, b.y - 0.6, { n: Math.round(4 + impact * 6) });
+        }
       }
       p.safeAccum += dt;
       if (p.safeAccum > 0.25 && !G.Physics.spikeTouch({ x: b.x, y: b.y - 1, w: 2, h: 2 })) {
@@ -480,6 +496,8 @@
     p.bobPh += dt * (running ? speed * 2.2 : 2);
     const bob = running ? Math.abs(Math.sin(p.bobPh)) * 0.09 : Math.sin(p.bobPh) * 0.03;
     v.position.y = bob + (p.focusing ? -0.12 : 0);
+    // lantern glow: gentle breathing at rest, a touch brighter while moving
+    if (!p.focusing && p.glow) p.glow.material.opacity = 0.2 + Math.sin(G.time * 1.6) * 0.035 + Math.min(0.12, speed * 0.02);
     let lean = 0;
     if (running) lean = -p.facing * 0.12;
     if (p.dashT > 0) lean = -p.dashDir * 0.22;

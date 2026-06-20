@@ -61,6 +61,17 @@
   .lvlitem.cur { background:#2c4663; }
   .lvlitem small { color:var(--txt2); display:block; }
   .lvlbtns { padding:8px; display:flex; gap:6px; flex-wrap:wrap; }
+  /* cutscene timeline */
+  .cstl { position:relative; overflow-x:auto; overflow-y:hidden; background:#141419;
+    border:1px solid #2a2a32; border-radius:4px; margin:6px 8px; }
+  .cstl .ruler { position:absolute; top:0; left:0; height:14px; border-bottom:1px solid #2a2a32; }
+  .cstl .tick { position:absolute; top:0; height:100%; border-left:1px solid #26262e; color:#6a6e76; font-size:9px; padding-left:2px; }
+  .cstlblk { position:absolute; height:18px; border-radius:3px; font-size:10px; color:#eaeef2;
+    line-height:18px; padding:0 5px; overflow:hidden; white-space:nowrap; cursor:grab;
+    box-shadow:0 1px 2px rgba(0,0,0,.4); border:1px solid rgba(255,255,255,.15); user-select:none; }
+  .cstlblk.sel { outline:2px solid #ffd887; z-index:2; }
+  .cstlblk.screen { background:#2f5a86; }
+  .cstlblk.actor { background:#2f7d4f; }
 
   /* viewport */
   #viewportWrap { grid-area:viewport; position:relative; background:#000; min-width:0; min-height:0;
@@ -70,6 +81,16 @@
   #mapCanvas { display:none; }
   #viewportHint { position:absolute; left:10px; bottom:8px; color:rgba(220,230,225,.45);
     font-size:11px; pointer-events:none; text-shadow:0 1px 2px #000; }
+  /* in-editor playtest overlay */
+  #playFrame { position:absolute; inset:0; display:none; flex-direction:column; background:#04070a; z-index:20; }
+  #playFrame.on { display:flex; }
+  #playBar { height:30px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 10px; background:var(--bg2); border-bottom:1px solid var(--line); }
+  #playBar #playLabel { color:#9fd8b8; font-size:12px; }
+  #playClose { background:#6b2f2f; color:#fff; border:1px solid #6b2f2f; border-radius:4px;
+    padding:3px 12px; cursor:pointer; font-size:12px; }
+  #playClose:hover { background:#843a3a; }
+  #playIframe { flex:1; width:100%; border:0; background:#04070a; }
 
   /* inspector */
   #inspector { grid-area:inspector; background:var(--bg1); border-left:1px solid var(--line);
@@ -93,7 +114,7 @@
     display:flex; flex-direction:column; min-height:0; }
   #assetBody { flex:1; overflow-y:auto; padding:8px; display:flex; flex-wrap:wrap;
     gap:6px; align-content:flex-start; }
-  .asset { width:104px; height:58px; background:var(--bg2); border:1px solid #3c3c44;
+  .asset { position:relative; width:104px; height:58px; background:var(--bg2); border:1px solid #3c3c44;
     border-radius:5px; cursor:pointer; display:flex; flex-direction:column; align-items:center;
     justify-content:center; gap:4px; text-align:center; padding:4px; }
   .asset:hover { background:var(--bg3); border-color:#5a5a64; }
@@ -159,13 +180,15 @@
     <span class="tsep"></span>
     <button class="tbtn" id="btnSnap" title="Snap objects to half-tiles">Snap</button>
     <button class="tbtn" id="btnGizmos" title="Show object gizmos (G)">Gizmos</button>
+    <button class="tbtn" id="btnScatter" title="Scatter: stamp a randomized cluster when placing decor">⁂ Scatter</button>
     <span class="tsep"></span>
     <button class="tbtn" id="btnUndo" title="Undo (Ctrl+Z)">↩</button>
     <button class="tbtn" id="btnRedo" title="Redo (Ctrl+Y)">↪</button>
     <span class="tsep"></span>
     <button class="tbtn" id="btnSave" title="Save all levels (Ctrl+S)">💾 Save</button>
     <button class="tbtn" id="btnSaveTarget" title="Choose where Save writes: local files or GitHub">→ …</button>
-    <button class="tbtn play" id="btnTest" title="Save & play this level">▶ Test Level</button>
+    <button class="tbtn play" id="btnPlayHere" title="Save & play this level right here in the editor">▶ Play here</button>
+    <button class="tbtn" id="btnTest" title="Save & play this level in a new tab">▶ Test tab</button>
     <button class="tbtn" id="btnTestStart" title="Save & play from the title screen">▶ From Start</button>
     <span id="dirty">● unsaved</span>
     <span id="saveMsg"></span>
@@ -187,6 +210,10 @@
     <canvas id="overlay"></canvas>
     <canvas id="mapCanvas"></canvas>
     <div id="viewportHint"></div>
+    <div id="playFrame">
+      <div id="playBar"><span id="playLabel">▶ Playtest</span><button id="playClose" title="Stop & close (Esc)">✕ Stop</button></div>
+      <iframe id="playIframe" title="playtest"></iframe>
+    </div>
   </div>
 
   <div id="inspector"><h3>Inspector</h3><div class="insBody" id="insBody"></div></div>
@@ -201,7 +228,7 @@
     <span id="stMouse"></span>
     <span id="stSel"></span>
     <span style="flex:1"></span>
-    <span class="hintDesktop">RMB / MMB drag — pan · wheel — zoom · Del — delete · Ctrl+D — duplicate · F — focus</span>
+    <span class="hintDesktop">drag empty = marquee select · Shift+click = add · Ctrl+C/V copy/paste · Ctrl+G prefab · L align · Del delete</span>
     <span class="hintTouch">one finger — place / move / paint · two fingers — pan &amp; pinch-zoom · double-tap a room to open</span>
   </div>
 </div>
@@ -217,8 +244,8 @@
   var scripts = [
     '../lib/three.min.js',
     '../data/levels.js', '../data/cutscenes.js',
-    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js',
-    '../src/world.js', '../src/map.js', '../src/player.js', '../src/enemies.js',
+    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js',
+    '../src/world.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
     '../src/bosses.js', '../src/cutscene.js', 'editor.js'
   ];
   scripts.forEach(function (src) {

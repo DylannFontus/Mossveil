@@ -483,8 +483,12 @@
           this.phase = 2;
           this.state = 'roar'; this.t = 1.0; this.move = null;
           G.Audio.sfx('roar');
-          G.FX.shake(0.4, 0.7);
-          G.FX.burst('spore', this.body.x, this.body.y + 1.5, { n: 24, color: cfg.colors.glow });
+          G.FX.shake(0.5, 0.8);
+          G.FX.hitStop(0.18);
+          G.FX.burst('spore', this.body.x, this.body.y + 1.5, { n: 30, color: cfg.colors.glow });
+          G.FX.ring(this.body.x, this.body.y + 1, { r1: 6, life: 0.5, color: cfg.colors.glow, alpha: 0.7 });
+          if (G.Post) { G.Post.flash(0.42, cfg.colors.glow); G.Post.punch(1.6); }
+          if (G.Main.camPunch) G.Main.camPunch(2.2);
         } else if (this.staggerAcc >= 9 && this.state !== 'stagger' && !fly) {
           this.staggerAcc = 0;
           this.state = 'stagger'; this.t = 1.1; this.move = null;
@@ -498,6 +502,9 @@
     G.Audio.setBoss(true);
     G.FX.shake(0.3, 0.8);
     G.UI.bossTitle(cfg.name);
+    G.UI.setBoss(bs);
+    if (G.Post) G.Post.flash(0.28, cfg.colors.glow);
+    if (G.Main.camPunch) G.Main.camPunch(1.6);
     return bs;
   };
 
@@ -512,6 +519,10 @@
     G.FX.shake(0.5, 0.8);
     G.FX.burst('death', bs.body.x, bs.body.y + 1);
     G.Audio.setBoss(false);
+    G.UI.setBoss(null);
+    if (G.Post) { G.Post.flash(0.5, 0xffffff); G.Post.punch(2); }
+    if (G.Main.camPunch) G.Main.camPunch(2.5);
+    if (G.Main.dropGlimmer) G.Main.dropGlimmer(bs.body.x, bs.body.y + 1, 40 + (Math.random() * 20 | 0));
   }
 
   function pickMove(bs) {
@@ -525,6 +536,9 @@
     bs.t = MOVES[id].tele / (bs.phase === 2 ? (bs.cfg.speed2 || 1.25) : 1);
     bs.move = id;
     bs.mv = {};
+    // telegraph: a warning pulse so the attack reads before it lands
+    U.flashGroup(bs.group, 0.1);
+    G.FX.ring(bs.body.x, bs.body.y + (bs.fly ? 0 : 0.8), { r0: 0.5, r1: 2.6, life: 0.28, color: bs.cfg.colors.glow, alpha: 0.5 });
   }
 
   function bossUpdate(bs, dt) {

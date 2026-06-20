@@ -9,7 +9,7 @@
   const ACTIVE_KEY = 'mossveil-active-slot';
   const SLOT_COUNT = 5;
 
-  let camX = 0, camY = 0;
+  let camX = 0, camY = 0, camLead = 0, zoomPunch = 0;
   let titleDrift = 0;
   let transitioning = false;
   let seenRooms = {};
@@ -115,6 +115,38 @@
   Main.menuIndex = 0;
   Main.menuItems = [];
   Main.confirm = null;   // { message, onYes, sel }
+  Main.pauseIndex = 0;
+  Main.pauseItems = ['Resume', 'Charms', 'Settings', 'Quit to Title'];
+  Main.charmIndex = 0;
+  Main.settingsIndex = 0;
+
+  // ---------------- settings ----------------
+  const SETTINGS_KEY = 'mossveil-settings';
+  G.settings = { volume: 0.8, shake: true, quality: 'high' };
+  function applySettings() {
+    if (G.Audio && G.Audio.setVolume) G.Audio.setVolume(G.settings.volume);
+    if (G.Post) G.Post.quality = G.settings.quality;
+  }
+  function loadSettings() {
+    try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s && typeof s === 'object') Object.assign(G.settings, s); } catch (e) { }
+    applySettings();
+  }
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) { } }
+  function settingsAdjust(dir) {
+    const s = G.settings, i = Main.settingsIndex;
+    if (i === 0) s.volume = U.clamp(+(s.volume + dir * 0.1).toFixed(2), 0, 1);
+    else if (i === 1) s.shake = !s.shake;
+    else if (i === 2) { const q = ['low', 'medium', 'high']; s.quality = q[(q.indexOf(s.quality) + dir + q.length) % q.length]; }
+    applySettings(); saveSettings(); G.Audio.sfx('clink');
+  }
+  function pauseSelect() {
+    G.Audio.sfx('uiBell');
+    const it = Main.pauseItems[Main.pauseIndex];
+    if (it === 'Resume') Main.state = 'play';
+    else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'pause'; Main.state = 'charms'; }
+    else if (it === 'Settings') { Main.settingsIndex = 0; Main.state = 'settings'; }
+    else if (it === 'Quit to Title') { G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; Main.state = 'title'; }
+  }
 
   Main.slotIndex = 0;
   Main.slots = [];
@@ -207,6 +239,7 @@
 
   // ---------------- pointer helpers (title / confirm / slots) ----------------
   function hitRect(e, b) { return e.clientX >= b.x && e.clientX <= b.x + b.w && e.clientY >= b.y && e.clientY <= b.y + b.h; }
+  function hitButton(e, arr) { for (const b of (arr || [])) if (hitRect(e, b)) return b; return null; }
   function pointerToConfirm(e) {
     for (const b of (G.UI.confirmButtons || [])) if (hitRect(e, b)) return { confirm: b.yes };
     return null;
@@ -239,6 +272,8 @@
     G.FX.init(scene);
     G.UI.init();
     resize();
+    if (G.Post) G.Post.init();
+    loadSettings();
     addEventListener('resize', resize);
 
     // audio must be created inside a user gesture
@@ -276,6 +311,24 @@
         if (hit.back) { Main.state = 'title'; G.Audio.sfx('clink'); }
         else if (hit.trash !== undefined) slotDelete(hit.trash);
         else if (hit.index !== undefined) slotActivate(hit.index);
+      } else if (Main.state === 'pause') {
+        const b = hitButton(e, G.UI.pauseButtons);
+        if (b) { Main.pauseIndex = b.index; pauseSelect(); }
+      } else if (Main.state === 'charms') {
+        const b = hitButton(e, G.UI.charmButtons);
+        if (b) { Main.charmIndex = b.index; const ok = G.Charms.toggle(G.Charms.LIST[b.index].id); G.Audio.sfx(ok ? 'uiBell' : 'clink'); }
+      } else if (Main.state === 'settings') {
+        const b = hitButton(e, G.UI.settingsButtons);
+        if (b) { Main.settingsIndex = b.index; settingsAdjust(1); }
+      } else if (Main.state === 'bench') {
+        const b = hitButton(e, G.UI.benchButtons);
+        if (b) { Main.benchIndex = b.index; benchSelect(); }
+      } else if (Main.state === 'travel') {
+        const b = hitButton(e, G.UI.travelButtons);
+        if (b) { Main.travelIndex = b.index; travelTo(b.index); }
+      } else if (Main.state === 'shop') {
+        const b = hitButton(e, G.UI.shopButtons);
+        if (b) { Main.shopIndex = b.index; shopBuy(); }
       }
     });
 
@@ -318,6 +371,7 @@
     G.camera.updateProjectionMatrix();
     G.pxScale = (G.renderer.domElement.height / 2) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
     G.FX.resize(G.renderer.domElement.height, FOV);
+    if (G.Post) G.Post.resize();
     G.UI.resize();
   }
 
@@ -450,13 +504,84 @@
     const p = G.player;
     p.hp = p.maxHp;
     G.save.bench = { room: G.room.id, x: bench.x, y: bench.y + 0.7 };
+    // remember this bench so it becomes a fast-travel destination
+    G.save.benchList = G.save.benchList || [];
+    const name = (G.LEVELS[G.room.id] && G.LEVELS[G.room.id].title) || G.room.id;
+    if (!G.save.benchList.find(b => b.room === G.room.id))
+      G.save.benchList.push({ room: G.room.id, x: bench.x, y: bench.y + 0.7, name });
     Main.persist();
     G.Audio.sfx('bench');
     G.FX.burst('healPop', bench.x, bench.y + 1);
     G.FX.ring(bench.x, bench.y + 1, { r1: 4, life: 0.6, color: 0xffe8c0, alpha: 0.6 });
     G.UI.onHeal();
-    G.UI.toast('Rested. Your journey is recorded.');
+    Main.benchIndex = 0;
+    Main.state = 'bench';   // open the bench hub (rest / travel / charms)
   };
+
+  // ---------------- economy: Glimmer ----------------
+  Main.glimmer = () => (G.save && G.save.glimmer) || 0;
+  Main.dropGlimmer = (x, y, n) => {
+    if (!G.save || !n) return;
+    G.save.glimmer = (G.save.glimmer || 0) + n;
+    for (let i = 0; i < Math.min(n, 7); i++)
+      G.FX.p(true, { x: x + U.rand(-.4, .4), y: y + U.rand(-.2, .5), vx: U.rand(-2, 2), vy: U.rand(1, 3.5), life: U.rand(.5, .95), size: U.rand(.14, .26), color: 0xffe28a, drag: 3, home: true, alpha: .95 });
+    G.Audio.sfx('soul');
+    if (Main.persist) Main.persist();
+  };
+  Main.spendGlimmer = n => { if (Main.glimmer() >= n) { G.save.glimmer -= n; Main.persist(); return true; } return false; };
+  Main.charmPrice = id => { const c = G.Charms.get(id); return c ? c.cost * 60 : 0; };
+
+  // ---------------- bench hub / fast-travel / vendor ----------------
+  Main.benchIndex = 0;
+  Main.benchItems = ['Travel', 'Charms', 'Leave'];
+  Main.travelIndex = 0;
+  Main.shopIndex = 0;
+  Main.shopList = [];
+  Main._charmReturn = 'pause';
+  function benchSelect() {
+    G.Audio.sfx('uiBell');
+    const it = Main.benchItems[Main.benchIndex];
+    if (it === 'Leave') Main.state = 'play';
+    else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'bench'; Main.state = 'charms'; }
+    else if (it === 'Travel') {
+      const list = G.save.benchList || [];
+      if (list.length <= 1) G.UI.toast('No other resting places discovered yet.');
+      else { Main.travelIndex = 0; Main.state = 'travel'; }
+    }
+  }
+  function travelTo(i) {
+    const list = G.save.benchList || [];
+    const b = list[i]; if (!b) return;
+    if (b.room === G.room.id) { Main.state = 'play'; return; }
+    G.Audio.sfx('uiBell');
+    Main.state = 'transition';
+    G.UI.setFade(1, 5, () => {
+      const sp = G.World.load(b.room, 'P');
+      G.player.reset(b.x !== undefined ? b.x : sp.x, b.y !== undefined ? b.y : sp.y);
+      snapCamera();
+      showAreaTitle();
+      Main.state = 'play';
+      G.UI.setFade(0, 4);
+    });
+  }
+  Main.openShop = () => {
+    Main.shopList = G.Charms.LIST.filter(c => !G.Charms.isOwned(c.id));
+    if (!Main.shopList.length) { G.UI.toast('The vendor has nothing left to offer.'); return; }
+    Main.shopIndex = 0; Main.state = 'shop'; G.Audio.sfx('uiBell');
+  };
+  function shopBuy() {
+    const c = Main.shopList[Main.shopIndex]; if (!c) return;
+    const price = Main.charmPrice(c.id);
+    if (Main.glimmer() < price) { G.Audio.sfx('clink'); G.UI.toast('Not enough Glimmer.'); return; }
+    Main.spendGlimmer(price);
+    G.Charms.grant(c.id);
+    G.Audio.sfx('pickup');
+    G.UI.toast('Acquired: ' + c.name);
+    Main.shopList = G.Charms.LIST.filter(x => !G.Charms.isOwned(x.id));
+    if (!Main.shopList.length) { Main.state = 'play'; return; }
+    Main.shopIndex = Math.min(Main.shopIndex, Main.shopList.length - 1);
+  }
+  Main.benchSelect = benchSelect; Main.travelTo = travelTo; Main.shopBuy = shopBuy;
 
   Main.onPlayerDeath = () => {
     if (Main.state === 'dead') return;
@@ -523,15 +648,21 @@
       camX = U.damp(camX, c.x, 0.6, rdt);
       camY = U.damp(camY, c.y, 0.6, rdt);
     } else if (p) {
-      const lookX = p.body.x + p.facing * 1.7 + p.body.vx * 0.06;
-      const lookY = p.body.y + 1.2 + U.clamp(p.body.vy * 0.06, -1.2, 0.6);
+      // springy look-ahead: lead the camera toward where the player is heading/facing
+      const leadTarget = p.facing * 2.1 + U.clamp(p.body.vx * 0.16, -2.2, 2.2);
+      camLead = U.damp(camLead, leadTarget, 3, rdt);
+      const lookX = p.body.x + camLead;
+      const lookY = p.body.y + 1.2 + U.clamp(p.body.vy * 0.07, -1.4, 0.7);
       const c = clampCam(lookX, lookY);
-      camX = U.damp(camX, c.x, 6, rdt);
-      camY = U.damp(camY, c.y, 5, rdt);
+      camX = U.damp(camX, c.x, 6.5, rdt);
+      camY = U.damp(camY, c.y, 5.5, rdt);
     }
+    zoomPunch = U.damp(zoomPunch, 0, 9, rdt);    // ease the punch back out
     const sh = G.FX.camOffset();
-    G.camera.position.set(camX + sh.x, camY + sh.y, CAM_Z);
+    G.camera.position.set(camX + sh.x, camY + sh.y, CAM_Z - zoomPunch);
   }
+  // a quick camera "kick" (zoom-in) for impacts — hits, hard landings, dashes
+  Main.camPunch = amt => { zoomPunch = Math.min(3.2, zoomPunch + (amt || 0.8)); };
 
   // ---------------- main loop ----------------
   function loop(t) {
@@ -577,7 +708,56 @@
         break;
       case 'pause':
         dt = 0;
-        if (I.pressed('pause')) Main.state = 'play';
+        if (I.pressed('up')) { Main.pauseIndex = (Main.pauseIndex - 1 + Main.pauseItems.length) % Main.pauseItems.length; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.pauseIndex = (Main.pauseIndex + 1) % Main.pauseItems.length; G.Audio.sfx('clink'); }
+        if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) pauseSelect();
+        else if (I.pressed('pause')) Main.state = 'play';
+        break;
+      case 'charms': {
+        dt = 0;
+        const n = G.Charms.LIST.length;
+        if (I.pressed('up')) { Main.charmIndex = (Main.charmIndex - 1 + n) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.charmIndex = (Main.charmIndex + 1) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) { const ok = G.Charms.toggle(G.Charms.LIST[Main.charmIndex].id); G.Audio.sfx(ok ? 'uiBell' : 'clink'); }
+        if (I.pressed('pause')) { Main.state = Main._charmReturn || 'pause'; G.Audio.sfx('clink'); }
+        break;
+      }
+      case 'bench':
+        dt = 0;
+        if (I.pressed('up')) { Main.benchIndex = (Main.benchIndex - 1 + Main.benchItems.length) % Main.benchItems.length; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.benchIndex = (Main.benchIndex + 1) % Main.benchItems.length; G.Audio.sfx('clink'); }
+        if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) benchSelect();
+        else if (I.pressed('pause')) Main.state = 'play';
+        break;
+      case 'travel': {
+        dt = 0;
+        const list = G.save.benchList || [];
+        if (list.length) {
+          if (I.pressed('up')) { Main.travelIndex = (Main.travelIndex - 1 + list.length) % list.length; G.Audio.sfx('clink'); }
+          if (I.pressed('down')) { Main.travelIndex = (Main.travelIndex + 1) % list.length; G.Audio.sfx('clink'); }
+          if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) travelTo(Main.travelIndex);
+        }
+        if (I.pressed('pause')) { Main.state = 'bench'; G.Audio.sfx('clink'); }
+        break;
+      }
+      case 'shop': {
+        dt = 0;
+        const sl = Main.shopList || [];
+        if (sl.length) {
+          if (I.pressed('up')) { Main.shopIndex = (Main.shopIndex - 1 + sl.length) % sl.length; G.Audio.sfx('clink'); }
+          if (I.pressed('down')) { Main.shopIndex = (Main.shopIndex + 1) % sl.length; G.Audio.sfx('clink'); }
+          if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) shopBuy();
+        }
+        if (I.pressed('pause')) { Main.state = 'play'; G.Audio.sfx('clink'); }
+        break;
+      }
+      case 'settings':
+        dt = 0;
+        if (I.pressed('up')) { Main.settingsIndex = (Main.settingsIndex - 1 + 3) % 3; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.settingsIndex = (Main.settingsIndex + 1) % 3; G.Audio.sfx('clink'); }
+        if (I.pressed('left')) settingsAdjust(-1);
+        else if (I.pressed('right') || I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) settingsAdjust(1);
+        if (I.pressed('pause')) { Main.state = 'pause'; G.Audio.sfx('clink'); }
         break;
       case 'map': {
         dt = 0;
@@ -627,7 +807,8 @@
     G.Audio.update(rdt);
     updateCamera(dt, rdt);
 
-    G.renderer.render(G.scene, G.camera);
+    if (G.Post && G.Post.enabled) G.Post.render(rdt);
+    else G.renderer.render(G.scene, G.camera);
     G.UI.draw(rdt);
     I.update();
   }

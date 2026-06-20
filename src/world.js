@@ -617,6 +617,64 @@
     };
   };
 
+  // a found-in-the-world charm pickup (editor: choose which charm)
+  mkProp.charmPickup = p => {
+    const grp = new THREE.Group();
+    grp.position.set(p.x, p.y, 0.1);
+    const col = 0xffe28a;
+    grp.add(U.flat(U.poly([[0, 0.42], [0.36, 0], [0, -0.42], [-0.36, 0]]), 0x2a2418, {}));
+    grp.add(U.flat(U.ellipse(0.2, 0.2), col, { additive: true, opacity: 0.9 }));
+    grp.add(U.glowSprite(col, 4, 0.4));
+    const cid = p.charm || (G.Charms && G.Charms.LIST[0] && G.Charms.LIST[0].id);
+    let t = 0;
+    return {
+      type: 'charmPickup', x: p.x, y: p.y, group: grp, dead: false,
+      update(dt) {
+        if (this.dead) return;
+        t += dt;
+        grp.position.y = p.y + Math.sin(t * 1.6) * 0.2;
+        grp.scale.x = 1 + Math.sin(t * 2) * 0.08;
+        if (G.Charms && G.Charms.isOwned(cid)) { this.dead = true; grp.visible = false; return; }
+        const pl = G.player;
+        if (pl && !pl.dead && Math.abs(pl.body.x - p.x) < 1 && Math.abs(pl.body.y - grp.position.y) < 1.3) {
+          this.dead = true; grp.visible = false;
+          if (G.Charms) G.Charms.grant(cid);
+          G.Audio.sfx('pickup');
+          G.FX.burst('healPop', p.x, grp.position.y);
+          G.FX.ring(p.x, grp.position.y, { r1: 4, life: 0.5, color: col });
+          G.FX.shake(0.12, 0.25);
+          const c = G.Charms && G.Charms.get(cid);
+          G.UI.toast('Charm found: ' + (c ? c.name : cid));
+        }
+      }
+    };
+  };
+
+  // a cloaked vendor — interact to open the charm shop (spend Glimmer)
+  mkProp.vendor = p => {
+    const grp = new THREE.Group();
+    grp.position.set(p.x, p.y, 0);
+    grp.add(U.flat(U.splineShape([[-0.5, 0], [-0.55, 1.2], [0, 1.95], [0.55, 1.2], [0.5, 0]]), 0x18141f, {}));
+    grp.add(U.flat(U.ellipse(0.32, 0.4), 0x0e0c14, { y: 1.7 }));
+    const eye = U.flat(U.ellipse(0.08, 0.08), 0xffd27a, { additive: true, opacity: 0.9, y: 1.72, z: 0.05 });
+    grp.add(eye);
+    const glow = U.glowSprite(0xffcf7a, 5, 0.25); glow.position.y = 1.5; grp.add(glow);
+    let t = 0;
+    return {
+      type: 'vendor', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        t += dt;
+        eye.material.opacity = 0.55 + Math.sin(t * 2) * 0.3;
+        const pl = G.player;
+        if (!pl || pl.dead || G.Main.state !== 'play') return;
+        if (Math.abs(pl.body.x - p.x) < 1.7 && Math.abs(pl.body.y - p.y) < 2 && pl.body.onGround) {
+          G.UI.prompt(p.x, p.y + 2.7, 'trade — E or ↑');
+          if (G.Input.pressed('interact') || G.Input.pressed('up')) G.Main.openShop(this);
+        }
+      }
+    };
+  };
+
   mkProp.gate = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, -0.2);
@@ -788,6 +846,19 @@
   }
 
   // ============================ ROOM LOAD ============================
+  // derive a cinematic colour-grade for the post pipeline from a biome's palette,
+  // so each biome reads with its own mood (ember warm, frost cool, fungal pink, ...)
+  function gradeFor(pal) {
+    const c = new THREE.Color(pal.light || pal.glow || 0xffffff);
+    const m = Math.max(c.r, c.g, c.b) || 1;
+    c.multiplyScalar(1 / m);                                   // normalise to brightest channel
+    const tint = new THREE.Color(1, 1, 1).lerp(c, 0.16);       // a gentle wash, not a heavy cast
+    return {
+      tint, exposure: 1.05, contrast: 1.05, saturation: 1.14,
+      bloom: pal.rays ? 0.72 : 0.56, vignette: 0.46, grain: 0.04
+    };
+  }
+
   W.load = function (id, spawnId) {
     if (G.room) {
       G.scene.remove(G.room.group);
@@ -809,6 +880,7 @@
 
     G.scene.fog = new THREE.Fog(pal.fog, pal.fogNear, pal.fogFar);
     G.renderer.setClearColor(pal.bgBottom);
+    if (G.Post) { G.Post.setGrade(gradeFor(pal)); if (def.grade) G.Post.setGrade(def.grade); }   // per-level look override
 
     // ---- backdrop ----
     const bgPlane = new THREE.Mesh(
@@ -1047,6 +1119,14 @@
         G.FX.burst('mote', cx + U.rand(-12, 12), cy + U.rand(-3, 8), { color: pal.glow });
       else if (a === 'mote' && U.chance(0.6))
         G.FX.burst('mote', cx + U.rand(-12, 12), cy + U.rand(-2, 8), { color: pal.dust });
+
+      // --- universal atmosphere: faint drifting haze on a soft wind (depth + bloom catch) ---
+      const wind = Math.sin(G.time * 0.13) * 0.22 + Math.sin(G.time * 0.37) * 0.12;
+      if (U.chance(0.6))
+        G.FX.p(true, { x: cx + U.rand(-17, 17), y: cy + U.rand(-9, 10), vx: wind + U.rand(-0.12, 0.12), vy: U.rand(-0.04, 0.16), life: U.rand(4, 9), size: U.rand(0.04, 0.11), color: pal.light, alpha: U.rand(0.06, 0.2), swirl: U.rand(-0.25, 0.25) });
+      // fireflies drift through the lush, ray-lit biomes
+      if (pal.rays && U.chance(0.16))
+        G.FX.p(true, { x: cx + U.rand(-13, 13), y: cy + U.rand(-3, 6), vx: U.rand(-0.3, 0.3) + wind, vy: U.rand(-0.1, 0.3), life: U.rand(3, 6), size: U.rand(0.12, 0.22), color: U.colLerp(pal.glow, 0xfff2c0, 0.5), alpha: U.rand(0.5, 0.9), swirl: U.rand(-1.2, 1.2) });
     }
     // transitions
     const p = G.player;

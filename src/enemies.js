@@ -34,6 +34,7 @@
       G.FX.burst('soul', ent.body.x, ent.body.y + 0.3, { n: 6 });
       G.FX.burst('spark', ent.body.x, ent.body.y + 0.2, { n: 8, dir });
       G.FX.ring(ent.body.x, ent.body.y + 0.2, { r1: 1.8, life: 0.3, color: 0xdfffe8, alpha: 0.5 });
+      if (G.Main.dropGlimmer) G.Main.dropGlimmer(ent.body.x, ent.body.y + 0.3, 2 + (Math.random() * 3 | 0));
       if (ent.onDeath) ent.onDeath();
       return true;
     }
