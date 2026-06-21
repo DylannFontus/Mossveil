@@ -262,6 +262,7 @@
   };
   function propRect(p) {
     if (p.type === 'textTrigger' || p.type === 'cutsceneTrigger') return { x: p.x, y: p.y, w: p.w || 3, h: p.h || 3 };
+    if (p.type === 'setActiveTrigger') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
     const s = PROP_SIZE[p.type] || [1.5, 1.5];
     const k = p.type === 'decor' ? (p.scale || 1) : 1;
     return { x: p.x, y: p.y + (p.type === 'textTrigger' ? 0 : s[1] * k / 2 - 0.2), w: s[0] * k, h: s[1] * k };
@@ -409,10 +410,10 @@
   vpEl.addEventListener('contextmenu', e => e.preventDefault());
   vpEl.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button > 2) return;
-    // The cutscene tab (timeline DOM + preview bar) handles its own input. Bail out
-    // BEFORE capturing the pointer — otherwise vpEl steals pointerup and clicks on the
-    // timeline's buttons (Preview, Add event…) never fire.
-    if (tab === 'cutscene') return;
+    // The cutscene tab (timeline DOM + preview bar) and the playtest overlay (with its
+    // Stop button) handle their own input. Bail out BEFORE capturing the pointer —
+    // otherwise vpEl steals pointerup and clicks on those buttons never fire.
+    if (tab === 'cutscene' || $('playFrame').classList.contains('on')) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { vpEl.setPointerCapture(e.pointerId); } catch (_) { }
 
@@ -636,19 +637,23 @@
       if (it.ref.type === 'textTrigger') col = '#e8b85f';
       if (it.ref.type === 'bossTrigger') col = '#e85fd0';
       if (it.ref.type === 'cutsceneTrigger') col = '#5fd0e8';
+      if (it.ref.type === 'setActiveTrigger') col = '#c89bff';
+      const inactive = it.ref.active === false;
+      octx.globalAlpha = inactive ? 0.4 : 1;        // dim objects that are switched off
       octx.strokeStyle = isSel ? '#ffd887' : (inMulti ? '#7fe8ff' : col + 'aa');
       octx.lineWidth = (isSel || inMulti) ? 2.5 : 1.2;
-      if (it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger') octx.setLineDash([4, 4]);
+      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger') octx.setLineDash([4, 4]);
       octx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
       octx.setLineDash([]);
       // label
-      const name = it.kind === 'enemy' ? it.ref.type
+      const name = (it.kind === 'enemy' ? it.ref.type
         : it.kind === 'zone' ? `→ ${it.ref.to}`
         : it.kind === 'spawn' ? `spawn ${it.key}`
-        : it.ref.type + (it.ref.kind ? ':' + it.ref.kind : '');
+        : it.ref.type + (it.ref.kind ? ':' + it.ref.kind : '')) + (inactive ? '  (off)' : '');
       octx.font = '10px Segoe UI';
       octx.fillStyle = isSel ? '#ffd887' : col;
       octx.fillText(name, p1.x + 2, p1.y - 3);
+      octx.globalAlpha = 1;
     }
     if (marquee) {
       const m1 = U.toScreen(Math.min(marquee.x0, marquee.x1), Math.max(marquee.y0, marquee.y1));
@@ -709,6 +714,34 @@
     clr.addEventListener('click', () => { pushUndo(); set(null); queueRebuild(); refreshInspector(); });
   }
 
+  // ---- set-active trigger: target helpers (a target object may live in ANY level) ----
+  // Objects are referenced by a stable per-level `oid`, assigned lazily the first time a
+  // trigger points at them, so editing/reordering other objects never breaks the link.
+  function ensureOid(levelId, ref) {
+    if (typeof ref.oid === 'number') return ref.oid;
+    const L = G.LEVELS[levelId]; let mx = 0;
+    const scan = o => { if (o && typeof o.oid === 'number' && o.oid > mx) mx = o.oid; };
+    (L.props || []).forEach(scan); (L.enemies || []).forEach(scan); (L.transitions || []).forEach(scan);
+    ref.oid = mx + 1;
+    return ref.oid;
+  }
+  function objLabel(kind, ref, i) {
+    const x = Math.round(ref.x != null ? ref.x : (ref.rect ? ref.rect.x : 0));
+    const y = Math.round(ref.y != null ? ref.y : (ref.rect ? ref.rect.y : 0));
+    if (kind === 'enemy') return `enemy ${ref.type} #${i} @(${x},${y})`;
+    if (kind === 'zone') return `portal → ${ref.to} #${i}`;
+    return `${ref.type}${ref.kind ? ':' + ref.kind : ''} #${i} @(${x},${y})`;
+  }
+  // every togglable object in a level → { key:'kind:index', label, ref }
+  function targetableList(levelId) {
+    const L = G.LEVELS[levelId]; const out = [];
+    if (!L) return out;
+    (L.props || []).forEach((r, i) => { if (r.type !== 'setActiveTrigger') out.push({ key: 'prop:' + i, label: objLabel('prop', r, i), ref: r }); });
+    (L.enemies || []).forEach((r, i) => out.push({ key: 'enemy:' + i, label: objLabel('enemy', r, i), ref: r }));
+    (L.transitions || []).forEach((r, i) => out.push({ key: 'zone:' + i, label: objLabel('zone', r, i), ref: r }));
+    return out;
+  }
+
   function refreshInspector() {
     if (csMode) return refreshCsInspector();
     const body = $('insBody');
@@ -752,6 +785,13 @@
     }
     const p = it.ref;
     el('div', { class: 'insNote' }, body, `${it.kind.toUpperCase()} — ${p.type || (it.kind === 'zone' ? 'transition' : '') || it.key || ''}`);
+    // Active toggle — works for every placeable object (prop/decor/light/boss/marker/enemy/portal).
+    // When off, the object isn't built into the game (it doesn't show or work). A Set-active
+    // trigger can flip it on/off at runtime. Shown dimmed with "(off)" in the viewport.
+    if (it.kind === 'prop' || it.kind === 'enemy' || it.kind === 'zone') {
+      checkField(body, 'Active', () => p.active !== false, v => { if (v) delete p.active; else p.active = false; });
+      if (p.oid != null) el('div', { class: 'insNote', style: 'opacity:.6' }, body, 'Object id: ' + p.oid + '  (referenced by a Set-active trigger)');
+    }
     if (it.kind !== 'zone' || p.rect) {
       if (it.kind === 'zone') {
         numField(body, 'X', () => p.rect.x, v => { p.rect.x = v; });
@@ -811,6 +851,37 @@
           selectField(body, 'Cutscene', csOpts, () => p.cutscene || csOpts[0].v, v => { p.cutscene = v; });
           checkField(body, 'Only once', () => p.once !== false, v => { p.once = v; });
           el('div', { class: 'insNote' }, body, 'Invisible zone — plays the chosen cutscene when the player walks in (in place, then control returns). "Only once" is remembered in the save.');
+          break;
+        }
+        case 'setActiveTrigger': {
+          numField(body, 'W', () => p.w || 4, v => { p.w = Math.max(0.5, v); });
+          numField(body, 'H', () => p.h || 4, v => { p.h = Math.max(0.5, v); });
+          checkField(body, 'Only once', () => !!p.once, v => { p.once = v; });
+          el('div', { class: 'insNote' }, body, 'Invisible zone. When the player walks in, each target below is switched on/off. Targets may live in ANY scene; the change is remembered in the save (and applied instantly if the target is in this room).');
+          el('div', { class: 'hgroup' }, body, 'Targets to flip');
+          p.targets = p.targets || [];
+          const levelOpts = Object.keys(G.LEVELS).map(id => ({ v: id, t: id }));
+          p.targets.forEach((t, ti) => {
+            const box = el('div', { style: 'border:1px solid #2c2c34;border-radius:5px;padding:6px 7px;margin:0 0 8px;background:#15151b' }, body);
+            const hd = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin:-1px 0 4px' }, box);
+            el('span', { style: 'color:#9fb0c0;font-size:11px' }, hd, 'Target ' + (ti + 1));
+            const rm = el('span', { style: 'color:#d77;cursor:pointer;font-size:12px', title: 'Remove this target' }, hd, '✕');
+            rm.addEventListener('click', () => { p.targets.splice(ti, 1); markDirty(); refreshInspector(); });
+            selectField(box, 'Scene', levelOpts, () => t.level || currentId, v => { t.level = v; delete t.oid; markDirty(); refreshInspector(); });
+            const list = targetableList(t.level || currentId);
+            const objOpts = [{ v: '', t: '(choose object…)' }].concat(list.map(o => ({ v: o.key, t: o.label })));
+            const cur = (t.oid != null) ? list.find(o => o.ref.oid === t.oid) : null;
+            selectField(box, 'Object', objOpts, () => cur ? cur.key : '', v => {
+              if (!v) { delete t.oid; markDirty(); refreshInspector(); return; }
+              const item = list.find(o => o.key === v);
+              if (item) { t.oid = ensureOid(t.level || currentId, item.ref); markDirty(); refreshInspector(); }
+            });
+            if (t.oid != null && !cur) el('div', { class: 'insNote', style: 'color:#e88' }, box, '⚠ object not found (id ' + t.oid + ') — was it deleted?');
+            selectField(box, 'Set to', [{ v: 'on', t: 'Active (show / enable)' }, { v: 'off', t: 'Inactive (hide / disable)' }],
+              () => (t.state === 'off' || t.state === false) ? 'off' : 'on', v => { t.state = v; markDirty(); });
+          });
+          const add = el('button', { class: 'tbtn play', style: 'margin-top:2px' }, body, '＋ Add target');
+          add.addEventListener('click', () => { p.targets.push({ level: currentId, state: 'on' }); markDirty(); refreshInspector(); });
           break;
         }
         case 'decor': {
@@ -1064,7 +1135,8 @@
       case 'markers': return [
         { cat: 'spawn', id: 'spawn', label: 'Spawn point', ico: '📍' },
         { cat: 'zone', id: 'portal', label: 'Portal / transition', ico: '🌀' },
-        { cat: 'prop', id: 'cutsceneTrigger', label: 'Cutscene trigger', ico: '🎬', defaults: { w: 4, h: 4, once: true } }
+        { cat: 'prop', id: 'cutsceneTrigger', label: 'Cutscene trigger', ico: '🎬', defaults: { w: 4, h: 4, once: true } },
+        { cat: 'prop', id: 'setActiveTrigger', label: 'Set-active trigger', ico: '🎚️', defaults: { w: 5, h: 5, once: false, targets: [] } }
       ];
       case 'prefabs': return Object.keys(prefabs).map(name => ({ cat: 'prefab', prefab: name, label: name, ico: '🧩', n: (prefabs[name].items || []).length, del: true }));
     }

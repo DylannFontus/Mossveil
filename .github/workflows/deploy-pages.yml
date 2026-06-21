@@ -25,11 +25,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    # don't let a stuck deploy hang for the full hour
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # try to (re)point Pages at the GitHub Actions build pipeline automatically,
+          # so the deploy step has a status to report instead of polling forever.
+          enablement: true
       - name: Upload the whole site (repo root)
         uses: actions/upload-pages-artifact@v3
         with:
@@ -37,3 +43,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # fail fast & loud (5 min) instead of the silent default timeout
+          timeout: 300000
+          error_count: 10

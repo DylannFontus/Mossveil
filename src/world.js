@@ -3,6 +3,54 @@
   const U = G.U;
   const W = G.World = {};
 
+  // ======================= ACTIVE / SET-ACTIVE SYSTEM =======================
+  // Every prop / enemy / transition carries an optional `active` flag (default true).
+  // An inactive object isn't built into the live game — it doesn't show or work, as if
+  // it doesn't exist. A `setActiveTrigger` can flip objects active/inactive — including
+  // objects in OTHER levels — and the change is remembered in the save under
+  // G.save.actives[levelId][oid] = bool. Objects only get an `oid` once a trigger
+  // references them (assigned in the editor), so overrides are matched by that id.
+  function activeOverride(levelId, oid) {
+    if (oid == null) return undefined;
+    const lv = G.save && G.save.actives && G.save.actives[levelId];
+    return lv ? lv[oid] : undefined;
+  }
+  // effective active state of a data object in a level (a save override beats the flag)
+  W.isActive = function (levelId, ref) {
+    const ov = activeOverride(levelId, ref.oid);
+    return ov !== undefined ? ov : (ref.active !== false);
+  };
+  // toggle a built entity live: visibility + logic + any collision solid it registered
+  W.setEntityActive = function (e, on) {
+    if (!e) return;
+    e._inactive = !on;
+    if (e.group) e.group.visible = on;
+    if (typeof e.onSetActive === 'function') e.onSetActive(on);
+    else if (e._solid) {
+      const arr = G.Physics.solids, i = arr.indexOf(e._solid);
+      if (on && i < 0) arr.push(e._solid);
+      else if (!on && i >= 0) arr.splice(i, 1);
+    }
+  };
+  // apply a setActiveTrigger's target list: persist each to the save, and live-toggle
+  // anything that's in the room we're standing in right now.
+  W.applyActiveTargets = function (targets) {
+    if (!targets || !targets.length) return;
+    G.save.actives = G.save.actives || {};
+    for (const t of targets) {
+      if (!t || !t.level || t.oid == null) continue;
+      const on = t.state !== 'off' && t.state !== false;
+      (G.save.actives[t.level] = G.save.actives[t.level] || {})[t.oid] = on;
+      if (G.room && G.room.id === t.level) {
+        const ent = G.room.entities.find(e2 => e2.oid === t.oid);
+        if (ent) W.setEntityActive(ent, on);
+        const zone = (G.room.zones || []).find(z => z.oid === t.oid);
+        if (zone) zone.active = on;
+      }
+    }
+    if (G.Main && G.Main.persist) G.Main.persist();
+  };
+
   // ============================ 13 BIOME PALETTES ============================
   const PAL = W.PAL = {
     verdant: {
@@ -511,6 +559,26 @@
     }
   });
 
+  // walk into this invisible zone to flip a chosen set of objects active/inactive — the
+  // targets may live in OTHER levels. Each target's state is written to the save (and
+  // applied live if it's in this room). See W.applyActiveTargets.
+  mkProp.setActiveTrigger = p => ({
+    type: 'setActiveTrigger', x: p.x, y: p.y, group: new THREE.Group(), inside: false,
+    update() {
+      const pl = G.player;
+      if (!pl || pl.dead || G.Main.state !== 'play') return;
+      const zone = { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
+      const over = U.overlap(pl.body, zone);
+      if (over && !this.inside) {
+        this.inside = true;
+        const key = G.room.id + ':sa:' + Math.round(p.x) + ',' + Math.round(p.y);
+        if (p.once && G.save.triggersFired && G.save.triggersFired[key]) return;
+        if (p.once) { G.save.triggersFired = G.save.triggersFired || {}; G.save.triggersFired[key] = true; }
+        W.applyActiveTargets(p.targets);
+      } else if (!over) this.inside = false;
+    }
+  });
+
   mkProp.lamp = (p, pal) => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, -0.12);
@@ -742,7 +810,9 @@
     const ent = { type: 'decor', x: p.x, y: p.y, group: grp, update() { } };
     if (p.solid && z > -2 && z < 2) {
       const cw = (p.cw || 2) * (p.scale || 1), ch = (p.chh || 2) * (p.scale || 1);
-      G.Physics.solids.push({ x: p.x, y: p.y + ch / 2, w: cw, h: ch });
+      const collider = { x: p.x, y: p.y + ch / 2, w: cw, h: ch };
+      ent._solid = collider;                 // so W.setEntityActive can pull it when toggled off
+      if (!G.EDITOR) G.Physics.solids.push(collider);
     }
     return ent;
   };
@@ -1039,15 +1109,32 @@
     group.add(motes.pts);
     room.shaderMats.push(motes.mat);
 
-    // ---- props & enemies from data ----
+    // ---- props & enemies from data (respecting the active / set-active system) ----
     for (const p of (def.props || [])) {
       if (p.type === 'wings' && G.save.wings) continue;
       const mk = mkProp[p.type];
-      if (mk) room.entities.push(mk(p, pal));
+      if (!mk) continue;
+      const on = W.isActive(id, p);
+      if (!on && !G.EDITOR && p.oid == null) continue;   // truly gone — no trigger can ever revive it
+      const ent = mk(p, pal);
+      ent.oid = p.oid;
+      room.entities.push(ent);
+      if (!on) {
+        if (G.EDITOR) ent.editorInactive = true;          // editor keeps it visible (dimmed) so you can re-enable it
+        else W.setEntityActive(ent, false);               // game: hidden + inert until a trigger flips it
+      }
     }
     for (const e of (def.enemies || [])) {
+      const on = W.isActive(id, e);
+      if (!on && !G.EDITOR && e.oid == null) continue;
       const ent = G.Enemies.make(e.type, e.x, e.y);
-      if (ent) room.entities.push(ent);
+      if (!ent) continue;
+      ent.oid = e.oid;
+      room.entities.push(ent);
+      if (!on) {
+        if (G.EDITOR) ent.editorInactive = true;
+        else W.setEntityActive(ent, false);
+      }
     }
     for (const e of room.entities) if (e.group) group.add(e.group);
 
@@ -1059,7 +1146,7 @@
       else if (tz.side === 'R') rect = { x: def.w - 0.4, y: def.h / 2, w: 0.9, h: def.h };
       else if (tz.side === 'T') rect = { x: (tz.x0 + tz.x1 + 1) / 2, y: def.h - 0.4, w: tz.x1 - tz.x0 + 1, h: 1.6 };
       else rect = { x: (tz.x0 + tz.x1 + 1) / 2, y: 0.5, w: tz.x1 - tz.x0 + 1, h: 2 };
-      return { rect, to: tz.to, spawn: tz.spawn };
+      return { rect, to: tz.to, spawn: tz.spawn, oid: tz.oid, active: W.isActive(id, tz) };
     });
 
     G.scene.add(group);
@@ -1090,6 +1177,7 @@
     if (!G.EDITOR) {
       for (let i = room.entities.length - 1; i >= 0; i--) {
         const e = room.entities[i];
+        if (e._inactive) continue;       // inactive objects don't run, collide or animate
         e.update(dt);
         if (e.dead) {
           if (e.group) { room.group.remove(e.group); U.disposeDeep(e.group); }
@@ -1135,6 +1223,7 @@
     const p = G.player;
     if (!G.EDITOR && p && !p.dead && G.Main.state === 'play') {
       for (const z of room.zones) {
+        if (z.active === false) continue;
         if (U.overlap(p.body, z.rect)) { G.Main.transition(z.to, z.spawn); break; }
       }
     }
