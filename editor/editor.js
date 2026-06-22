@@ -1741,6 +1741,55 @@
     csCurrent = id; csSel = -1; markCsDirty(); refreshScenes(); refreshInspector();
   }
 
+  const EASE_EVENTS = new Set(['fade', 'letterbox', 'blur', 'camera', 'cameraRestore']);
+  const EASE_PRESETS = [['Linear', 'linear'], ['Ease In', 'inQuad'], ['Ease Out', 'outQuad'], ['Ease In-Out', 'inOutQuad'], ['Cubic In-Out', 'inOutCubic'], ['Back In', 'inBack'], ['Back Out', 'outBack'], ['Elastic Out', 'outElastic'], ['Custom curve', 'custom']];
+  // easing picker + a draggable cubic-bezier curve editor for one cutscene event
+  function addEaseControl(body, ev) {
+    const CW = 172, CH = 112, PAD = 12, W = CW - 2 * PAD, H = CH - 2 * PAD;
+    const r = el('div', { class: 'frow' }, body); el('label', {}, r, 'Easing');
+    const sel = el('select', {}, r);
+    for (const [lab, val] of EASE_PRESETS) el('option', { value: val }, sel, lab);
+    sel.value = Array.isArray(ev.ease) ? 'custom' : (ev.ease || 'inOutQuad');
+    const cnv = el('canvas', { width: CW, height: CH, style: 'display:block;margin:6px 0 2px;background:#0c1014;border:1px solid rgba(120,200,180,.25);border-radius:5px;cursor:pointer' }, body);
+    const cx = cnv.getContext('2d');
+    function fn() { return Array.isArray(ev.ease) ? U.cubicBezier(ev.ease[0], ev.ease[1], ev.ease[2], ev.ease[3]) : (U.ease[ev.ease || 'inOutQuad'] || U.ease.inOutQuad); }
+    function draw() {
+      cx.clearRect(0, 0, CW, CH); cx.fillStyle = '#0c1014'; cx.fillRect(0, 0, CW, CH);
+      cx.strokeStyle = 'rgba(255,255,255,.06)'; cx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) { const x = PAD + W * i / 4, y = PAD + H * i / 4; cx.beginPath(); cx.moveTo(x, PAD); cx.lineTo(x, PAD + H); cx.stroke(); cx.beginPath(); cx.moveTo(PAD, y); cx.lineTo(PAD + W, y); cx.stroke(); }
+      const f = fn(); cx.strokeStyle = '#6fd6a8'; cx.lineWidth = 2; cx.beginPath();
+      for (let i = 0; i <= 48; i++) { const t = i / 48, y = f(t), X = PAD + W * t, Y = PAD + H * (1 - y); i ? cx.lineTo(X, Y) : cx.moveTo(X, Y); }
+      cx.stroke();
+      if (Array.isArray(ev.ease)) {
+        const e = ev.ease, h1 = { x: PAD + W * e[0], y: PAD + H * (1 - e[1]) }, h2 = { x: PAD + W * e[2], y: PAD + H * (1 - e[3]) };
+        cx.strokeStyle = 'rgba(180,210,200,.4)'; cx.beginPath(); cx.moveTo(PAD, PAD + H); cx.lineTo(h1.x, h1.y); cx.stroke(); cx.beginPath(); cx.moveTo(PAD + W, PAD); cx.lineTo(h2.x, h2.y); cx.stroke();
+        for (const h of [h1, h2]) { cx.fillStyle = '#ffd887'; cx.beginPath(); cx.arc(h.x, h.y, 5, 0, 6.2832); cx.fill(); }
+      }
+    }
+    draw();
+    sel.addEventListener('change', () => {
+      if (sel.value === 'custom') ev.ease = [0.42, 0, 0.58, 1]; else ev.ease = sel.value;
+      delete ev._ef; delete ev._efKey; markCsDirty(); refreshScenes(); draw();
+    });
+    let drag = null;
+    cnv.addEventListener('pointerdown', e => {
+      if (!Array.isArray(ev.ease)) return;
+      const rc = cnv.getBoundingClientRect(), mx = e.clientX - rc.left, my = e.clientY - rc.top, ee = ev.ease;
+      const h1 = { x: PAD + W * ee[0], y: PAD + H * (1 - ee[1]) }, h2 = { x: PAD + W * ee[2], y: PAD + H * (1 - ee[3]) };
+      if (Math.hypot(h1.x - mx, h1.y - my) < 13) drag = 0; else if (Math.hypot(h2.x - mx, h2.y - my) < 13) drag = 1; else return;
+      cnv.setPointerCapture(e.pointerId);
+    });
+    cnv.addEventListener('pointermove', e => {
+      if (drag === null) return;
+      const rc = cnv.getBoundingClientRect();
+      let x = (e.clientX - rc.left - PAD) / W, y = 1 - (e.clientY - rc.top - PAD) / H;
+      x = Math.max(0, Math.min(1, x)); y = Math.max(-0.6, Math.min(1.6, y));
+      ev.ease[drag * 2] = +x.toFixed(3); ev.ease[drag * 2 + 1] = +y.toFixed(3);
+      delete ev._ef; delete ev._efKey; markCsDirty(); draw();
+    });
+    cnv.addEventListener('pointerup', () => { if (drag !== null) { drag = null; refreshScenes(); } });
+  }
+
   function refreshCsInspector() {
     const body = $('insBody');
     body.innerHTML = '';
@@ -1793,6 +1842,7 @@
     });
     csNum('Start (t)', 't', 0.1);
     csNum('Duration', 'dur', 0.1);
+    if (EASE_EVENTS.has(ev.type)) addEaseControl(body, ev);
     for (const [key, kind] of spec.fields) {
       if (kind === 'num') csNum(key, key, 0.1);
       else csText(key, key);
@@ -2427,7 +2477,8 @@
     retileAll: () => retileWholeLevel(),
     logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
-    logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected()
+    logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
+    csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); }
   };
 
   boot();

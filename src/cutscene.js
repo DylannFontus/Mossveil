@@ -52,11 +52,25 @@
   }
   const phase = (cs, ev) => cs.time - ev.t; // seconds into the event
 
+  // resolve an event's easing curve: a named U.ease preset, a [x1,y1,x2,y2] cubic-bezier
+  // (authored in the editor's curve editor), or the default inOutQuad. Bezier fns are cached.
+  function csEase(ev, l) {
+    const e = ev.ease;
+    if (!e || e === 'inOutQuad') return U.ease.inOutQuad(l);
+    if (typeof e === 'string') return (U.ease[e] || U.ease.inOutQuad)(l);
+    if (Array.isArray(e) && e.length === 4) {
+      const key = e.join(',');
+      if (ev._efKey !== key) { ev._ef = U.cubicBezier(e[0], e[1], e[2], e[3]); ev._efKey = key; }
+      return ev._ef(l);
+    }
+    return U.ease.inOutQuad(l);
+  }
+
   // ---- event handlers: each may define start(cs,ev), run(cs,ev,dt,local), end(cs,ev) ----
   const HANDLERS = {
-    fade: { run(cs, ev, dt, l) { cs.fadeAlpha = U.lerp(ev.from, ev.to, U.ease.inOutQuad(l)); } },
-    letterbox: { run(cs, ev, dt, l) { cs.barFrac = U.lerp(ev.from, ev.to, U.ease.inOutQuad(l)); } },
-    blur: { run(cs, ev, dt, l) { cs.blurPx = U.lerp(ev.from, ev.to, U.ease.inOutQuad(l)); } },
+    fade: { run(cs, ev, dt, l) { cs.fadeAlpha = U.lerp(ev.from, ev.to, csEase(ev, l)); } },
+    letterbox: { run(cs, ev, dt, l) { cs.barFrac = U.lerp(ev.from, ev.to, csEase(ev, l)); } },
+    blur: { run(cs, ev, dt, l) { cs.blurPx = U.lerp(ev.from, ev.to, csEase(ev, l)); } },
 
     text: {
       start(cs, ev) { G.Audio.sfx('chime'); },
@@ -72,7 +86,7 @@
     camera: {
       run(cs, ev, dt, l) {
         if (!ev._rt) ev._rt = { from: { x: cs.cam.x, y: cs.cam.y, z: cs.cam.z } };
-        const e = U.ease.inOutQuad(l);
+        const e = csEase(ev, l);
         cs.cam.x = U.lerp(ev._rt.from.x, cs.spawnX + (ev.dx || 0), e);
         cs.cam.y = U.lerp(ev._rt.from.y, cs.spawnY + (ev.dy || 0), e);
         cs.cam.z = U.lerp(ev._rt.from.z, ev.z !== undefined ? ev.z : ev._rt.from.z, e);
@@ -85,7 +99,7 @@
           const to = (cs.gameplayCam && cs.gameplayCam()) || { x: cs.spawnX + 1.7, y: cs.spawnY + 1.2, z: 30 };
           ev._rt = { from: { x: cs.cam.x, y: cs.cam.y, z: cs.cam.z }, to };
         }
-        const e = U.ease.inOutQuad(l);
+        const e = csEase(ev, l);
         cs.cam.x = U.lerp(ev._rt.from.x, ev._rt.to.x, e);
         cs.cam.y = U.lerp(ev._rt.from.y, ev._rt.to.y, e);
         cs.cam.z = U.lerp(ev._rt.from.z, ev._rt.to.z, e);

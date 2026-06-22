@@ -26,13 +26,30 @@ window.G = window.G || {};
   };
 
   U.ease = {
+    linear: t => t,
     outQuad: t => 1 - (1 - t) * (1 - t),
     outCubic: t => 1 - Math.pow(1 - t, 3),
     inCubic: t => t * t * t,
     inQuad: t => t * t,
     inOutQuad: t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+    inOutCubic: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+    inBack: t => { const c = 1.70158; return t * t * ((c + 1) * t - c); },
     outBack: t => { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
     outElastic: t => t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - .75) * (U.TAU / 3)) + 1
+  };
+  // CSS-style cubic-bezier easing (P0=0,0  P3=1,1) -> returns a t->y function (Newton solve)
+  U.cubicBezier = function (x1, y1, x2, y2) {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    const bezX = t => ((ax * t + bx) * t + cx) * t;
+    const bezY = t => ((ay * t + by) * t + cy) * t;
+    const dX = t => (3 * ax * t + 2 * bx) * t + cx;
+    return function (t) {
+      if (t <= 0) return 0; if (t >= 1) return 1;
+      let u = t;
+      for (let i = 0; i < 6; i++) { const x = bezX(u) - t, d = dX(u); if (Math.abs(x) < 1e-4 || Math.abs(d) < 1e-6) break; u -= x / d; }
+      return bezY(Math.max(0, Math.min(1, u)));
+    };
   };
 
   U.makeCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
