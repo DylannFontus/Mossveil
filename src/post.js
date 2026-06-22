@@ -175,6 +175,12 @@
       if (g[k] !== undefined) target[k] = g[k];
     if (g.tint !== undefined) target.tint.set(g.tint);
   };
+  // grade smoothing rate (per second); raise for snappy room loads, lower for slow fades
+  Post.gradeRate = 3;
+  Post.setGradeRate = r => { Post.gradeRate = r > 0 ? r : 3; };
+  // user graphics toggles (Settings menu): master 0..1 multipliers per effect
+  Post.fx = { bloom: 1, dof: 1, reflections: 1, aberr: 1, vignette: 1 };
+  Post.setFX = function (o) { if (!o) return; for (const k in o) if (k in Post.fx) Post.fx[k] = o[k]; };
   // transient hit/landing feedback: a chromatic-aberration spike (+ optional flash)
   Post.punch = function (amt) { aberr = Math.min(2.5, aberr + (amt || 0.6)); };
   Post.flash = function (amt, color) { flash = Math.max(flash, amt || 0.4); if (color !== undefined) flashCol.set(color); };
@@ -190,14 +196,14 @@
     dt = dt || 0.016;
     timeAcc += dt;
     // smooth grade toward biome target; decay transient effects
-    const k = Math.min(1, dt * 3);
+    const k = Math.min(1, dt * Post.gradeRate);
     for (const p of ['exposure', 'contrast', 'saturation', 'bloom', 'vignette', 'grain', 'dof'])
       grade[p] += (target[p] - grade[p]) * k;
     grade.tint.lerp(target.tint, k);
     aberr *= Math.max(0, 1 - dt * 6); flash *= Math.max(0, 1 - dt * 5);
 
     const lowQ = Post.quality === 'low';
-    const dofOn = !lowQ && grade.dof > 0.01;
+    const dofOn = !lowQ && grade.dof > 0.01 && Post.fx.dof > 0.01;
 
     // 1) scene -> sceneRT
     renderer.setRenderTarget(sceneRT);
@@ -236,16 +242,16 @@
     u.tDof.value = dofA.texture; u.tDepth.value = depthRT.depthTexture;
     u.uTime.value = timeAcc * 60.0;
     u.uExposure.value = grade.exposure; u.uContrast.value = grade.contrast;
-    u.uSaturation.value = grade.saturation; u.uBloom.value = lowQ ? 0 : grade.bloom;
-    u.uVignette.value = grade.vignette; u.uGrain.value = grade.grain;
-    u.uAberr.value = aberr; u.uFlash.value = flash;
-    u.uDof.value = dofOn ? grade.dof : 0;
+    u.uSaturation.value = grade.saturation; u.uBloom.value = (lowQ ? 0 : grade.bloom) * Post.fx.bloom;
+    u.uVignette.value = grade.vignette * Post.fx.vignette; u.uGrain.value = grade.grain;
+    u.uAberr.value = aberr * Post.fx.aberr; u.uFlash.value = flash;
+    u.uDof.value = (dofOn ? grade.dof : 0) * Post.fx.dof;
     u.uFocus.value = (G.camera && G.camera.position) ? G.camera.position.z : 30;
     u.uNear.value = (G.camera && G.camera.near) || 1; u.uFar.value = (G.camera && G.camera.far) || 300;
     // project the world water line to a screen uv.y
-    if (water.y !== null && water.strength > 0.001 && G.camera) {
+    if (water.y !== null && water.strength > 0.001 && Post.fx.reflections > 0.001 && G.camera) {
       _wv.set(G.camera.position.x, water.y, 0).project(G.camera);
-      u.uReflStr.value = water.strength; u.uReflY.value = _wv.y * 0.5 + 0.5;
+      u.uReflStr.value = water.strength * Post.fx.reflections; u.uReflY.value = _wv.y * 0.5 + 0.5;
       u.uReflRipple.value = water.ripple; u.uReflFade.value = water.fade; u.uReflCol.value.copy(water.color);
     } else u.uReflStr.value = 0;
     u.uTint.value.copy(grade.tint); u.uFlashCol.value.copy(flashCol);

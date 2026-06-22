@@ -129,10 +129,35 @@
 
   // ---------------- settings ----------------
   const SETTINGS_KEY = 'mossveil-settings';
-  G.settings = { volume: 0.8, shake: true, quality: 'high' };
+  // schema drives the menu, the adjust logic, and the saved keys
+  const SETTINGS_DEFS = [
+    { key: 'volume', label: 'Sound volume', type: 'slider' },
+    { key: 'shake', label: 'Screen shake', type: 'toggle' },
+    { key: 'quality', label: 'Visual quality', type: 'cycle', opts: ['low', 'medium', 'high'] },
+    { key: 'bloom', label: 'Bloom glow', type: 'toggle' },
+    { key: 'dof', label: 'Depth of field', type: 'toggle' },
+    { key: 'reflections', label: 'Water reflections', type: 'toggle' },
+    { key: 'weather', label: 'Weather effects', type: 'toggle' },
+    { key: 'aberration', label: 'Chromatic aberration', type: 'toggle' },
+    { key: 'vignette', label: 'Vignette', type: 'toggle' }
+  ];
+  G.settings = { volume: 0.8, shake: true, quality: 'high', bloom: true, dof: true, reflections: true, weather: true, aberration: true, vignette: true };
+  const fmtSetting = d => {
+    const v = G.settings[d.key];
+    if (d.type === 'slider') return Math.round(v * 100) + '%';
+    if (d.type === 'cycle') return ('' + v).charAt(0).toUpperCase() + ('' + v).slice(1);
+    return v ? 'On' : 'Off';
+  };
+  Main.settingsCount = SETTINGS_DEFS.length;
+  Main.settingsRows = () => SETTINGS_DEFS.map(d => ({ label: d.label, value: fmtSetting(d) }));
   function applySettings() {
-    if (G.Audio && G.Audio.setVolume) G.Audio.setVolume(G.settings.volume);
-    if (G.Post) G.Post.quality = G.settings.quality;
+    const s = G.settings;
+    if (G.Audio && G.Audio.setVolume) G.Audio.setVolume(s.volume);
+    if (G.Post) {
+      G.Post.quality = s.quality;
+      if (G.Post.setFX) G.Post.setFX({ bloom: s.bloom ? 1 : 0, dof: s.dof ? 1 : 0, reflections: s.reflections ? 1 : 0, aberr: s.aberration ? 1 : 0, vignette: s.vignette ? 1 : 0 });
+    }
+    if (G.Weather) G.Weather.userEnabled = s.weather !== false;
   }
   function loadSettings() {
     try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s && typeof s === 'object') Object.assign(G.settings, s); } catch (e) { }
@@ -140,20 +165,30 @@
   }
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) { } }
   function settingsAdjust(dir) {
-    const s = G.settings, i = Main.settingsIndex;
-    if (i === 0) s.volume = U.clamp(+(s.volume + dir * 0.1).toFixed(2), 0, 1);
-    else if (i === 1) s.shake = !s.shake;
-    else if (i === 2) { const q = ['low', 'medium', 'high']; s.quality = q[(q.indexOf(s.quality) + dir + q.length) % q.length]; }
+    const d = SETTINGS_DEFS[Main.settingsIndex]; if (!d) return;
+    const s = G.settings;
+    if (d.type === 'slider') s[d.key] = U.clamp(+(s[d.key] + dir * 0.1).toFixed(2), 0, 1);
+    else if (d.type === 'cycle') s[d.key] = d.opts[(d.opts.indexOf(s[d.key]) + dir + d.opts.length) % d.opts.length];
+    else s[d.key] = !s[d.key];
     applySettings(); saveSettings(); G.Audio.sfx('clink');
+  }
+  // Menu-to-menu transition: fire the bat sweep and DELAY the state swap until the swarm
+  // has covered the screen (~SWP_COVER), so the new menu appears from behind the bats —
+  // the same beat the gameplay→pause sweep uses. Input is held during the cover.
+  Main.transLock = 0; Main.transTo = null;
+  function menuGo(to) {
+    if (Main.transLock > 0) return;
+    if (G.UI.menuSweep) G.UI.menuSweep();
+    Main.transTo = to; Main.transLock = 0.22;   // swap once the (faster) curtain has covered
   }
   function pauseSelect() {
     G.Audio.sfx('uiBell');
     const it = Main.pauseItems[Main.pauseIndex];
     if (it === 'Resume') { if (G.UI.closePause) G.UI.closePause(); Main.state = 'play'; }
-    else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'pause'; Main.state = 'charms'; }
-    else if (it === 'Map') { Main.mapView = Main.mapView || { pan: { x: 0, y: 0 }, zoom: 3 }; G.MapView.centerOn(G.room.id, Main.mapView); Main.state = 'map'; }
-    else if (it === 'Settings') { Main.settingsIndex = 0; Main.state = 'settings'; }
-    else if (it === 'Quit to Title') { if (G.UI.closePause) G.UI.closePause(); G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; Main.state = 'title'; }
+    else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'pause'; menuGo('charms'); }
+    else if (it === 'Map') { Main.mapView = Main.mapView || { pan: { x: 0, y: 0 }, zoom: 3 }; G.MapView.centerOn(G.room.id, Main.mapView); menuGo('map'); }
+    else if (it === 'Settings') { Main.settingsIndex = 0; Main._settingsReturn = 'pause'; menuGo('settings'); }
+    else if (it === 'Quit to Title') { G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; menuGo('title'); }
   }
 
   Main.slotIndex = 0;
@@ -164,6 +199,7 @@
       { label: 'New Game', enabled: true, action: menuNewGame },
       { label: 'Continue', enabled: anyOccupied(), action: continueGame },
       { label: 'Load Save', enabled: true, action: openSlots },
+      { label: 'Settings', enabled: true, action: () => { Main.settingsIndex = 0; Main._settingsReturn = 'title'; menuGo('settings'); } },
       { label: 'Exit', enabled: true, action: exitGame }
     ];
     if (!Main.menuItems[Main.menuIndex] || !Main.menuItems[Main.menuIndex].enabled)
@@ -703,7 +739,11 @@
     let dt = rdt;
     if (G.hitStop > 0) { G.hitStop -= rdt; dt = 0; }
 
-    switch (Main.state) {
+    // mid menu-transition: hold input, wait for the swarm to cover, then swap behind it
+    if (Main.transLock > 0) {
+      Main.transLock -= rdt; dt = 0;
+      if (Main.transLock <= 0 && Main.transTo) { Main.state = Main.transTo; Main.transTo = null; }
+    } else switch (Main.state) {
       case 'title':
         dt = rdt * 0.6;
         buildMenu();
@@ -744,7 +784,7 @@
         if (I.pressed('up')) { Main.charmIndex = (Main.charmIndex - 1 + n) % n; G.Audio.sfx('clink'); }
         if (I.pressed('down')) { Main.charmIndex = (Main.charmIndex + 1) % n; G.Audio.sfx('clink'); }
         if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) { const ok = G.Charms.toggle(G.Charms.LIST[Main.charmIndex].id); G.Audio.sfx(ok ? 'uiBell' : 'clink'); }
-        if (I.pressed('pause')) { Main.state = Main._charmReturn || 'pause'; G.Audio.sfx('clink'); }
+        if (I.pressed('pause')) { G.Audio.sfx('clink'); menuGo(Main._charmReturn || 'pause'); }
         break;
       }
       case 'bench':
@@ -776,14 +816,16 @@
         if (I.pressed('pause')) { Main.state = 'play'; G.Audio.sfx('clink'); }
         break;
       }
-      case 'settings':
+      case 'settings': {
         dt = 0;
-        if (I.pressed('up')) { Main.settingsIndex = (Main.settingsIndex - 1 + 3) % 3; G.Audio.sfx('clink'); }
-        if (I.pressed('down')) { Main.settingsIndex = (Main.settingsIndex + 1) % 3; G.Audio.sfx('clink'); }
+        const n = Main.settingsCount || 3;
+        if (I.pressed('up')) { Main.settingsIndex = (Main.settingsIndex - 1 + n) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.settingsIndex = (Main.settingsIndex + 1) % n; G.Audio.sfx('clink'); }
         if (I.pressed('left')) settingsAdjust(-1);
         else if (I.pressed('right') || I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) settingsAdjust(1);
-        if (I.pressed('pause')) { Main.state = 'pause'; G.Audio.sfx('clink'); }
+        if (I.pressed('pause')) { G.Audio.sfx('clink'); menuGo(Main._settingsReturn || 'pause'); }
         break;
+      }
       case 'map': {
         dt = 0;
         if (I.pressed('map') || I.pressed('pause')) Main.state = 'play';
@@ -829,6 +871,7 @@
     if (dt > 0) {
       G.time += dt;
       G.World.update(dt);
+      if (G.World.updateLook) G.World.updateLook(dt);
       if (G.Weather) G.Weather.update(dt);
       if (Main.state === 'cutscene') G.Cutscene.update(dt);
       else if (Main.state === 'prologue') G.Prologue.update(dt);

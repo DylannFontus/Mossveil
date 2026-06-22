@@ -12,6 +12,8 @@
   let tab = 'scene';            // 'scene' | 'map'
   let snap = true, gizmos = true, scatter = false;
   let brushSize = 1, brushShape = 'pencil', paintStart = null;   // tile brush: pencil|rect|line|fill
+  let terrainMat = '#';          // solid-tile material char (see G.World.TERRAIN_MATS)
+  let terrainSmooth = false;     // paint the curvy (smooth) variant of the material
   let dirty = false;
   let sel = null;               // {kind:'prop'|'enemy'|'zone'|'spawn', i | key}
   let multi = [];               // additional multi-selection (array of sel descriptors)
@@ -264,7 +266,7 @@
   };
   function propRect(p) {
     if (p.type === 'textTrigger' || p.type === 'cutsceneTrigger') return { x: p.x, y: p.y, w: p.w || 3, h: p.h || 3 };
-    if (p.type === 'setActiveTrigger') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
+    if (p.type === 'setActiveTrigger' || p.type === 'lookTrigger') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
     const s = PROP_SIZE[p.type] || [1.5, 1.5];
     const k = p.type === 'decor' ? (p.scale || 1) : 1;
     return { x: p.x, y: p.y + (p.type === 'textTrigger' ? 0 : s[1] * k / 2 - 0.2), w: s[0] * k, h: s[1] * k };
@@ -552,7 +554,10 @@
     camZ = U.clamp(camZ * (e.deltaY > 0 ? 1.1 : 0.9), 8, 110);
   }, { passive: false });
 
-  function paintCh() { return tool === 'solid' ? '#' : tool === 'oneway' ? '=' : tool === 'spike' ? '^' : ' '; }
+  function paintCh() {
+    if (tool !== 'solid') return tool === 'oneway' ? '=' : tool === 'spike' ? '^' : ' ';
+    return terrainSmooth ? ((G.World.SMOOTH_CHAR && G.World.SMOOTH_CHAR[terrainMat]) || terrainMat) : terrainMat;
+  }
   function brushStamp(c, r, ch) {                 // a brushSize×brushSize square
     const h0 = Math.floor((brushSize - 1) / 2);
     for (let dy = 0; dy < brushSize; dy++) for (let dx = 0; dx < brushSize; dx++) setTile(c - h0 + dx, r - h0 + dy, ch);
@@ -697,11 +702,12 @@
       if (it.ref.type === 'bossTrigger') col = '#e85fd0';
       if (it.ref.type === 'cutsceneTrigger') col = '#5fd0e8';
       if (it.ref.type === 'setActiveTrigger') col = '#c89bff';
+      if (it.ref.type === 'lookTrigger') col = '#5fe0a8';
       const inactive = it.ref.active === false;
       octx.globalAlpha = inactive ? 0.4 : 1;        // dim objects that are switched off
       octx.strokeStyle = isSel ? '#ffd887' : (inMulti ? '#7fe8ff' : col + 'aa');
       octx.lineWidth = (isSel || inMulti) ? 2.5 : 1.2;
-      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger') octx.setLineDash([4, 4]);
+      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger' || it.ref.type === 'lookTrigger') octx.setLineDash([4, 4]);
       octx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
       octx.setLineDash([]);
       // label
@@ -958,6 +964,51 @@
           add.addEventListener('click', () => { p.targets.push({ level: currentId, state: 'on' }); markDirty(); refreshInspector(); });
           break;
         }
+        case 'lookTrigger': {
+          numField(body, 'W', () => p.w || 5, v => { p.w = Math.max(0.5, v); });
+          numField(body, 'H', () => p.h || 5, v => { p.h = Math.max(0.5, v); });
+          numField(body, 'Fade in (s)', () => p.fade !== undefined ? p.fade : 2, v => { p.fade = Math.max(0, v); }, 0.25);
+          el('div', { class: 'insNote' }, body, 'Walk into this zone to re-theme the room. Tick a section to override it; left unticked, it stays as-is. Grade/weather/water fade over the time above; a biome change always fades the background to black for 1.5s each way.');
+
+          // ---- biome ----
+          el('div', { class: 'hgroup' }, body, 'Biome');
+          checkField(body, 'Change biome', () => p.biome !== undefined, v => { if (v) p.biome = lvl().biome; else delete p.biome; refreshInspector(); });
+          if (p.biome !== undefined)
+            selectField(body, 'To biome', G.World.BIOMES.map(b2 => ({ v: b2, t: G.World.PAL[b2].label })), () => p.biome, v => { p.biome = v; });
+
+          // ---- colour grade ----
+          el('div', { class: 'hgroup' }, body, 'Colour grade');
+          checkField(body, 'Override grade', () => !!p.grade, v => { if (v) p.grade = {}; else delete p.grade; refreshInspector(); });
+          if (p.grade) {
+            const gd = p.grade, gset = (k, dv) => v => { gd[k] = +v.toFixed(2); };
+            numField(body, 'Exposure', () => gd.exposure !== undefined ? gd.exposure : 1.05, gset('exposure'), 0.05);
+            numField(body, 'Bloom', () => gd.bloom !== undefined ? gd.bloom : 0.6, gset('bloom'), 0.05);
+            numField(body, 'Vignette', () => gd.vignette !== undefined ? gd.vignette : 0.46, gset('vignette'), 0.05);
+            numField(body, 'Saturation', () => gd.saturation !== undefined ? gd.saturation : 1.14, gset('saturation'), 0.05);
+            numField(body, 'Contrast', () => gd.contrast !== undefined ? gd.contrast : 1.05, gset('contrast'), 0.05);
+            colorField(body, 'Tint', () => gd.tint || '#ffffff', v => { if (!v || v.toLowerCase() === '#ffffff') delete gd.tint; else gd.tint = v; });
+          }
+
+          // ---- weather ----
+          el('div', { class: 'hgroup' }, body, 'Weather');
+          checkField(body, 'Override weather', () => p.weather !== undefined, v => { if (v) p.weather = 'none'; else delete p.weather; refreshInspector(); });
+          if (p.weather !== undefined) {
+            const wK = (G.Weather ? G.Weather.KINDS : ['none']);
+            selectField(body, 'Weather', wK.map(k => ({ v: k, t: (G.Weather && G.Weather.LABELS[k]) || k })), () => p.weather || 'none', v => { p.weather = v; });
+          }
+
+          // ---- water ----
+          el('div', { class: 'hgroup' }, body, 'Reflective water');
+          checkField(body, 'Override water', () => p.water !== undefined, v => { if (v) p.water = { y: Math.round(lvl().h * 0.16), strength: 0.5, color: '#9ec8e6' }; else delete p.water; refreshInspector(); });
+          if (p.water) {
+            numField(body, 'Water level Y', () => p.water.y, v => { p.water.y = v; }, 0.5);
+            numField(body, 'Reflectivity', () => p.water.strength !== undefined ? p.water.strength : 0.5, v => { p.water.strength = U.clamp(v, 0, 1); }, 0.05);
+            colorField(body, 'Water tint', () => p.water.color || '#9ec8e6', v => { p.water.color = v || '#9ec8e6'; });
+          } else if (p.water !== undefined) {
+            el('div', { class: 'insNote' }, body, 'Water OFF (removes any reflective water).');
+          }
+          break;
+        }
         case 'decor': {
           const kinds = [...G.World.DECOR_KINDS.standing, ...G.World.DECOR_KINDS.hanging];
           selectField(body, 'Kind', kinds.map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
@@ -1210,7 +1261,8 @@
         { cat: 'spawn', id: 'spawn', label: 'Spawn point', ico: '📍' },
         { cat: 'zone', id: 'portal', label: 'Portal / transition', ico: '🌀' },
         { cat: 'prop', id: 'cutsceneTrigger', label: 'Cutscene trigger', ico: '🎬', defaults: { w: 4, h: 4, once: true } },
-        { cat: 'prop', id: 'setActiveTrigger', label: 'Set-active trigger', ico: '🎚️', defaults: { w: 5, h: 5, once: false, targets: [] } }
+        { cat: 'prop', id: 'setActiveTrigger', label: 'Set-active trigger', ico: '🎚️', defaults: { w: 5, h: 5, once: false, targets: [] } },
+        { cat: 'prop', id: 'lookTrigger', label: 'Biome / look changer', ico: '🌗', defaults: { w: 5, h: 5, fade: 2 } }
       ];
       case 'prefabs': return Object.keys(prefabs).map(name => ({ cat: 'prefab', prefab: name, label: name, ico: '🧩', n: (prefabs[name].items || []).length, del: true }));
     }
@@ -1358,12 +1410,15 @@
     const c = cv.getContext('2d');
     const pal = (G.World.PAL[lvl.biome] || G.World.PAL.verdant);
     const hx = '#' + ((pal.moss || 0x55b070).toString(16).padStart(6, '0'));
+    const MATS = (G.World && G.World.TERRAIN_MATS) || {};
+    const matHx = ch => { const m = MATS[ch]; if (!m) return null; const col = m.col(pal); return '#' + (col >>> 0).toString(16).padStart(6, '0'); };
     const tiles = lvl.tiles || [];
     for (let r = 0; r < lvl.h; r++) {
       const row = tiles[r] || '';
       for (let col = 0; col < lvl.w; col++) {
         const ch = row[col];
         if (ch === '#') { c.fillStyle = hx; c.fillRect(col, r, 1, 1); }
+        else if (MATS[ch]) { c.fillStyle = matHx(ch) || hx; c.fillRect(col, r, 1, 1); }
         else if (ch === '=') { c.fillStyle = 'rgba(180,200,170,0.6)'; c.fillRect(col, r, 1, 1); }
         else if (ch === '^') { c.fillStyle = '#d06060'; c.fillRect(col, r, 1, 1); }
       }
@@ -1721,6 +1776,7 @@
     $('btnSnap').classList.toggle('on', snap);
     $('btnGizmos').classList.toggle('on', gizmos);
     $('btnScatter').classList.toggle('on', scatter);
+    $('btnSmooth').classList.toggle('on', terrainSmooth);
   }
   document.querySelectorAll('.tool').forEach(b2 => {
     b2.addEventListener('click', () => { tool = b2.dataset.tool; setPlacing(null); refreshToolbar(); });
@@ -1731,6 +1787,13 @@
   $('btnLint').addEventListener('click', lintModal);
   $('brushShape').addEventListener('change', e => { brushShape = e.target.value; });
   $('brushSize').addEventListener('change', e => { brushSize = parseInt(e.target.value) || 1; });
+  (function () {                                   // populate the terrain-material picker (hard chars)
+    const sel = $('terrainMat'); const M = (G.World && G.World.TERRAIN_MATS) || { '#': { label: 'Grassy' } };
+    for (const ch in M) { if (M[ch].smooth) continue; el('option', { value: ch }, sel, M[ch].label); }
+    sel.value = terrainMat;
+    sel.addEventListener('change', e => { terrainMat = e.target.value; if (tool !== 'solid') { tool = 'solid'; refreshToolbar(); } });
+  })();
+  $('btnSmooth').addEventListener('click', () => { terrainSmooth = !terrainSmooth; if (tool !== 'solid') tool = 'solid'; refreshToolbar(); });
   $('btnUndo').addEventListener('click', doUndo);
   $('btnRedo').addEventListener('click', doRedo);
   $('tabScene').addEventListener('click', () => setTab('scene'));
@@ -1956,15 +2019,6 @@
   }
   $('btnSave').addEventListener('click', save);
   $('btnSaveTarget').addEventListener('click', saveTargetModal);
-  $('btnTest').addEventListener('click', async () => {
-    if (await save()) {
-      // relative path (../index.html) so it works under a hosting subpath too (e.g. GitHub Pages /<repo>/)
-      if (csMode && csCurrent) { window.open(`../index.html?cutscene=${csCurrent}`, 'mossveil-test'); return; }
-      const L = lvl();
-      const sp = L.spawns && (L.spawns.P ? 'P' : Object.keys(L.spawns)[0]);
-      window.open(`../index.html?level=${currentId}${sp ? '&spawn=' + sp : ''}`, 'mossveil-test');
-    }
-  });
   $('btnTestStart').addEventListener('click', async () => {
     if (await save()) window.open('../index.html', 'mossveil-test');
   });

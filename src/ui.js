@@ -291,55 +291,49 @@
     }
   }
 
+  // Title screen shares the pause-menu look: slanted backdrop, drifting bats, wanderer,
+  // and a biome-accent slash on the selected item.
   function drawTitleScreen() {
-    cx.save();
-    const bg = cx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, 'rgba(3,8,9,0.82)');
-    bg.addColorStop(0.5, 'rgba(3,8,9,0.6)');
-    bg.addColorStop(1, 'rgba(3,8,9,0.85)');
-    cx.fillStyle = bg;
-    cx.fillRect(0, 0, w, h);
-    cx.textAlign = 'center';
-    const pulse = 0.5 + Math.sin(G.time * 1.5) * 0.5;
+    pmAcc = biomeAccent();
+    menuChrome({ vtitle: false, nod: true });   // no side title; the wanderer nods
+    // title + subtitle (pushed to the right)
+    cx.save(); cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = '#eaf2ee'; cx.shadowColor = pmAcc; cx.shadowBlur = 24;
+    cx.font = `900 ${Math.round(h * 0.105)}px ${menuFont}`;
+    cx.fillText('MOSSVEIL', w * 0.52, h * 0.22); cx.shadowBlur = 0;
+    cx.fillStyle = 'rgba(200,220,210,0.8)'; cx.font = `italic ${Math.round(h * 0.026)}px ${serif}`;
+    cx.fillText('— echoes beneath —', w * 0.52 + 5, h * 0.22 + Math.round(h * 0.04));
+    cx.restore();
 
-    cx.fillStyle = '#eaf2ee';
-    cx.shadowColor = 'rgba(160,240,200,0.45)';
-    cx.shadowBlur = 28;
-    cx.font = `86px ${serif}`;
-    const sp = '  ';
-    cx.fillText('M O S S V E I L', w / 2, h * 0.34);
-    cx.shadowBlur = 0;
-    cx.font = `italic 22px ${serif}`;
-    cx.fillStyle = 'rgba(200,220,210,0.85)';
-    cx.fillText('—  e c h o e s   b e n e a t h  —', w / 2, h * 0.34 + 46);
-
-    // ---- menu buttons ----
+    // diagonal accent-slash menu list (right side)
     const items = G.Main.menuItems || [];
-    const bw = 280, bh = 46, gap = 13;
-    const x0 = w / 2 - bw / 2;
-    const y0 = h * 0.48;
     G.UI.titleButtons = [];
-    items.forEach((it, i) => {
-      const y = y0 + i * (bh + gap);
-      const sel = i === G.Main.menuIndex && !G.Main.confirm;
-      roundRect(x0, y, bw, bh, 9);
-      cx.fillStyle = !it.enabled ? 'rgba(14,18,16,0.45)' : (sel ? 'rgba(38,72,54,0.92)' : 'rgba(18,28,24,0.7)');
-      cx.fill();
-      cx.lineWidth = sel ? 2.2 : 1;
-      cx.strokeStyle = !it.enabled ? 'rgba(110,125,118,0.3)' : (sel ? `rgba(180,240,200,${0.7 + pulse * 0.3})` : 'rgba(120,150,135,0.45)');
-      cx.stroke();
-      cx.fillStyle = !it.enabled ? 'rgba(140,150,145,0.35)' : (sel ? '#eafff0' : '#c6d4cc');
-      cx.font = `${sel ? 23 : 21}px ${serif}`;
-      cx.textBaseline = 'middle';
-      cx.fillText(it.label, w / 2, y + bh / 2 + 1);
-      if (sel) { cx.fillStyle = 'rgba(180,240,200,0.9)'; cx.fillText('‹', x0 + 22, y + bh / 2 + 1); cx.fillText('›', x0 + bw - 22, y + bh / 2 + 1); }
-      G.UI.titleButtons.push({ x: x0, y, w: bw, h: bh, index: i, enabled: it.enabled });
-    });
-    cx.textBaseline = 'alphabetic';
+    const ang = -0.05, lx = w * 0.54, ly = h * 0.38, step = Math.min(h * 0.082, 58), fs = Math.round(Math.min(h * 0.046, 30));
+    const cos = Math.cos(ang), sin = Math.sin(ang), colW = Math.min(w * 0.34, 420);
+    cx.save(); cx.translate(lx, ly); cx.rotate(ang); cx.textBaseline = 'middle';
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i], sel = i === G.Main.menuIndex && !G.Main.confirm, yy = i * step;
+      if (sel) {
+        const sw = colW, sh = fs * 1.2;
+        cx.save(); cx.globalAlpha = 0.92; cx.fillStyle = pmAcc;
+        cx.beginPath();
+        cx.moveTo(-16, yy - sh * 0.5); cx.lineTo(sw, yy - sh * 0.55);
+        cx.lineTo(sw + sh * 0.65, yy + sh * 0.5); cx.lineTo(-16 + sh * 0.35, yy + sh * 0.5);
+        cx.closePath(); cx.fill(); cx.restore();
+      }
+      const label = it.label.toUpperCase();
+      cx.font = `${sel ? '900' : '700'} ${fs}px ${menuFont}`; cx.textAlign = 'left';
+      if (!it.enabled) cx.fillStyle = 'rgba(120,132,126,0.35)';
+      else { if (!sel) { cx.lineWidth = 1; cx.strokeStyle = 'rgba(120,180,160,0.25)'; cx.strokeText(label, 6, yy); } cx.fillStyle = sel ? '#06120e' : 'rgba(202,226,216,0.9)'; }
+      cx.fillText(label, 6, yy);
+      const scx = lx + (-16) * cos - yy * sin, scy = ly + (-16) * sin + yy * cos;
+      G.UI.titleButtons.push({ x: scx, y: scy - fs * 0.85, w: colW + 40, h: fs * 1.6, index: i, enabled: it.enabled });
+    }
+    cx.restore();
 
-    cx.font = `italic 13px ${serif}`;
-    cx.fillStyle = 'rgba(140,160,152,0.55)';
-    cx.fillText('↑ ↓ select · Enter / Z confirm · or click — an original 2.5D homage, woven procedurally', w / 2, h - 24);
+    cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  select        Enter  confirm        or click', w - 32, h - 32);
     cx.restore();
 
     if (G.Main.confirm) drawConfirm();
@@ -417,108 +411,59 @@
     cx.restore();
   }
 
+  // Load Save shares the pause-menu look; the saved-vessel rows carry the biome accent.
   function drawSlots() {
-    cx.save();
-    const bg = cx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, 'rgba(3,8,9,0.86)');
-    bg.addColorStop(0.5, 'rgba(3,8,9,0.7)');
-    bg.addColorStop(1, 'rgba(3,8,9,0.88)');
-    cx.fillStyle = bg;
-    cx.fillRect(0, 0, w, h);
-    const pulse = 0.5 + Math.sin(G.time * 1.5) * 0.5;
-
-    cx.textAlign = 'center';
-    cx.fillStyle = '#eaf2ee';
-    cx.shadowColor = 'rgba(160,240,200,0.4)';
-    cx.shadowBlur = 20;
-    cx.font = `46px ${serif}`;
-    cx.fillText('C H O O S E   A   V E S S E L', w / 2, h * 0.155);
-    cx.shadowBlur = 0;
-
+    pmAcc = biomeAccent();
+    menuChrome();
+    menuHeader('LOAD SAVE');
     const slots = G.Main.slots || [];
-    const bw = Math.min(580, w - 80), bh = 78, gap = 14;
-    const total = SLOT_VIEW * bh + (SLOT_VIEW - 1) * gap;
-    const x0 = w / 2 - bw / 2;
-    const y0 = Math.max(h * 0.22, h * 0.5 - total / 2 + 14);
-    G.UI.slotButtons = [];
-    G.UI.slotTrashButtons = [];
-
+    const bw = Math.min(w * 0.5, 560), bh = 76, gap = 12;
+    const x0 = Math.min(w * 0.4, w - bw - 40), y0 = h * 0.28;
+    G.UI.slotButtons = []; G.UI.slotTrashButtons = [];
     for (let i = 0; i < SLOT_VIEW; i++) {
       const y = y0 + i * (bh + gap);
       const sel = i === G.Main.slotIndex && !G.Main.confirm;
-      const slot = slots[i];
-      const info = slot ? G.Main.slotInfo(slot) : null;
-
-      roundRect(x0, y, bw, bh, 10);
-      cx.fillStyle = sel ? 'rgba(34,64,49,0.92)' : 'rgba(16,25,21,0.74)';
-      cx.fill();
-      cx.lineWidth = sel ? 2.2 : 1;
-      cx.strokeStyle = sel ? `rgba(180,240,200,${0.7 + pulse * 0.3})` : 'rgba(110,140,125,0.4)';
-      cx.stroke();
-
-      // vessel numeral badge
-      cx.textAlign = 'center';
-      cx.fillStyle = sel ? 'rgba(180,240,200,0.95)' : 'rgba(150,180,165,0.7)';
-      cx.font = `italic 30px ${serif}`;
-      cx.textBaseline = 'middle';
-      cx.fillText(ROMAN[i], x0 + 40, y + bh / 2);
-      cx.beginPath();
-      cx.moveTo(x0 + 76, y + 16); cx.lineTo(x0 + 76, y + bh - 16);
-      cx.strokeStyle = 'rgba(140,170,155,0.25)'; cx.lineWidth = 1; cx.stroke();
-
+      const slot = slots[i], info = slot ? G.Main.slotInfo(slot) : null;
+      roundRect(x0, y, bw, bh, 8);
+      if (sel) { cx.globalAlpha = 0.92; cx.fillStyle = pmAcc; cx.fill(); cx.globalAlpha = 1; }
+      else { cx.fillStyle = 'rgba(12,20,17,0.66)'; cx.fill(); cx.lineWidth = 1; cx.strokeStyle = 'rgba(110,140,125,0.35)'; cx.stroke(); }
+      // vessel numeral
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillStyle = sel ? '#06120e' : 'rgba(150,180,165,0.7)';
+      cx.font = `900 ${Math.round(bh * 0.4)}px ${menuFont}`;
+      cx.fillText(ROMAN[i], x0 + 42, y + bh / 2);
+      cx.beginPath(); cx.moveTo(x0 + 82, y + 14); cx.lineTo(x0 + 82, y + bh - 14);
+      cx.strokeStyle = sel ? 'rgba(6,18,14,0.3)' : 'rgba(140,170,155,0.22)'; cx.lineWidth = 1; cx.stroke();
       cx.textAlign = 'left';
-      const tx = x0 + 96;
+      const tx = x0 + 100;
       if (info) {
-        cx.fillStyle = sel ? '#eafff0' : '#cad8d0';
-        cx.font = `22px ${serif}`;
-        cx.fillText(info.place, tx, y + 28);
-        cx.fillStyle = 'rgba(170,195,182,0.75)';
-        cx.font = `14px ${serif}`;
-        cx.fillText(info.detail, tx, y + 50);
-        cx.fillStyle = 'rgba(140,165,153,0.6)';
-        cx.font = `italic 13px ${serif}`;
-        cx.fillText('rested ' + info.when, tx, y + 68);
-        // trash button (top-right)
-        const tbx = x0 + bw - 30, tby = y + 26, tbox = 34;
-        drawTrashIcon(tbx, tby, 18, sel ? 'rgba(235,170,165,0.95)' : 'rgba(180,150,148,0.6)');
-        G.UI.slotTrashButtons.push({ x: tbx - tbox / 2, y: y, w: tbox, h: bh, index: i });
+        cx.fillStyle = sel ? '#06120e' : '#cad8d0'; cx.font = `21px ${serif}`;
+        cx.fillText(info.place, tx, y + 26);
+        cx.fillStyle = sel ? 'rgba(6,18,14,0.72)' : 'rgba(170,195,182,0.75)'; cx.font = `13px ${serif}`;
+        cx.fillText(info.detail, tx, y + 47);
+        cx.fillStyle = sel ? 'rgba(6,18,14,0.6)' : 'rgba(140,165,153,0.6)'; cx.font = `italic 12px ${serif}`;
+        cx.fillText('rested ' + info.when, tx, y + 64);
+        const tbx = x0 + bw - 28, tbox = 34;
+        drawTrashIcon(tbx, y + 24, 17, sel ? 'rgba(70,20,18,0.9)' : 'rgba(180,150,148,0.6)');
+        G.UI.slotTrashButtons.push({ x: tbx - tbox / 2, y, w: tbox, h: bh, index: i });
       } else {
-        cx.textAlign = 'center';
-        cx.fillStyle = sel ? 'rgba(210,225,216,0.85)' : 'rgba(150,170,160,0.6)';
-        cx.font = `italic 21px ${serif}`;
-        cx.fillText('— empty vessel —', x0 + bw / 2 + 20, y + bh / 2 - 6);
-        cx.fillStyle = 'rgba(150,180,165,0.5)';
-        cx.font = `13px ${serif}`;
-        cx.fillText('begin a new journey here', x0 + bw / 2 + 20, y + bh / 2 + 18);
-      }
-      if (sel) {
-        cx.fillStyle = 'rgba(180,240,200,0.9)';
-        cx.font = `20px ${serif}`;
-        cx.textAlign = 'center';
-        cx.fillText('‹', x0 + 12, y + bh / 2);
+        cx.fillStyle = sel ? '#06120e' : 'rgba(150,170,160,0.6)'; cx.font = `italic 20px ${serif}`;
+        cx.fillText('— empty vessel —', tx, y + bh / 2 - 4);
+        cx.fillStyle = sel ? 'rgba(6,18,14,0.6)' : 'rgba(150,180,165,0.5)'; cx.font = `13px ${serif}`;
+        cx.fillText('begin a new journey here', tx, y + bh / 2 + 18);
       }
       cx.textBaseline = 'alphabetic';
       G.UI.slotButtons.push({ x: x0, y, w: bw, h: bh, index: i });
     }
-
-    // back button
-    const back = { x: x0, y: y0 + SLOT_VIEW * (bh + gap) + 6, w: 120, h: 36 };
-    roundRect(back.x, back.y, back.w, back.h, 8);
-    cx.fillStyle = 'rgba(18,28,24,0.7)';
-    cx.fill();
-    cx.strokeStyle = 'rgba(120,150,135,0.45)'; cx.lineWidth = 1; cx.stroke();
-    cx.fillStyle = '#c6d4cc'; cx.font = `17px ${serif}`;
-    cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    cx.fillText('‹ Back', back.x + back.w / 2, back.y + back.h / 2 + 1);
-    cx.textBaseline = 'alphabetic';
+    // back
+    const back = { x: x0, y: y0 + SLOT_VIEW * (bh + gap) + 6, w: 120, h: 34 };
+    roundRect(back.x, back.y, back.w, back.h, 7); cx.fillStyle = 'rgba(14,22,19,0.7)'; cx.fill();
+    cx.lineWidth = 1; cx.strokeStyle = 'rgba(120,150,135,0.4)'; cx.stroke();
+    cx.fillStyle = '#c6d4cc'; cx.font = `16px ${serif}`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText('‹ Back', back.x + back.w / 2, back.y + back.h / 2); cx.textBaseline = 'alphabetic';
     G.UI.slotBack = back;
-
-    cx.font = `italic 13px ${serif}`;
-    cx.fillStyle = 'rgba(140,160,152,0.55)';
-    cx.textAlign = 'center';
-    cx.fillText('↑ ↓ select · Enter / Z choose · Del delete · Esc back — empty slots start a new run', w / 2, h - 22);
-    cx.restore();
-
+    cx.save(); cx.textAlign = 'right'; cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  select        Enter  choose        Del  delete        Esc  back', w - 32, h - 32); cx.restore();
     if (G.Main.confirm) drawConfirm();
   }
 
@@ -573,7 +518,7 @@
   const swp = { on: false, t: 0, dir: 1, bats: [] };
   // The bat sweep has three beats (seconds): the swarm COVERs the screen, HOLDs it
   // fully black while the menu swaps in/out behind it, then REVEALs the result.
-  const SWP_COVER = 0.32, SWP_HOLD = 0.40, SWP_REVEAL = 0.36;
+  const SWP_COVER = 0.22, SWP_HOLD = 0.30, SWP_REVEAL = 0.26;   // faster curtain (bats themselves stay calm)
   const SWP_TOTAL = SWP_COVER + SWP_HOLD + SWP_REVEAL;   // ~1.08s
   const menuFont = '"Arial Black", "Arial Bold", Impact, sans-serif';
   // the pause menu's accent follows the biome the player is in
@@ -582,31 +527,37 @@
     return gl ? '#' + gl.toString(16).padStart(6, '0') : '#6cf2b0';
   }
 
-  UI.openPause = () => { pmOpen = 0; pmClosing = 0; pmSel = G.Main.pauseIndex || 0; pmAcc = biomeAccent(); startSweep(1); G.Audio.sfx('uiBell'); };
-  UI.closePause = () => { pmClosing = SWP_TOTAL + 0.05; startSweep(-1); };
+  UI.openPause = () => { pmOpen = 0; pmClosing = 0; pmSel = G.Main.pauseIndex || 0; pmAcc = biomeAccent(); startSweep('up', 'open'); G.Audio.sfx('uiBell'); };
+  UI.closePause = () => { pmClosing = SWP_TOTAL + 0.05; startSweep('down', 'close'); };
+  // a screen-filling bat sweep from a RANDOM edge — used between the pause menu and its
+  // sub-menus (Charms / Map / Settings / Quit) so the swap is hidden behind the swarm.
+  UI.menuSweep = () => { pmAcc = biomeAccent(); startSweep(['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)], 'menu'); };
 
-  function startSweep(dir) {
-    // dir > 0 = opening (bats sweep UP), dir < 0 = closing (bats sweep DOWN)
-    swp.on = true; swp.t = 0; swp.dir = dir; swp.bats = [];
-    for (let i = 0; i < 170; i++) {
-      const sp = U.rand(0.9, 2.3);
-      swp.bats.push({
-        px: U.rand(-0.06, 1.06),
-        // bias the swarm toward the edge it enters from so it reads as a wave
-        py: dir > 0 ? U.rand(0.35, 1.55) : U.rand(-0.55, 0.65),
-        vx: U.rand(-0.4, 0.4) * sp,
-        vy: (dir > 0 ? -1 : 1) * sp * U.rand(0.95, 1.7),
-        s: U.rand(0.8, 2.7), flap: U.rand(0, 6.28), flapSp: U.rand(14, 24), delay: U.rand(0, 0.12)
-      });
+  function startSweep(dir, kind) {
+    if (dir === 1) dir = 'up'; else if (dir === -1) dir = 'down';
+    // axis the curtain travels along, and the sign of the swarm's velocity on it
+    const axis = (dir === 'left' || dir === 'right') ? 'x' : 'y';
+    const sgn = (dir === 'up' || dir === 'left') ? -1 : 1;
+    swp.on = true; swp.t = 0; swp.axis = axis; swp.sgn = sgn; swp.kind = kind || 'menu'; swp.bats = [];
+    // FEW but BIG opaque bats spread across the whole screen (+ a deep margin in the travel
+    // axis). Big overlapping bodies black out the frame on their own — no curtain — and the
+    // low count keeps it smooth.
+    for (let i = 0; i < 80; i++) {
+      const sp = U.rand(1.0, 2.4);
+      const speed = sp * U.rand(0.55, 1.1) * sgn;       // calm drift in the sweep direction
+      const along = U.rand(-0.5, 1.5);                  // the whole axis + deep margin
+      const perp = U.rand(-0.2, 1.2);
+      const jit = U.rand(-0.35, 0.35) * sp;
+      // bats nearest the entering edge appear first; the rest follow within a short window
+      const a01 = U.clamp((along + 0.5) / 2, 0, 1);
+      const delay = (sgn < 0 ? 1 - a01 : a01) * 0.07;
+      const b = { s: U.rand(4.2, 7.6), flap: U.rand(0, 6.28), flapSp: U.rand(13, 22), delay };
+      if (axis === 'y') { b.px = perp; b.py = along; b.vx = jit; b.vy = speed; }
+      else { b.px = along; b.py = perp; b.vx = speed; b.vy = jit; }
+      swp.bats.push(b);
     }
   }
-  function drawBat(ctx, x, y, s, flap, alpha) {
-    if (alpha <= 0.01) return;
-    ctx.save();
-    ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha = alpha;
-    const f = Math.sin(flap);
-    ctx.fillStyle = '#060a08';
-    ctx.shadowColor = pmAcc; ctx.shadowBlur = 7;
+  function batPath(ctx, f) {
     ctx.beginPath();
     ctx.moveTo(0, -2);
     ctx.bezierCurveTo(5, -6 - f * 5, 12, -3, 20, -7 - f * 7);
@@ -614,7 +565,26 @@
     ctx.bezierCurveTo(2, 7, -2, 7, -4, 4);
     ctx.bezierCurveTo(-11, 3, -16, 0, -20, -7 - f * 7);
     ctx.bezierCurveTo(-12, -3, -5, -6 - f * 5, 0, -2);
-    ctx.closePath(); ctx.fill();
+    ctx.closePath();
+  }
+  // Each bat is its OWN opaque cover: a solid dark body (plus a slightly-larger dark
+  // under-body so overlapping bats leave no gaps) with a bright glowing edge. No shadow
+  // blur (cheap) — the swarm itself blacks out the screen, no separate curtain needed.
+  function drawBat(ctx, x, y, s, flap, alpha) {
+    if (alpha <= 0.01) return;
+    const f = Math.sin(flap);
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, s);
+    ctx.lineJoin = 'round'; ctx.fillStyle = '#070d0b'; ctx.strokeStyle = pmAcc;
+    // under-body: the same shape, fattened by a wide stroke, fills the gaps between bats
+    ctx.globalAlpha = alpha;
+    batPath(ctx, f);
+    ctx.lineWidth = 9; ctx.strokeStyle = '#070d0b'; ctx.stroke();
+    ctx.fill();
+    // glowing edge — two cheap bright strokes (no blur)
+    ctx.strokeStyle = pmAcc;
+    ctx.globalAlpha = alpha * 0.32; ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.globalAlpha = alpha * 0.9; ctx.lineWidth = 0.9; ctx.stroke();
     ctx.restore();
   }
   function updateSweep(dt) {
@@ -623,48 +593,26 @@
     if (swp.t >= SWP_TOTAL) { swp.on = false; return; }
     for (const b of swp.bats) { if (swp.t < b.delay) continue; b.px += b.vx * dt * 0.6; b.py += b.vy * dt * 0.6; b.flap += dt * b.flapSp; }
   }
-  // 0 → 0.5 as the curtain slides on, held at 0.5 (fully covering) through the hold, 0.5 → 1 as it slides off
-  function sweepTravel(t) {
-    const ez = x => x * x * (3 - 2 * x);   // smoothstep
-    if (t < SWP_COVER) return 0.5 * ez(t / SWP_COVER);
-    if (t < SWP_COVER + SWP_HOLD) return 0.5;
-    return 0.5 + 0.5 * ez(U.clamp((t - SWP_COVER - SWP_HOLD) / SWP_REVEAL, 0, 1));
-  }
-  // true once the swarm has the screen fully blacked out (cover done) — the cue to swap the menu
+  // true once the swarm has the screen blacked out (cover done) — the cue to swap the menu
   function sweepCovered() { return swp.on && swp.t >= SWP_COVER; }
   function drawSweep(ctx) {
     if (!swp.on) return;
     const sc = (w / 1280) * 2.2;
-    // A dark curtain rides with the swarm: it slides on to fully black out the screen,
-    // HOLDS there while the menu swaps behind it, then slides off to reveal the result —
-    // so the game<->pause transition underneath is never visible. The band is taller than
-    // the screen and travels up on open / down on close.
-    const Hb = 1.8;
-    const travel = sweepTravel(swp.t);
-    const bt = U.lerp(swp.dir > 0 ? 1.0 : -1.8, swp.dir > 0 ? -1.8 : 1.0, travel);
-    const y0 = bt * h, y1 = (bt + Hb) * h;
-    const g = ctx.createLinearGradient(0, y0, 0, y1);
-    g.addColorStop(0, 'rgba(3,6,5,0)');
-    g.addColorStop(0.14, 'rgba(3,6,5,1)');
-    g.addColorStop(0.86, 'rgba(3,6,5,1)');
-    g.addColorStop(1, 'rgba(3,6,5,0)');
-    ctx.save();
-    ctx.fillStyle = g;
-    ctx.fillRect(0, Math.min(y0, y1), w, Math.abs(y1 - y0));
-    ctx.restore();
-    // bats fade in over the cover, stay through the hold, fade out over the reveal
-    const fade = swp.t < SWP_COVER ? U.clamp(swp.t / (SWP_COVER * 0.6), 0, 1)
+    // The bats ARE the sweep — no separate curtain. They snap to full opacity quickly
+    // (well before the menu swaps), hold the blackout, then fade out on the reveal.
+    const fade = swp.t < SWP_COVER ? U.clamp(swp.t / (SWP_COVER * 0.35), 0, 1)
       : swp.t > SWP_COVER + SWP_HOLD ? U.clamp(1 - (swp.t - SWP_COVER - SWP_HOLD) / SWP_REVEAL, 0, 1)
         : 1;
     for (const b of swp.bats) {
       if (swp.t < b.delay) continue;
-      const fin = swp.dir > 0 ? U.clamp((swp.t - b.delay) / 0.12, 0, 1) : 1;
-      drawBat(ctx, b.px * w, b.py * h, b.s * sc, b.flap, 0.96 * fade * fin);
+      const fin = U.clamp((swp.t - b.delay) / 0.05, 0, 1);
+      drawBat(ctx, b.px * w, b.py * h, b.s * sc, b.flap, fade * fin);
     }
   }
-  function drawWanderer(ctx, x, y, s, alpha) {
+  function drawWanderer(ctx, x, y, s, alpha, nodT) {
     ctx.save();
     ctx.translate(x, y); ctx.scale(s, s); ctx.globalAlpha = alpha;
+    // body (cloak) — stays still
     ctx.fillStyle = '#0b171b';
     ctx.beginPath();
     ctx.moveTo(0, -175); ctx.bezierCurveTo(-122, -118, -150, 70, -108, 235);
@@ -673,11 +621,16 @@
     ctx.beginPath();
     ctx.moveTo(0, -148); ctx.bezierCurveTo(-72, -100, -92, 70, -62, 224);
     ctx.lineTo(62, 224); ctx.bezierCurveTo(92, 70, 72, -100, 0, -148); ctx.closePath(); ctx.fill();
-    // horns
+    // head (horns + mask + eyes) — nods on a loop when nodT is given (two dips, then a rest)
+    ctx.save();
+    if (nodT != null) {
+      const c = nodT % 3.4;
+      const dip = c < 1.5 ? Math.max(0, Math.sin(c / 1.5 * Math.PI * 3)) : 0;
+      ctx.translate(0, -40); ctx.rotate(dip * 0.05); ctx.translate(0, 40 + dip * 12);
+    }
     ctx.fillStyle = '#e9e4d4';
     ctx.beginPath(); ctx.moveTo(-24, -120); ctx.bezierCurveTo(-72, -150, -104, -214, -82, -150); ctx.bezierCurveTo(-62, -118, -42, -110, -24, -116); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(24, -120); ctx.bezierCurveTo(72, -150, 104, -214, 82, -150); ctx.bezierCurveTo(62, -118, 42, -110, 24, -116); ctx.closePath(); ctx.fill();
-    // mask
     ctx.shadowColor = 'rgba(120,255,190,0.4)'; ctx.shadowBlur = 26;
     ctx.beginPath();
     ctx.moveTo(0, -132); ctx.bezierCurveTo(-58, -126, -64, -58, -34, -34);
@@ -686,6 +639,7 @@
     ctx.fillStyle = '#17110b';
     ctx.beginPath(); ctx.ellipse(-20, -72, 9, 17, 0, 0, 6.28); ctx.fill();
     ctx.beginPath(); ctx.ellipse(20, -72, 9, 17, 0, 0, 6.28); ctx.fill();
+    ctx.restore();
     ctx.restore();
   }
 
@@ -763,79 +717,131 @@
     cx.restore();
   }
 
+  // Charms share the pause/settings look: slanted backdrop, bats, wanderer, and a
+  // biome-accent slash on the selected charm.
   function drawCharms() {
-    menuBackdrop();
+    pmAcc = biomeAccent();
+    menuChrome();
+    menuHeader('CHARMS');
     const C = G.Charms;
-    cx.textAlign = 'center';
-    cx.fillStyle = '#eaf2ee'; cx.shadowColor = 'rgba(160,240,200,0.4)'; cx.shadowBlur = 18;
-    cx.font = `40px ${serif}`; cx.fillText('C H A R M S', w / 2, h * 0.13); cx.shadowBlur = 0;
-    // notch meter
-    const used = C.usedNotches(), total = C.notches();
-    cx.font = `15px ${serif}`; cx.fillStyle = 'rgba(190,210,200,0.8)';
-    cx.fillText('Notches  ' + used + ' / ' + total, w / 2, h * 0.13 + 28);
-    const list = C.LIST, n = list.length;
-    const bw = Math.min(640, w - 80), bh = 56, gap = 8, x0 = w / 2 - bw / 2;
-    const y0 = h * 0.22;
+    cx.save(); cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    cx.font = `${Math.round(h * 0.024)}px ${serif}`; cx.fillStyle = 'rgba(190,210,200,0.85)';
+    cx.fillText('Notches  ' + C.usedNotches() + ' / ' + C.notches(), w * 0.42, h * 0.16 + 26);
+    cx.restore();
+
+    const list = C.LIST;
     G.UI.charmButtons = [];
+    const ang = -0.05, lx = w * 0.44, ly = h * 0.30, step = Math.min(h * 0.072, 52), fs = Math.round(Math.min(h * 0.04, 25));
+    const cos = Math.cos(ang), sin = Math.sin(ang), colW = Math.min(w * 0.44, 520);
+    cx.save(); cx.translate(lx, ly); cx.rotate(ang); cx.textBaseline = 'middle';
     list.forEach((c, i) => {
-      const y = y0 + i * (bh + gap);
-      const sel = i === G.Main.charmIndex;
-      const owned = C.isOwned(c.id);
-      const eq = C.isEquipped(c.id);
-      const affordable = eq || C.canEquip(c.id);
-      roundRect(x0, y, bw, bh, 9);
-      cx.fillStyle = sel ? 'rgba(36,64,50,0.94)' : 'rgba(16,25,21,0.74)'; cx.fill();
-      cx.lineWidth = sel ? 2.2 : 1;
-      cx.strokeStyle = eq ? 'rgba(150,240,180,0.85)' : (sel ? 'rgba(180,240,200,0.8)' : 'rgba(110,140,125,0.4)'); cx.stroke();
+      const sel = i === G.Main.charmIndex, yy = i * step;
+      const owned = C.isOwned(c.id), eq = C.isEquipped(c.id), affordable = eq || C.canEquip(c.id);
+      if (sel) {
+        const sw = colW, sh = fs * 1.2;
+        cx.save(); cx.globalAlpha = 0.92; cx.fillStyle = pmAcc;
+        cx.beginPath();
+        cx.moveTo(-16, yy - sh * 0.5); cx.lineTo(sw, yy - sh * 0.55);
+        cx.lineTo(sw + sh * 0.65, yy + sh * 0.5); cx.lineTo(-16 + sh * 0.35, yy + sh * 0.5);
+        cx.closePath(); cx.fill(); cx.restore();
+      }
       // equipped pip
-      cx.beginPath(); cx.arc(x0 + 22, y + bh / 2, 7, 0, Math.PI * 2);
-      cx.fillStyle = eq ? '#9bf0b8' : 'rgba(120,140,130,0.25)'; cx.fill();
-      cx.textAlign = 'left';
-      cx.fillStyle = !owned ? 'rgba(130,140,135,0.55)' : (affordable ? (sel ? '#eafff0' : '#cad8d0') : 'rgba(150,120,120,0.7)');
-      cx.font = `19px ${serif}`; cx.textBaseline = 'middle';
-      cx.fillText(owned ? c.name : '— locked —', x0 + 40, y + 19);
-      cx.fillStyle = 'rgba(175,195,182,0.62)'; cx.font = `13px ${serif}`;
-      cx.fillText(owned ? c.desc : 'Undiscovered — find it in the world or buy it from a vendor.', x0 + 40, y + 39);
-      cx.textAlign = 'right'; cx.fillStyle = 'rgba(200,220,190,0.75)'; cx.font = `13px ${serif}`;
-      cx.fillText('◆'.repeat(c.cost), x0 + bw - 16, y + bh / 2);
-      G.UI.charmButtons.push({ x: x0, y, w: bw, h: bh, index: i });
+      cx.beginPath(); cx.arc(fs * 0.2, yy, fs * 0.22, 0, 6.28);
+      cx.fillStyle = eq ? (sel ? '#06120e' : pmAcc) : (sel ? 'rgba(6,18,14,0.35)' : 'rgba(120,140,130,0.3)'); cx.fill();
+      // name
+      const nm = owned ? c.name.toUpperCase() : '— LOCKED —';
+      cx.font = `${sel ? '900' : '700'} ${fs}px ${menuFont}`; cx.textAlign = 'left';
+      if (!sel && owned) { cx.lineWidth = 1; cx.strokeStyle = 'rgba(120,180,160,0.25)'; cx.strokeText(nm, fs * 0.75, yy); }
+      cx.fillStyle = sel ? '#06120e' : (!owned ? 'rgba(130,140,135,0.5)' : (affordable ? 'rgba(202,226,216,0.9)' : 'rgba(170,140,140,0.7)'));
+      cx.fillText(nm, fs * 0.75, yy);
+      // cost / equipped tag (right)
+      cx.textAlign = 'right'; cx.font = `${Math.round(fs * 0.8)}px ${serif}`;
+      cx.fillStyle = sel ? '#06120e' : 'rgba(200,220,190,0.75)';
+      cx.fillText(owned ? ('◆'.repeat(c.cost) + (eq ? '   equipped' : '')) : 'undiscovered', colW - 8, yy);
+      const scx = lx + (-16) * cos - yy * sin, scy = ly + (-16) * sin + yy * cos;
+      G.UI.charmButtons.push({ x: scx, y: scy - fs * 0.85, w: colW + 40, h: fs * 1.6, index: i });
     });
-    cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
-    cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)';
-    cx.fillText('↑ ↓ select · Enter / Z equip-unequip · ESC back', w / 2, h - 22);
+    cx.restore();
+
+    // selected charm description + hint (right)
+    const selc = list[U.clamp(G.Main.charmIndex, 0, list.length - 1)];
+    cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = 'rgba(222,236,229,0.92)'; cx.font = `italic 16px ${serif}`;
+    cx.fillText(selc ? (C.isOwned(selc.id) ? selc.desc : 'Undiscovered — find it in the world or buy it from a vendor.') : '', w - 32, h - 58);
+    cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  select        Enter / Z  equip · unequip        Esc  back', w - 32, h - 32);
     cx.restore();
   }
 
+  // The pause menu's chrome (slanted dark backdrop, drifting bats, vertical title,
+  // wanderer art), tinted by the current biome accent. Shared by Settings / Charms / Slots.
+  // opts: { vtitle:false } hides the side MOSSVEIL · { nod:true } makes the wanderer nod.
+  function menuChrome(opts) {
+    opts = opts || {};
+    cx.save();
+    const g = cx.createLinearGradient(0, 0, w * 0.7, h);
+    g.addColorStop(0, 'rgba(5,18,15,0.97)'); g.addColorStop(1, 'rgba(2,7,9,0.98)');
+    cx.fillStyle = g; cx.fillRect(0, 0, w, h);
+    cx.globalAlpha = 0.08; cx.fillStyle = pmAcc;
+    cx.beginPath(); cx.moveTo(w * 0.52, 0); cx.lineTo(w * 0.66, 0); cx.lineTo(w * 0.44, h); cx.lineTo(w * 0.3, h); cx.closePath(); cx.fill();
+    cx.restore();
+    for (let i = 0; i < 7; i++) {
+      const ph = pmTime * 0.16 + i * 1.7;
+      drawBat(cx, ((Math.sin(ph) * 0.5 + 0.5) * 0.9 + 0.05) * w, (((i * 0.137 + pmTime * 0.025) % 1)) * h, 0.5 + (i % 3) * 0.22, pmTime * 7 + i, 0.16);
+    }
+    if (opts.vtitle !== false) {
+      cx.save(); cx.globalAlpha = 0.09; cx.translate(w * 0.045, h * 0.5); cx.rotate(-Math.PI / 2);
+      cx.textAlign = 'center'; cx.fillStyle = '#cfeede'; cx.font = `900 ${Math.round(h * 0.15)}px ${menuFont}`;
+      cx.fillText('MOSSVEIL', 0, 0); cx.restore();
+    }
+    drawWanderer(cx, w * 0.3, h * 0.62, (h / 720) * 0.8, 0.9, opts.nod ? G.time : null);
+  }
+
+  // a bold accent-glow header for the pause-style menus
+  function menuHeader(text) {
+    cx.save(); cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = '#eaf2ee'; cx.shadowColor = pmAcc; cx.shadowBlur = 16;
+    cx.font = `900 ${Math.round(h * 0.075)}px ${menuFont}`;
+    cx.fillText(text, w * 0.42, h * 0.16); cx.shadowBlur = 0; cx.restore();
+  }
+
+  // Settings shares the pause menu's look: slanted dark backdrop, drifting bats, the
+  // wanderer, and a biome-accent slash on the selected row.
   function drawSettings() {
-    menuBackdrop();
-    const s = G.settings || { volume: 0.8, shake: true, quality: 'high' };
-    cx.textAlign = 'center';
-    cx.fillStyle = '#eaf2ee'; cx.shadowColor = 'rgba(160,240,200,0.4)'; cx.shadowBlur = 18;
-    cx.font = `40px ${serif}`; cx.fillText('S E T T I N G S', w / 2, h * 0.2); cx.shadowBlur = 0;
-    const rows = [
-      ['Sound volume', Math.round(s.volume * 100) + '%'],
-      ['Screen shake', s.shake ? 'On' : 'Off'],
-      ['Visual quality', s.quality.charAt(0).toUpperCase() + s.quality.slice(1)]
-    ];
-    const bw = 460, bh = 52, gap = 12, x0 = w / 2 - bw / 2, y0 = h * 0.34;
+    pmAcc = biomeAccent();
+    menuChrome();
+    menuHeader('SETTINGS');
+
+    const rows = (G.Main.settingsRows && G.Main.settingsRows()) || [];
     G.UI.settingsButtons = [];
-    rows.forEach((r, i) => {
-      const y = y0 + i * (bh + gap);
-      const sel = i === G.Main.settingsIndex;
-      roundRect(x0, y, bw, bh, 9);
-      cx.fillStyle = sel ? 'rgba(38,72,54,0.92)' : 'rgba(18,28,24,0.7)'; cx.fill();
-      cx.lineWidth = sel ? 2.2 : 1;
-      cx.strokeStyle = sel ? 'rgba(180,240,200,0.8)' : 'rgba(120,150,135,0.45)'; cx.stroke();
-      cx.textAlign = 'left'; cx.fillStyle = sel ? '#eafff0' : '#c6d4cc';
-      cx.font = `19px ${serif}`; cx.textBaseline = 'middle';
-      cx.fillText(r[0], x0 + 22, y + bh / 2);
-      cx.textAlign = 'right'; cx.fillStyle = '#eafff0';
-      cx.fillText('‹  ' + r[1] + '  ›', x0 + bw - 20, y + bh / 2);
-      G.UI.settingsButtons.push({ x: x0, y, w: bw, h: bh, index: i });
-    });
-    cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
-    cx.font = `italic 13px ${serif}`; cx.fillStyle = 'rgba(140,160,152,0.55)';
-    cx.fillText('↑ ↓ select · ← → adjust · ESC back', w / 2, h - 26);
+    const ang = -0.05, lx = w * 0.44, ly = h * 0.27, step = Math.min(h * 0.07, 50), fs = Math.round(Math.min(h * 0.04, 25));
+    const cos = Math.cos(ang), sin = Math.sin(ang), colW = Math.min(w * 0.44, 520);
+    cx.save(); cx.translate(lx, ly); cx.rotate(ang); cx.textBaseline = 'middle';
+    for (let i = 0; i < rows.length; i++) {
+      const sel = i === G.Main.settingsIndex, yy = i * step;
+      if (sel) {
+        const sw = colW, sh = fs * 1.2;
+        cx.save(); cx.globalAlpha = 0.92; cx.fillStyle = pmAcc;
+        cx.beginPath();
+        cx.moveTo(-16, yy - sh * 0.5); cx.lineTo(sw, yy - sh * 0.55);
+        cx.lineTo(sw + sh * 0.65, yy + sh * 0.5); cx.lineTo(-16 + sh * 0.35, yy + sh * 0.5);
+        cx.closePath(); cx.fill(); cx.restore();
+      }
+      cx.font = `${sel ? '900' : '700'} ${fs}px ${menuFont}`; cx.textAlign = 'left';
+      if (!sel) { cx.lineWidth = 1; cx.strokeStyle = 'rgba(120,180,160,0.25)'; cx.strokeText(rows[i].label.toUpperCase(), 6, yy); }
+      cx.fillStyle = sel ? '#06120e' : 'rgba(202,226,216,0.9)';
+      cx.fillText(rows[i].label.toUpperCase(), 6, yy);
+      cx.textAlign = 'right'; cx.font = `${Math.round(fs * 0.82)}px ${serif}`;
+      cx.fillStyle = sel ? '#06120e' : '#cfe8d8';
+      cx.fillText('‹  ' + rows[i].value + '  ›', colW - 8, yy);
+      const scx = lx + (-16) * cos - yy * sin, scy = ly + (-16) * sin + yy * cos;
+      G.UI.settingsButtons.push({ x: scx, y: scy - fs * 0.85, w: colW + 40, h: fs * 1.6, index: i });
+    }
+    cx.restore();
+
+    cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  select        ← →  adjust        Esc  back', w - 32, h - 32);
     cx.restore();
   }
 
@@ -957,14 +963,14 @@
     if (st === 'pause') {
       pmSel = U.damp(pmSel, G.Main.pauseIndex, 16, dt);
       // hold the menu hidden until the swarm has covered the screen, then reveal it
-      const target = (swp.on && swp.dir > 0 && !sweepCovered()) ? 0 : 1;
+      const target = (swp.on && swp.kind === 'open' && !sweepCovered()) ? 0 : 1;
       pmOpen = U.damp(pmOpen, target, 14, dt);
       pmClosing = 0;
       drawPause(pmOpen);
     } else if (pmClosing > 0) {
       pmClosing -= dt;
       // keep the menu up until the swarm covers it, then drop it behind the blackout
-      const target = (swp.on && swp.dir < 0 && !sweepCovered()) ? 1 : 0;
+      const target = (swp.on && swp.kind === 'close' && !sweepCovered()) ? 1 : 0;
       pmOpen = U.damp(pmOpen, target, 14, dt);
       drawPause(pmOpen);
     }

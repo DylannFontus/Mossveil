@@ -51,6 +51,53 @@
     if (G.Main && G.Main.persist) G.Main.persist();
   };
 
+  // ======================= LOOK / BIOME TRANSITIONS (lookTrigger) =======================
+  let biomeFade = null;   // active biome cross-fade { mask, t, phase, opts }
+  // smoothly fade the colour grade / weather / water (no biome change) over `dur` seconds
+  W.applyLook = function (opts, dur) {
+    if (!G.room) return;
+    const ls = G.room.lookState = G.room.lookState || {};
+    if (opts.grade !== undefined && G.Post) {
+      G.Post.setGradeRate(2.5 / Math.max(0.25, dur || 2));
+      let g = gradeFor(G.room.pal); if (G.Weather) g = G.Weather.gradeFor(g);
+      G.Post.setGrade(g); if (opts.grade) G.Post.setGrade(opts.grade);
+      ls.grade = opts.grade || null;
+    }
+    if (opts.weather !== undefined && G.Weather) { G.Weather.set(opts.weather || 'none'); ls.weather = opts.weather || 'none'; }
+    if (opts.water !== undefined && G.Post) { G.Post.setWater(opts.water || null); ls.water = opts.water || null; }
+  };
+  // change biome (+ any look options) behind a background-only fade to black (1.5s each way)
+  W.changeBiome = function (opts) {
+    if (biomeFade || !G.room) return;
+    const mask = new THREE.Mesh(
+      new THREE.PlaneGeometry(6000, 4000),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false, fog: false })
+    );
+    mask.position.set(0, 0, -6);   // behind the gameplay layer, in front of the backdrop
+    G.scene.add(mask);
+    biomeFade = { mask, t: 0, phase: 'in', opts };
+  };
+  W.updateLook = function (dt) {
+    if (!biomeFade) return;
+    const f = biomeFade, DUR = 1.5;
+    if (G.camera) f.mask.position.set(G.camera.position.x, G.camera.position.y, -6);
+    f.t += dt;
+    if (f.phase === 'in') {
+      f.mask.material.opacity = Math.min(1, f.t / DUR);
+      if (f.t >= DUR) {
+        const o = f.opts, id = G.room.id;
+        G.lookOverride = { id, biome: o.biome, grade: o.grade || null, weather: o.weather, water: o.water || null };
+        const b = G.player && G.player.body, st = b ? { x: b.x, y: b.y, vx: b.vx, vy: b.vy } : null;
+        W.load(id, 'P');                         // re-theme in place; the mask lives on G.scene and survives
+        if (b && st) { b.x = st.x; b.y = st.y; b.vx = st.vx; b.vy = st.vy; }
+        f.phase = 'out'; f.t = 0; f.mask.material.opacity = 1;
+      }
+    } else {
+      f.mask.material.opacity = Math.max(0, 1 - f.t / DUR);
+      if (f.t >= DUR) { G.scene.remove(f.mask); f.mask.geometry.dispose(); f.mask.material.dispose(); biomeFade = null; }
+    }
+  };
+
   // ============================ 13 BIOME PALETTES ============================
   const PAL = W.PAL = {
     verdant: {
@@ -579,6 +626,42 @@
     }
   });
 
+  // walk into this zone to change the biome and/or the colour grade / weather / water of the
+  // room. Grade/weather/water changes fade in over `fade`s; a biome change always fades the
+  // background to black (1.5s), swaps, then fades back. No-op if nothing actually differs.
+  mkProp.lookTrigger = p => ({
+    type: 'lookTrigger', x: p.x, y: p.y, group: new THREE.Group(), inside: false,
+    update() {
+      const pl = G.player;
+      if (!pl || pl.dead || G.Main.state !== 'play') return;
+      const zone = { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
+      const over = U.overlap(pl.body, zone);
+      if (over && !this.inside) {
+        this.inside = true;
+        const cur = G.room.lookState || {};
+        const biomeChanged = p.biome && p.biome !== cur.biome;
+        const gradeChanged = p.grade && JSON.stringify(p.grade) !== JSON.stringify(cur.grade || null);
+        const weatherChanged = p.weather !== undefined && (p.weather || 'none') !== (cur.weather || 'none');
+        const waterChanged = p.water !== undefined && JSON.stringify(p.water || null) !== JSON.stringify(cur.water || null);
+        if (!biomeChanged && !gradeChanged && !weatherChanged && !waterChanged) return;   // all the same → do nothing
+        if (biomeChanged) {
+          W.changeBiome({
+            biome: p.biome,
+            grade: gradeChanged ? p.grade : (cur.grade || null),
+            weather: weatherChanged ? p.weather : cur.weather,
+            water: waterChanged ? p.water : (cur.water || null)
+          });
+        } else {
+          W.applyLook({
+            grade: gradeChanged ? p.grade : undefined,
+            weather: weatherChanged ? p.weather : undefined,
+            water: waterChanged ? p.water : undefined
+          }, p.fade || 2);
+        }
+      } else if (!over) this.inside = false;
+    }
+  });
+
   mkProp.lamp = (p, pal) => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, -0.12);
@@ -852,6 +935,27 @@
     };
   };
 
+  // ============================ TERRAIN MATERIALS ============================
+  // Solid tile characters paint different ground materials. All collide identically;
+  // only the look (colour + whether grass/moss grows on the top) differs. '#' is the
+  // biome's default grassy ground.
+  const TERRAIN_MATS = W.TERRAIN_MATS = {
+    '#': { id: 'grass', label: 'Grassy', foliage: true, smooth: false, col: p => p.terrain },
+    'd': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: false, col: () => 0x2a1d12 },
+    'k': { id: 'rock', label: 'Rocky', foliage: false, smooth: false, col: () => 0x242832 },
+    's': { id: 'sand', label: 'Sandy', foliage: false, smooth: false, col: () => 0x352b19 },
+    'p': { id: 'pale', label: 'Pale stone', foliage: false, smooth: false, col: () => 0x30323a },
+    // curvy (smooth-rendered) variants of each material — combined freely in one level
+    'G': { id: 'grass', label: 'Grassy', foliage: true, smooth: true, col: p => p.terrain },
+    'D': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: true, col: () => 0x2a1d12 },
+    'K': { id: 'rock', label: 'Rocky', foliage: false, smooth: true, col: () => 0x242832 },
+    'S': { id: 'sand', label: 'Sandy', foliage: false, smooth: true, col: () => 0x352b19 },
+    'P': { id: 'pale', label: 'Pale stone', foliage: false, smooth: true, col: () => 0x30323a }
+  };
+  const SOLID_SET = new Set(Object.keys(TERRAIN_MATS));
+  W.SMOOTH_CHAR = { '#': 'G', 'd': 'D', 'k': 'K', 's': 'S', 'p': 'P' };   // hard → smooth
+  W.HARD_CHAR = { 'G': '#', 'D': 'd', 'K': 'k', 'S': 's', 'P': 'p' };     // smooth → hard
+
   // ============================ TILE PARSING ============================
   function parseLevel(lvl) {
     const Wd = lvl.w, Hd = lvl.h;
@@ -860,15 +964,17 @@
       const row = (lvl.tiles[r] || '');
       g.push(row.padEnd(Wd, ' ').split(''));
     }
-    const solid = (c, r) => r >= 0 && r < Hd && c >= 0 && c < Wd && g[r][c] === '#';
+    const solid = (c, r) => r >= 0 && r < Hd && c >= 0 && c < Wd && SOLID_SET.has(g[r][c]);
+    // horizontal runs of the SAME material char
     const runs = [];
     for (let r = 0; r < Hd; r++) {
       let c = 0;
       while (c < Wd) {
-        if (g[r][c] === '#') {
+        if (SOLID_SET.has(g[r][c])) {
+          const mat = g[r][c];
           let c2 = c;
-          while (c2 + 1 < Wd && g[r][c2 + 1] === '#') c2++;
-          runs.push({ r0: r, c0: c, c1: c2 });
+          while (c2 + 1 < Wd && g[r][c2 + 1] === mat) c2++;
+          runs.push({ r0: r, c0: c, c1: c2, mat });
           c = c2 + 1;
         } else c++;
       }
@@ -882,14 +988,14 @@
       while (scan) {
         scan = false;
         for (let j = i + 1; j < runs.length; j++) {
-          if (!used[j] && runs[j].r0 === r1 + 1 && runs[j].c0 === a.c0 && runs[j].c1 === a.c1) {
+          if (!used[j] && runs[j].r0 === r1 + 1 && runs[j].c0 === a.c0 && runs[j].c1 === a.c1 && runs[j].mat === a.mat) {
             used[j] = true; r1++; scan = true; break;
           }
         }
       }
       solids.push({
         x: (a.c0 + a.c1 + 1) / 2, w: a.c1 - a.c0 + 1,
-        y: Hd - (a.r0 + r1 + 1) / 2, h: r1 - a.r0 + 1
+        y: Hd - (a.r0 + r1 + 1) / 2, h: r1 - a.r0 + 1, mat: a.mat
       });
     }
     const oneWays = [], spikes = [];
@@ -909,10 +1015,68 @@
     }
     const tops = [], bottoms = [];
     for (let r = 0; r < Hd; r++) for (let c = 0; c < Wd; c++) {
-      if (solid(c, r) && !solid(c, r - 1) && r > 1) tops.push({ c, r, x: c + 0.5, y: Hd - r });
+      if (solid(c, r) && !solid(c, r - 1) && r > 1) tops.push({ c, r, x: c + 0.5, y: Hd - r, mat: g[r][c] });
       if (solid(c, r) && !solid(c, r + 1) && r < Hd - 2) bottoms.push({ c, r, x: c + 0.5, y: Hd - r - 1 });
     }
-    return { solids, oneWays, spikes, tops, bottoms };
+    return { solids, oneWays, spikes, tops, bottoms, grid: g, Wd, Hd };
+  }
+
+  // ---- smooth/curvy terrain: trace each material's outline, round it (Chaikin), fill it ----
+  function chaikin(pts, iters) {
+    for (let it = 0; it < iters; it++) {
+      const out = [], n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const a = pts[i], b = pts[(i + 1) % n];
+        out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+        out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+      }
+      pts = out;
+    }
+    return pts;
+  }
+  function terrainLoops(g, Wd, Hd, mat) {
+    const is = (c, r) => r >= 0 && r < Hd && c >= 0 && c < Wd && g[r][c] === mat;
+    const edges = [];                                    // unit boundary segments in grid space
+    for (let r = 0; r <= Hd; r++) for (let c = 0; c < Wd; c++) if (is(c, r - 1) !== is(c, r)) edges.push([[c, r], [c + 1, r]]);
+    for (let c = 0; c <= Wd; c++) for (let r = 0; r < Hd; r++) if (is(c - 1, r) !== is(c, r)) edges.push([[c, r], [c, r + 1]]);
+    const key = p => p[0] + ',' + p[1];
+    const adj = new Map();
+    edges.forEach((e, i) => e.forEach(p => { const k = key(p); (adj.get(k) || adj.set(k, []).get(k)).push(i); }));
+    const usedE = new Array(edges.length).fill(false), loops = [];
+    for (let i = 0; i < edges.length; i++) {
+      if (usedE[i]) continue;
+      const loop = []; let cur = edges[i][0], ei = i, guard = 0;
+      while (ei >= 0 && !usedE[ei] && guard++ < edges.length * 2 + 10) {
+        usedE[ei] = true;
+        const e = edges[ei];
+        loop.push({ x: cur[0], y: cur[1] });
+        cur = (key(e[0]) === key(cur)) ? e[1] : e[0];
+        const cand = (adj.get(key(cur)) || []).filter(j => !usedE[j]);
+        ei = cand.length ? cand[0] : -1;
+      }
+      if (loop.length >= 4) loops.push(loop);
+    }
+    return loops;
+  }
+  function buildSmoothTerrain(parsed, pal, group, matFor) {
+    const { grid, Wd, Hd } = parsed;
+    for (const ch in TERRAIN_MATS) {
+      const md = TERRAIN_MATS[ch];
+      if (!md.smooth) continue;                // only the smooth-variant tiles get rounded silhouettes
+      const loops = terrainLoops(grid, Wd, Hd, ch);
+      if (!loops.length) continue;
+      const shapes = loops.map(loop => {
+        const sm = chaikin(loop, 3);
+        const s = new THREE.Shape();
+        sm.forEach((p, i) => { const wx = p.x, wy = Hd - p.y; i ? s.lineTo(wx, wy) : s.moveTo(wx, wy); });
+        s.closePath();
+        return s;
+      });
+      const geo = new THREE.ShapeGeometry(shapes);
+      const mesh = new THREE.Mesh(geo, matFor(md.col(pal)));
+      mesh.position.z = -1.2;
+      group.add(mesh);
+    }
   }
 
   // ============================ ROOM LOAD ============================
@@ -940,7 +1104,13 @@
     }
     const def = G.LEVELS[id];
     if (!def) throw new Error('No level: ' + id);
-    const pal = PAL[def.biome] || PAL.verdant;
+    // a lookTrigger may have re-themed this room (biome/grade/weather/water); clear it when
+    // we move to a different room
+    if (G.lookOverride && G.lookOverride.id !== id) G.lookOverride = null;
+    const lo = (G.lookOverride && G.lookOverride.id === id) ? G.lookOverride : null;
+    const biome = (lo && lo.biome) ? lo.biome : def.biome;
+    const pal = PAL[biome] || PAL.verdant;
+    if (G.Post) G.Post.setGradeRate(3);   // snappy by default; lookTriggers slow it for fades
     const parsed = parseLevel(def);
     const rng = U.mulberry32(id.length * 7919 + def.w * 131 + def.h);
     const group = new THREE.Group();
@@ -952,7 +1122,10 @@
     G.Physics.setRoom(parsed.solids.slice(), parsed.oneWays, parsed.spikes.map(s => ({ x: s.x, y: s.y, w: s.w, h: s.h })));
 
     // per-level weather (rain / wind / fog / snow / embers …) — affects the look & water
-    if (G.Weather) G.Weather.set(def.weather || 'none');
+    const weather = (lo && lo.weather !== undefined) ? lo.weather : (def.weather || 'none');
+    const gradeOv = (lo && lo.grade) ? lo.grade : def.grade;
+    const waterOv = (lo && lo.water !== undefined) ? lo.water : (def.water || null);
+    if (G.Weather) G.Weather.set(weather);
     const fogMul = (G.Weather && G.Weather.props().fog) ? (1 - 0.45 * G.Weather.props().fog) : 1;
     G.scene.fog = new THREE.Fog(pal.fog, pal.fogNear * fogMul, pal.fogFar * fogMul);
     G.renderer.setClearColor(pal.bgBottom);
@@ -960,9 +1133,11 @@
       let g = gradeFor(pal);
       if (G.Weather) g = G.Weather.gradeFor(g);
       G.Post.setGrade(g);
-      if (def.grade) G.Post.setGrade(def.grade);   // explicit per-level grade override wins
-      G.Post.setWater(def.water || null);          // reflective water / wet floor surface
+      if (gradeOv) G.Post.setGrade(gradeOv);       // explicit grade override wins
+      G.Post.setWater(waterOv);                     // reflective water / wet floor surface
     }
+    room.biome = biome;
+    room.lookState = { biome, grade: gradeOv || null, weather, water: waterOv || null };
 
     // ---- backdrop ----
     const bgPlane = new THREE.Mesh(
@@ -1009,13 +1184,19 @@
       }
     }
 
-    // ---- terrain ----
-    const terrMat = new THREE.MeshBasicMaterial({ color: pal.terrain, fog: false });
+    // ---- terrain (coloured per material) ----
+    const terrMatCache = {};
+    const terrMatFor = col => terrMatCache[col] || (terrMatCache[col] = new THREE.MeshBasicMaterial({ color: col, fog: false }));
+    const terrMat = terrMatFor(pal.terrain);   // also reused by one-ways below
+    // hard materials render as blocks; smooth materials get rounded contours (both can mix)
     for (const s of parsed.solids) {
-      const box = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h, 1.6), terrMat);
+      const md = TERRAIN_MATS[s.mat] || TERRAIN_MATS['#'];
+      if (md.smooth) continue;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h, 1.6), terrMatFor(md.col(pal)));
       box.position.set(s.x, s.y, -1.2);
       group.add(box);
     }
+    buildSmoothTerrain(parsed, pal, group, terrMatFor);
     for (const o of parsed.oneWays) {
       const slab = new THREE.Mesh(new THREE.BoxGeometry(o.w, 0.26, 1.2), terrMat);
       slab.position.set(o.x, o.y, -1.0);
@@ -1026,6 +1207,7 @@
     const fol = FoliageBatch(-0.3);
     const tileRng = U.mulberry32(def.w * 977 + 13);
     for (const t of parsed.tops) {
+      if (!(TERRAIN_MATS[t.mat] || TERRAIN_MATS['#']).foliage) continue;   // dirt/rock/etc. get no grass
       const jit = tileRng() * 0.07;
       const mossC = U.colLerp(pal.mossDark, pal.moss, 0.3 + tileRng() * 0.7);
       fol.quad(t.x - 0.5, t.y - 0.05, t.x + 0.5, t.y + 0.16 + jit, mossC, tileRng() * 9, 0.02, 0);

@@ -5,7 +5,7 @@
 // any water reflection. Author it per level from the editor's Level settings.
 (function () {
   const U = G.U;
-  const W = G.Weather = { kind: 'none' };
+  const W = G.Weather = { kind: 'none', userEnabled: true };   // userEnabled toggled by the Settings menu
 
   // preset → properties. rain/snow/leaves/embers are particle densities (0..1),
   // wind is horizontal strength, fog is haze, wet drives reflection+grade, lightning bool.
@@ -50,7 +50,7 @@
   W.update = function (dt) {
     t += dt;
     lightFlash = Math.max(0, lightFlash - dt * 3.2);
-    if (W.kind === 'none') return;
+    if (W.kind === 'none' || W.userEnabled === false) return;
     const wx = wind();
     for (const d of parts) {
       if (d.type === 'rain') { d.y += d.sp * dt; d.x += wx * 0.35 * dt; if (d.y > 1.05) { d.x = Math.random(); d.y = -0.05; } }
@@ -78,6 +78,7 @@
   };
 
   W.draw = function (ctx, w, h) {
+    if (W.userEnabled === false) return;
     if (W.kind === 'none' && lightFlash <= 0.01) return;
     ctx.save();
     // fog haze first (behind particles)

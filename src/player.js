@@ -20,7 +20,7 @@
 
     const C_CLOAK = 0x2c3a46, C_CLOAK_IN = 0x3e5263, C_CLOAK_BK = 0x1c2730, C_BODY = 0x10151a, C_MASK = 0xe9e4d4;
 
-    const glow = U.glowSprite(0xcfe8e0, 9, 0.32);
+    const glow = U.glowSprite(0x677470, 9, 0.32);   // colour halved (additive) → ~50% softer character glow
     glow.position.set(0, 0.2, -0.06);
     root.add(glow);
     p.glow = glow;
