@@ -11,6 +11,7 @@
   let tool = 'select';
   let tab = 'scene';            // 'scene' | 'map'
   let snap = true, gizmos = true, scatter = false;
+  let brushSize = 1, brushShape = 'pencil', paintStart = null;   // tile brush: pencil|rect|line|fill
   let dirty = false;
   let sel = null;               // {kind:'prop'|'enemy'|'zone'|'spawn', i | key}
   let multi = [];               // additional multi-selection (array of sel descriptors)
@@ -194,6 +195,7 @@
     refreshHierarchy();
     refreshInspector();
     $('stLevel').textContent = `${currentId}  ·  ${lvl().w}×${lvl().h}  ·  ${lvl().biome}`;
+    refreshLint();
   }
   function queueRebuild() {
     needsRebuild = true;
@@ -455,9 +457,10 @@
         refreshHierarchy(); refreshInspector();
       }
     } else {
-      pushUndo();
-      painting = true;
-      paintAt(w);
+      const st = worldToTile(w.x, w.y);
+      if (brushShape === 'fill') { pushUndo(); floodFill(st.c, st.r); needsRebuild = true; }
+      else if (brushShape === 'rect' || brushShape === 'line') { paintStart = st; painting = true; }   // preview now, commit on release
+      else { pushUndo(); painting = true; paintAt(w); }                                                // freehand pencil
     }
   });
   addEventListener('pointermove', e => {
@@ -492,7 +495,8 @@
       } else { const it = selectedItem(); if (it) { it.ref.x = nx; it.ref.y = ny; } }
       queueRebuild();
       refreshInspector();
-    } else if (painting) paintAt(w);
+    } else if (painting && brushShape !== 'rect' && brushShape !== 'line') paintAt(w);
+    // rect/line just track the end (lastWorld) and draw a preview in the overlay
   });
   function endPointer(e) {
     pointers.delete(e.pointerId);
@@ -511,6 +515,12 @@
         }
         marquee = null;
       }
+      if (painting && paintStart && (brushShape === 'rect' || brushShape === 'line')) {
+        pushUndo();
+        const endT = worldToTile(lastWorld.x, lastWorld.y), ch = paintCh();
+        if (brushShape === 'rect') fillRectTiles(paintStart, endT, ch); else lineTiles(paintStart, endT, ch);
+      }
+      paintStart = null;
       if (dragging || painting) { dragging = null; painting = false; needsRebuild = true; }
       mapDrag = null;
     }
@@ -542,10 +552,34 @@
     camZ = U.clamp(camZ * (e.deltaY > 0 ? 1.1 : 0.9), 8, 110);
   }, { passive: false });
 
-  function paintAt(w) {
-    const t = worldToTile(w.x, w.y);
-    const ch = tool === 'solid' ? '#' : tool === 'oneway' ? '=' : tool === 'spike' ? '^' : ' ';
-    setTile(t.c, t.r, ch);
+  function paintCh() { return tool === 'solid' ? '#' : tool === 'oneway' ? '=' : tool === 'spike' ? '^' : ' '; }
+  function brushStamp(c, r, ch) {                 // a brushSize×brushSize square
+    const h0 = Math.floor((brushSize - 1) / 2);
+    for (let dy = 0; dy < brushSize; dy++) for (let dx = 0; dx < brushSize; dx++) setTile(c - h0 + dx, r - h0 + dy, ch);
+  }
+  function paintAt(w) { const t = worldToTile(w.x, w.y); brushStamp(t.c, t.r, paintCh()); }
+  function fillRectTiles(a, b, ch) {
+    const c0 = Math.min(a.c, b.c), c1 = Math.max(a.c, b.c), r0 = Math.min(a.r, b.r), r1 = Math.max(a.r, b.r);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) setTile(c, r, ch);
+  }
+  function lineTiles(a, b, ch) {                   // Bresenham, stamped with the brush
+    let x0 = a.c, y0 = a.r; const x1 = b.c, y1 = b.r;
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy, guard = 0;
+    while (guard++ < 4000) { brushStamp(x0, y0, ch); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+  }
+  function floodFill(sc, sr) {                      // 4-way flood of the contiguous same-tile region
+    const L = lvl(), ch = paintCh();
+    const at = (c, r) => (r < 0 || r >= L.h || c < 0 || c >= L.w) ? null : (L.tiles[r] || '').padEnd(L.w, ' ')[c];
+    const target = at(sc, sr);
+    if (target === null || target === ch) return;
+    const stack = [[sc, sr]]; let guard = 0;
+    while (stack.length && guard++ < L.w * L.h * 4 + 50) {
+      const [c, r] = stack.pop();
+      if (at(c, r) !== target) continue;
+      setTile(c, r, ch);
+      stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]);
+    }
   }
 
   function placeAsset(wx, wy) {
@@ -621,6 +655,31 @@
     octx.setLineDash([6, 6]);
     octx.strokeRect(a.x, b.y, b.x - a.x, a.y - b.y);
     octx.setLineDash([]);
+
+    if (G.Weather) G.Weather.draw(octx, G.viewW, G.viewH);   // live weather preview
+
+    // tile-paint brush / shape preview
+    if (tool !== 'select') {
+      const tileRect = (c, r) => { const A = U.toScreen(c, L.h - r), B = U.toScreen(c + 1, L.h - 1 - r); return { x: A.x, y: A.y, w: B.x - A.x, h: B.y - A.y }; };
+      const col = tool === 'solid' ? '#7fb2e8' : tool === 'oneway' ? '#7fe8c0' : tool === 'spike' ? '#e8b85f' : '#e87f7f';
+      octx.strokeStyle = col; octx.fillStyle = col + '33'; octx.lineWidth = 1.5;
+      if (painting && paintStart && (brushShape === 'rect' || brushShape === 'line')) {
+        const e = worldToTile(lastWorld.x, lastWorld.y);
+        if (brushShape === 'rect') {
+          const c0 = Math.min(paintStart.c, e.c), c1 = Math.max(paintStart.c, e.c), r0 = Math.min(paintStart.r, e.r), r1 = Math.max(paintStart.r, e.r);
+          const A = U.toScreen(c0, L.h - r0), B = U.toScreen(c1 + 1, L.h - 1 - r1);
+          octx.fillRect(A.x, A.y, B.x - A.x, B.y - A.y); octx.strokeRect(A.x, A.y, B.x - A.x, B.y - A.y);
+        } else {
+          let x0 = paintStart.c, y0 = paintStart.r; const x1 = e.c, y1 = e.r;
+          const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy, g = 0;
+          while (g++ < 2000) { const rr = tileRect(x0, y0); octx.fillRect(rr.x, rr.y, rr.w, rr.h); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+        }
+      } else if (brushShape !== 'fill') {
+        const t = worldToTile(lastWorld.x, lastWorld.y), h0 = Math.floor((brushSize - 1) / 2);
+        const A = tileRect(t.c - h0, t.r - h0), B = tileRect(t.c - h0 + brushSize - 1, t.r - h0 + brushSize - 1);
+        octx.strokeRect(A.x, A.y, (B.x + B.w) - A.x, (B.y + B.h) - A.y);
+      }
+    }
 
     if (!gizmos) return;
     const item = selectedItem();
@@ -781,6 +840,21 @@
         applyGrade();
       });
       el('div', { class: 'insNote' }, body, 'Overrides the biome’s automatic grade for this level. Leave at defaults to use the biome look. Shown live in the viewport.');
+
+      // ---- weather & reflective water ----
+      el('div', { class: 'hgroup' }, body, 'Weather & water');
+      const wKinds = (G.Weather ? G.Weather.KINDS : ['none']);
+      selectField(body, 'Weather', wKinds.map(k => ({ v: k, t: (G.Weather && G.Weather.LABELS[k]) || k })),
+        () => L.weather || 'none', v => { if (v && v !== 'none') L.weather = v; else delete L.weather; });
+      checkField(body, 'Reflective water', () => !!L.water,
+        v => { if (v) L.water = L.water || { y: Math.round(L.h * 0.16), strength: 0.5, color: '#9ec8e6' }; else delete L.water; });
+      if (L.water) {
+        numField(body, 'Water level Y', () => L.water.y, v => { L.water.y = v; }, 0.5);
+        numField(body, 'Reflectivity', () => L.water.strength !== undefined ? L.water.strength : 0.5, v => { L.water.strength = U.clamp(v, 0, 1); }, 0.05);
+        colorField(body, 'Water tint', () => L.water.color || '#9ec8e6', v => { L.water.color = v || '#9ec8e6'; });
+        el('div', { class: 'insNote' }, body, 'Everything below the water line mirrors the scene above (ripple + tint). Low reflectivity = wet floor; higher = a pool.');
+      }
+      el('div', { class: 'insNote' }, body, 'Weather draws over the world (rain, snow, wind, fog, embers…) and nudges the look — storms/blizzards add lightning. Shown live in the viewport.');
       return;
     }
     const p = it.ref;
@@ -1142,6 +1216,60 @@
     }
     return [];
   }
+
+  // ---- 3D asset thumbnails: render each asset's real mesh into a tiny canvas (cached) ----
+  let thumbR = null, thumbScene = null, thumbCam = null;
+  const assetThumbCache = {};
+  function thumbInit() {
+    if (thumbR !== null) return !!thumbR;
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 96;
+      thumbR = new THREE.WebGLRenderer({ canvas: c, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      thumbR.setSize(96, 96, false); thumbR.setClearColor(0x000000, 0);
+      thumbScene = new THREE.Scene();
+      thumbCam = new THREE.PerspectiveCamera(30, 1, 0.05, 200);
+    } catch (e) { thumbR = false; return false; }
+    return true;
+  }
+  function buildAssetObject(a) {
+    const pal = G.World.PAL.verdant;
+    try {
+      if (a.cat === 'enemy') { const e = G.Enemies.make(a.id, 0, 0); return e && e.group ? e.group : null; }
+      if (a.id === 'bossTrigger') return G.Bosses.preview(a.boss || 'mossSovereign');
+      if (a.cat === 'prop' && G.World.mkProp && G.World.mkProp[a.id]) {
+        const params = Object.assign({ x: 0, y: 0, kind: a.kind, boss: a.boss }, JSON.parse(JSON.stringify(a.defaults || {})));
+        const e = G.World.mkProp[a.id](params, pal);
+        return e && e.group ? e.group : null;
+      }
+    } catch (e) { return null; }
+    return null;
+  }
+  function assetThumb(a) {
+    const key = a.cat + ':' + a.id + ':' + (a.kind || a.boss || a.label || '');
+    if (assetThumbCache[key] !== undefined) return assetThumbCache[key];
+    if (!thumbInit()) return (assetThumbCache[key] = null);
+    let url = null;
+    const obj = buildAssetObject(a);
+    if (obj) {
+      try {
+        const box = new THREE.Box3().setFromObject(obj);
+        if (!box.isEmpty() && isFinite(box.min.x)) {
+          const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+          obj.position.x -= c.x; obj.position.y -= c.y; obj.position.z -= c.z;   // centre on origin
+          const rad = Math.max(s.x, s.y, 0.5) * 0.5;
+          thumbScene.add(obj);
+          const dist = rad / Math.tan(THREE.MathUtils.degToRad(15)) * 1.3 + 1.5;
+          thumbCam.position.set(0, 0, dist + Math.max(0, s.z)); thumbCam.lookAt(0, 0, 0); thumbCam.updateProjectionMatrix();
+          thumbR.render(thumbScene, thumbCam);
+          url = thumbR.domElement.toDataURL('image/png');
+          thumbScene.remove(obj);
+        }
+      } catch (e) { url = null; }
+      try { U.disposeDeep(obj); } catch (e) { }
+    }
+    return (assetThumbCache[key] = url);
+  }
+
   function refreshAssets() {
     const tabs = $('assetTabs');
     tabs.innerHTML = '';
@@ -1160,7 +1288,9 @@
     }
     for (const a of assetList()) {
       const d = el('div', { class: 'asset' + (placing && placing.label === a.label ? ' on' : '') }, body);
-      el('div', { class: 'ico' }, d, a.ico);
+      const url = assetThumb(a);                         // a rendered 3D preview, when available
+      if (url) el('img', { class: 'ico', src: url, style: 'width:42px;height:42px;object-fit:contain;image-rendering:auto' }, d);
+      else el('div', { class: 'ico' }, d, a.ico);        // markers / prefabs fall back to the emoji
       el('div', { class: 'nm' }, d, a.label + (a.n ? ' (' + a.n + ')' : ''));
       d.addEventListener('click', () => setPlacing(placing && placing.label === a.label ? null : a));
       if (a.del) {
@@ -1245,19 +1375,89 @@
   // validate transitions across the whole world
   function validateWorld() {
     const warns = [], bad = {};
+    const cs = G.CUTSCENES || {};
+    const charmIds = new Set((G.Charms && G.Charms.LIST ? G.Charms.LIST : []).map(c => c.id));
+    const bossIds = new Set((G.Bosses && G.Bosses.LIST ? G.Bosses.LIST : []).map(b => b.id));
+    const flag = (id, msg, sev, sel) => { warns.push({ id, msg, sev: sev || 'warn', sel }); bad[id] = Math.max(bad[id] || 0, sev === 'error' ? 2 : 1); };
+    const incoming = {};
+    for (const id in G.LEVELS) for (const tz of (G.LEVELS[id].transitions || [])) if (tz.to) incoming[tz.to] = (incoming[tz.to] || 0) + 1;
+
     for (const id in G.LEVELS) {
       const L = G.LEVELS[id];
-      const trs = (L.transitions || []);
-      for (const tz of trs) {
+      // transitions
+      (L.transitions || []).forEach((tz, i) => {
         const to = tz.to;
-        if (!to || !G.LEVELS[to]) { warns.push({ id, msg: `${id}: exit points to missing level "${to || '∅'}"` }); bad[id] = 1; continue; }
-        const sp = tz.spawn;
-        if (sp && G.LEVELS[to].spawns && !G.LEVELS[to].spawns[sp]) { warns.push({ id, msg: `${id} → ${to}: arrival spawn "${sp}" not found in ${to}` }); bad[id] = 1; }
-        const back = (G.LEVELS[to].transitions || []).some(t2 => t2.to === id);
-        if (!back) { warns.push({ id, msg: `${id} → ${to}: no return exit from ${to} (one-way)` }); bad[id] = 1; bad[to] = 1; }
-      }
+        if (!to || !G.LEVELS[to]) { flag(id, `${id}: exit points to missing level "${to || '∅'}"`, 'error', { kind: 'zone', i }); return; }
+        if (tz.spawn && G.LEVELS[to].spawns && !G.LEVELS[to].spawns[tz.spawn]) flag(id, `${id} → ${to}: arrival spawn "${tz.spawn}" not found in ${to}`, 'error', { kind: 'zone', i });
+        if (!(G.LEVELS[to].transitions || []).some(t2 => t2.to === id)) { flag(id, `${id} → ${to}: no return exit (one-way)`, 'warn', { kind: 'zone', i }); bad[to] = Math.max(bad[to] || 0, 1); }
+      });
+      // props
+      (L.props || []).forEach((p, i) => {
+        const sel = { kind: 'prop', i };
+        if (p.type === 'cutsceneTrigger' && p.cutscene && !cs[p.cutscene]) flag(id, `${id}: cutscene trigger references missing cutscene "${p.cutscene}"`, 'error', sel);
+        if (p.type === 'charmPickup' && p.charm && charmIds.size && !charmIds.has(p.charm)) flag(id, `${id}: charm pickup has unknown charm "${p.charm}"`, 'error', sel);
+        if (p.type === 'bossTrigger' && p.boss && bossIds.size && !bossIds.has(p.boss)) flag(id, `${id}: boss trigger has unknown boss "${p.boss}"`, 'error', sel);
+        if (p.type === 'setActiveTrigger') {
+          if (!p.targets || !p.targets.length) flag(id, `${id}: set-active trigger has no targets`, 'warn', sel);
+          for (const t of (p.targets || [])) {
+            if (!t.level || !G.LEVELS[t.level]) { flag(id, `${id}: set-active target points to missing scene "${t.level || '∅'}"`, 'error', sel); continue; }
+            if (t.oid == null) { flag(id, `${id}: a set-active target has no object chosen`, 'warn', sel); continue; }
+            const TL = G.LEVELS[t.level];
+            const found = (TL.props || []).some(o => o.oid === t.oid) || (TL.enemies || []).some(o => o.oid === t.oid) || (TL.transitions || []).some(o => o.oid === t.oid);
+            if (!found) flag(id, `${id}: set-active target object (id ${t.oid}) no longer exists in ${t.level}`, 'error', sel);
+          }
+        }
+      });
+      // level-level
+      if (L.intro && !cs[L.intro]) flag(id, `${id}: intro cutscene "${L.intro}" doesn't exist`, 'error');
+      if (L.water && (L.water.y < 0 || L.water.y > L.h)) flag(id, `${id}: water level Y (${L.water.y}) is outside the room`, 'warn');
+      if (!(L.transitions || []).length) flag(id, `${id}: has no exits (dead-end room)`, 'warn');
+      if (!incoming[id] && Object.keys(G.LEVELS)[0] !== id) flag(id, `${id}: no other room links here (unreachable?)`, 'warn');
     }
     return { warns, bad };
+  }
+
+  // live count badge on the Lint button
+  function refreshLint() {
+    const b = $('btnLint'); if (!b) return;
+    const { warns } = validateWorld();
+    const errs = warns.filter(w => w.sev === 'error').length;
+    b.textContent = warns.length ? `⚠ Lint (${warns.length})` : '⚠ Lint';
+    b.classList.toggle('warn', errs > 0);
+  }
+  // a clickable panel of every world issue, grouped by level
+  function lintModal() {
+    const box = $('modalBox'); box.innerHTML = '';
+    el('h3', {}, box, '⚠ World validation');
+    const { warns } = validateWorld();
+    if (!warns.length) {
+      el('div', { class: 'insNote', style: 'color:#7fd89a;padding:10px 0' }, box, '✓ No issues found — every link, reference and exit checks out.');
+    } else {
+      const errs = warns.filter(w => w.sev === 'error').length;
+      el('div', { class: 'insNote' }, box, `${warns.length} issue${warns.length > 1 ? 's' : ''} · ${errs} error${errs !== 1 ? 's' : ''}, ${warns.length - errs} warning${(warns.length - errs) !== 1 ? 's' : ''} — click one to jump to it.`);
+      const list = el('div', { style: 'max-height:50vh;overflow:auto;margin:8px 0' }, box);
+      const byId = {};
+      for (const w of warns) (byId[w.id] = byId[w.id] || []).push(w);
+      for (const id in byId) {
+        el('div', { style: 'color:#9fd8b8;font-size:12px;margin:9px 0 2px;font-weight:600' }, list, id);
+        for (const w of byId[id]) {
+          const row = el('div', { style: 'display:flex;gap:7px;align-items:flex-start;padding:4px 6px;border-radius:4px;cursor:pointer;font-size:12px' }, list);
+          row.addEventListener('mouseenter', () => row.style.background = 'rgba(255,255,255,0.06)');
+          row.addEventListener('mouseleave', () => row.style.background = '');
+          el('span', { style: 'color:' + (w.sev === 'error' ? '#ff7a6a' : '#ffcf4a'), title: w.sev }, row, w.sev === 'error' ? '✕' : '⚠');
+          el('span', { style: 'color:#d8d2c8' }, row, w.msg);
+          row.addEventListener('click', () => {
+            $('modal').style.display = 'none';
+            if (!G.LEVELS[w.id]) return;
+            if (w.id !== currentId) openLevel(w.id);
+            if (w.sel) setTimeout(() => { sel = w.sel; multi = []; if (w.sel.kind === 'prop' || w.sel.kind === 'zone') { const it = selectedItem(); if (it && it.ref) { camX = it.ref.x != null ? it.ref.x : (it.ref.rect ? it.ref.rect.x : camX); camY = it.ref.y != null ? it.ref.y : (it.ref.rect ? it.ref.rect.y : camY); } } refreshInspector(); refreshHierarchy(); }, 220);
+          });
+        }
+      }
+    }
+    const btns = el('div', { id: 'modalBtns' }, box);
+    el('button', { class: 'tbtn', onclick: () => { $('modal').style.display = 'none'; } }, btns, 'Close');
+    $('modal').style.display = 'flex';
   }
 
   function drawMapTab() {
@@ -1528,6 +1728,9 @@
   $('btnSnap').addEventListener('click', () => { snap = !snap; refreshToolbar(); });
   $('btnGizmos').addEventListener('click', () => { gizmos = !gizmos; refreshToolbar(); });
   $('btnScatter').addEventListener('click', () => { scatter = !scatter; refreshToolbar(); });
+  $('btnLint').addEventListener('click', lintModal);
+  $('brushShape').addEventListener('change', e => { brushShape = e.target.value; });
+  $('brushSize').addEventListener('change', e => { brushSize = parseInt(e.target.value) || 1; });
   $('btnUndo').addEventListener('click', doUndo);
   $('btnRedo').addEventListener('click', doRedo);
   $('tabScene').addEventListener('click', () => setTab('scene'));
@@ -1788,7 +1991,7 @@
   // ---------------- in-editor cutscene preview ----------------
   // Plays the cutscene live in the 3D viewport with a real player rig, so you can
   // watch the protagonist perform the animations without launching the whole game.
-  let csBarEl = null, csBarLabel = null, csBarTime = null;
+  let csBarEl = null, csBarLabel = null, csBarTime = null, csPlayBtn = null, csScrubTrack = null, csScrubHead = null, csScrubbing = false;
   function ensureCsBar() {
     if (csBarEl) return;
     csBarEl = el('div', {
@@ -1797,10 +2000,32 @@
         'border-radius:9px;color:#cfe7dc;font:600 12px system-ui;box-shadow:0 6px 22px rgba(0,0,0,0.5)'
     }, $('viewportWrap'));
     csBarLabel = el('span', {}, csBarEl, '▶ Preview');
-    csBarTime = el('span', { style: 'color:#7fdcb0;min-width:78px;font-variant-numeric:tabular-nums' }, csBarEl, '');
-    el('button', { class: 'tbtn', onclick: () => replayCsPreview() }, csBarEl, '⟲ Replay');
+    csPlayBtn = el('button', { class: 'tbtn', title: 'Play / pause (Space)', onclick: () => toggleCsPlay() }, csBarEl, '⏸');
+    // scrub track — drag the playhead to seek anywhere in the cutscene
+    csScrubTrack = el('div', { title: 'Drag to scrub', style: 'position:relative;width:280px;height:10px;background:#26303a;border-radius:5px;cursor:pointer' }, csBarEl);
+    csScrubHead = el('div', { style: 'position:absolute;top:-3px;left:0;width:4px;height:16px;background:#ffd887;border-radius:2px;pointer-events:none;box-shadow:0 0 6px #ffd887' }, csScrubTrack);
+    csScrubTrack.addEventListener('pointerdown', e => { e.preventDefault(); csScrubbing = true; csScrubTo(e.clientX); });
+    csBarTime = el('span', { style: 'color:#7fdcb0;min-width:82px;font-variant-numeric:tabular-nums' }, csBarEl, '');
+    el('button', { class: 'tbtn', title: 'Restart', onclick: () => replayCsPreview() }, csBarEl, '⟲');
     el('button', { class: 'tbtn', onclick: () => stopCsPreview() }, csBarEl, '✕ Stop (Esc)');
   }
+  function csScrubTo(clientX) {
+    if (!csPreview || !G.Cutscene.active || !csScrubTrack) return;
+    const r = csScrubTrack.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    csPreview.scrub = true;
+    if (csPlayBtn) csPlayBtn.textContent = '▶';
+    G.Cutscene.debugSeek(frac * (G.Cutscene.active.total || 1));
+  }
+  function toggleCsPlay() {
+    if (!csPreview) return;
+    if (csPreview.done || !G.Cutscene.active) { runCsFromStart(); csPreview.scrub = false; }
+    else csPreview.scrub = !csPreview.scrub;
+    if (csPlayBtn) csPlayBtn.textContent = csPreview.scrub ? '▶' : '⏸';
+  }
+  // global scrub drag
+  addEventListener('pointermove', e => { if (csScrubbing) csScrubTo(e.clientX); });
+  addEventListener('pointerup', () => { csScrubbing = false; });
   function showCsBar(on, name) {
     ensureCsBar();
     csBarEl.style.display = on ? 'flex' : 'none';
@@ -1826,7 +2051,8 @@
   function runCsFromStart() {
     const cp = csPreview; if (!cp) return;
     if (G.player) { G.player.body.x = cp.sx; G.player.body.y = cp.sy; }
-    cp.done = false;
+    cp.done = false; cp.scrub = false;
+    if (csPlayBtn) csPlayBtn.textContent = '⏸';
     G.Cutscene.start(cp.id, {
       spawnX: cp.sx, spawnY: cp.sy,
       gameplayCam: () => ({ x: cp.sx + 1.7, y: cp.sy + 1.2, z: 30 }),
@@ -1849,7 +2075,7 @@
 
   // ---------------- keyboard ----------------
   addEventListener('keydown', e => {
-    if (csPreview) { if (e.code === 'Escape') stopCsPreview(); else if (e.code === 'KeyR') replayCsPreview(); return; }
+    if (csPreview) { if (e.code === 'Escape') stopCsPreview(); else if (e.code === 'KeyR') replayCsPreview(); else if (e.code === 'Space') { e.preventDefault(); toggleCsPlay(); } return; }
     if ($('playFrame').classList.contains('on')) { if (e.code === 'Escape') closePlay(); return; }
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
     if (e.ctrlKey && e.code === 'KeyS') { e.preventDefault(); save(); return; }
@@ -1881,6 +2107,7 @@
     const dt = Math.min(0.05, (t - lastT) / 1000) || 0.016;
     lastT = t;
     G.time += dt;
+    if (G.Weather) G.Weather.update(dt);   // animate the live weather preview
 
     if (needsRebuild && !csPreview) {
       rebuildTimer -= dt;
@@ -1900,7 +2127,10 @@
             try { e.update(dt); } catch (_) { }
         }
       }
-      if (G.Cutscene.active) { G.Cutscene.update(dt); csPreview.lastCam = { x: G.Cutscene.active.cam.x, y: G.Cutscene.active.cam.y, z: G.Cutscene.active.cam.z }; }
+      if (G.Cutscene.active) {
+        if (!csPreview.scrub) G.Cutscene.update(dt);     // scrubbing holds the frame
+        csPreview.lastCam = { x: G.Cutscene.active.cam.x, y: G.Cutscene.active.cam.y, z: G.Cutscene.active.cam.z };
+      }
       G.FX.update(dt);
       const cam = csPreview.lastCam;
       camera.position.set(cam.x, cam.y, cam.z);
@@ -1912,7 +2142,9 @@
       octx.clearRect(0, 0, G.viewW, G.viewH);
       G.Cutscene.drawHUD(octx, G.viewW, G.viewH);
       const cur = G.Cutscene.active;
+      if (csScrubHead && cur) csScrubHead.style.left = ((cur.time / (cur.total || 1)) * 100) + '%';
       if (csBarTime) csBarTime.textContent = cur ? cur.time.toFixed(1) + ' / ' + cur.total.toFixed(1) + 's' : 'done — ⟲ to replay';
+      if (cur && csPreview.done && csPlayBtn && csPlayBtn.textContent !== '▶') csPlayBtn.textContent = '▶';
     } else if (tab === 'scene') {
       // animate ambience but keep AI frozen: update only decorative entity types
       G.World.update(dt);

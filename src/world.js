@@ -462,7 +462,7 @@
   }
 
   // ============================ PROPS ============================
-  const mkProp = {};
+  const mkProp = W.mkProp = {};   // exposed so the editor can build single props (asset thumbnails)
 
   mkProp.bench = p => {
     const grp = new THREE.Group();
@@ -951,9 +951,18 @@
 
     G.Physics.setRoom(parsed.solids.slice(), parsed.oneWays, parsed.spikes.map(s => ({ x: s.x, y: s.y, w: s.w, h: s.h })));
 
-    G.scene.fog = new THREE.Fog(pal.fog, pal.fogNear, pal.fogFar);
+    // per-level weather (rain / wind / fog / snow / embers …) — affects the look & water
+    if (G.Weather) G.Weather.set(def.weather || 'none');
+    const fogMul = (G.Weather && G.Weather.props().fog) ? (1 - 0.45 * G.Weather.props().fog) : 1;
+    G.scene.fog = new THREE.Fog(pal.fog, pal.fogNear * fogMul, pal.fogFar * fogMul);
     G.renderer.setClearColor(pal.bgBottom);
-    if (G.Post) { G.Post.setGrade(gradeFor(pal)); if (def.grade) G.Post.setGrade(def.grade); }   // per-level look override
+    if (G.Post) {
+      let g = gradeFor(pal);
+      if (G.Weather) g = G.Weather.gradeFor(g);
+      G.Post.setGrade(g);
+      if (def.grade) G.Post.setGrade(def.grade);   // explicit per-level grade override wins
+      G.Post.setWater(def.water || null);          // reflective water / wet floor surface
+    }
 
     // ---- backdrop ----
     const bgPlane = new THREE.Mesh(

@@ -936,6 +936,9 @@
     cx.clearRect(0, 0, w, h);
     const st = G.Main.state;
 
+    // weather (rain/snow/wind…) over the world but under the HUD
+    if (G.Weather && (st === 'play' || st === 'pause' || st === 'transition' || st === 'dead')) G.Weather.draw(cx, w, h);
+
     if (st === 'play' || st === 'dead' || st === 'pause' || st === 'transition') {
       drawHud(dt);
       drawPrompts();

@@ -139,6 +139,11 @@
     G.LEVELS.prologue = makeLevel();
     const sp = G.World.load('prologue', 'P');
     groundY = sp.y;
+    // wet, storm-lit ground: the rain reflects on a glossy floor and the grade goes cold & dark
+    if (G.Post) {
+      G.Post.setWater({ y: groundY - 0.35, strength: 0.5, color: '#8fb0c8', ripple: 1.5, fade: 1.3 });
+      G.Post.setGrade({ exposure: 0.95, contrast: 1.17, saturation: 1.0, vignette: 0.56, bloom: 0.66 });
+    }
     if (G.player) G.player.root.visible = false;
     parts = buildOldMan(); man = parts.group;
     walkX = sp.x; walkPh = 0; walkSpeed = 1.5;
@@ -151,6 +156,7 @@
     P.active = true;
     G.Audio.prologueStart();
     G.Audio.thunder(); flashA = 0.8;
+    if (G.Post) G.Post.flash(0.4, 0xcfe0ff);
   };
 
   function nextPhase() {
@@ -164,7 +170,7 @@
     if (!P.active) return;
     const ph = PHASES[phaseI].n, dur = PHASES[phaseI].d, l = t / dur;
     thunderT -= dt;
-    if (thunderT <= 0 && !smashed) { thunderT = 3; G.Audio.thunder(); flashA = 0.82; }   // rain/thunder cease at the smash
+    if (thunderT <= 0 && !smashed) { thunderT = 3; G.Audio.thunder(); flashA = 0.82; if (G.Post) G.Post.flash(0.4, 0xcfe0ff); }   // rain/thunder cease at the smash
     flashA = Math.max(0, flashA - dt * 2.2);
     for (const d of rain) { d.y += d.sp * dt; if (d.y > 1.06) { d.x = Math.random(); d.y = -0.05; d.sp = 0.85 + Math.random() * 0.5; } }
     if (WALKING.has(ph)) { walkX += walkSpeed * dt; walkPh += dt * walkSpeed * 2.6; animWalk(); }
@@ -214,6 +220,7 @@
     if (!P.active) return;
     P.active = false;
     if (man) { G.scene.remove(man); U.disposeDeep && U.disposeDeep(man); man = null; parts = null; }
+    if (G.Post) G.Post.setWater(null);   // drop the wet ground; the next room sets its own look
     G.Audio.prologueStop();
     const cb = doneCb; doneCb = null;
     if (cb) cb();

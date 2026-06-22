@@ -44,6 +44,7 @@
   .tbtn.play { background:#2f7d4f; border-color:#2f7d4f; color:#eafff0; font-weight:600; }
   .tbtn.play:hover { background:#379159; }
   .tbtn.warn { border-color:var(--warn); color:var(--warn); }
+  .tsel { background:var(--bg3); color:var(--txt); border:1px solid #45454d; border-radius:4px; padding:3px 4px; font-size:12px; cursor:pointer; }
   .tsep { width:1px; height:22px; background:#46464e; margin:0 4px; }
   #dirty { color:var(--warn); display:none; margin-left:4px; }
   #saveMsg { color:#7fd6a0; margin-left:4px; font-size:11px; }
@@ -187,10 +188,20 @@
     <button class="tbtn tool" data-tool="oneway" title="Paint one-way platforms (3)">▭ One-way</button>
     <button class="tbtn tool" data-tool="spike" title="Paint spikes (4)">▲ Spikes</button>
     <button class="tbtn tool" data-tool="erase" title="Erase tiles (5)">⌫ Erase</button>
+    <select id="brushShape" class="tsel" title="Brush shape for tile tools">
+      <option value="pencil">✏ Pencil</option>
+      <option value="line">／ Line</option>
+      <option value="rect">▭ Rect</option>
+      <option value="fill">🪣 Fill</option>
+    </select>
+    <select id="brushSize" class="tsel" title="Brush size (pencil / line)">
+      <option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option>
+    </select>
     <span class="tsep"></span>
     <button class="tbtn" id="btnSnap" title="Snap objects to half-tiles">Snap</button>
     <button class="tbtn" id="btnGizmos" title="Show object gizmos (G)">Gizmos</button>
     <button class="tbtn" id="btnScatter" title="Scatter: stamp a randomized cluster when placing decor">⁂ Scatter</button>
+    <button class="tbtn" id="btnLint" title="Validate the world — broken links, missing refs, dead ends">⚠ Lint</button>
     <span class="tsep"></span>
     <button class="tbtn" id="btnUndo" title="Undo (Ctrl+Z)">↩</button>
     <button class="tbtn" id="btnRedo" title="Redo (Ctrl+Y)">↪</button>
@@ -258,7 +269,7 @@
     '../lib/three.min.js',
     '../data/levels.js', '../data/cutscenes.js',
     '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js',
-    '../src/world.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
+    '../src/world.js', '../src/weather.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
     '../src/bosses.js', '../src/cutscene.js', 'editor.js'
   ];
   scripts.forEach(function (src) {

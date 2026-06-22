@@ -829,6 +829,7 @@
     if (dt > 0) {
       G.time += dt;
       G.World.update(dt);
+      if (G.Weather) G.Weather.update(dt);
       if (Main.state === 'cutscene') G.Cutscene.update(dt);
       else if (Main.state === 'prologue') G.Prologue.update(dt);
       else if (Main.state !== 'title' && Main.state !== 'prologue' && G.player) G.player.update(dt);
