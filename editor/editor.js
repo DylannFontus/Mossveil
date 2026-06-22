@@ -107,6 +107,7 @@
     const dpr = Math.min(2, devicePixelRatio || 1);
     overlay.width = r.width * dpr; overlay.height = r.height * dpr;
     mapCanvas.width = r.width * dpr; mapCanvas.height = r.height * dpr;
+    const lc = $('logicCanvas'); if (lc) { lc.width = r.width; lc.height = r.height; }
     G.pxScale = (renderer.domElement.height / 2) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
     G.FX.resize(renderer.domElement.height, FOV);
     if (G.Post) G.Post.resize();
@@ -838,6 +839,7 @@
     if (csMode) return refreshCsInspector();
     const body = $('insBody');
     body.innerHTML = '';
+    if (tab === 'logic') return refreshLogicInspector(body);
     const it = selectedItem();
     $('stSel').textContent = it ? `selected: ${it.kind} ${it.ref.type || it.ref.to || it.key || ''}` : '';
     if (!it) {
@@ -1606,11 +1608,15 @@
     $('tabScene').classList.toggle('on', t === 'scene');
     $('tabMap').classList.toggle('on', t === 'map');
     $('tabCutscene').classList.toggle('on', t === 'cutscene');
+    $('tabLogic').classList.toggle('on', t === 'logic');
     mapCanvas.style.display = t === 'map' ? 'block' : 'none';
     glCanvas.style.display = t === 'scene' ? 'block' : 'none';
     $('csView').classList.toggle('on', t === 'cutscene');
+    $('logicCanvas').classList.toggle('on', t === 'logic');
+    $('logicPalette').classList.toggle('on', t === 'logic');
     $('viewportHint').textContent = '';
     if (t === 'cutscene') { setLeftTab('S'); refreshCsTab(); }
+    if (t === 'logic') { resize(); buildLogicPalette(); refreshInspector(); }
   }
 
   // ---------------- cutscene editor ----------------
@@ -1842,6 +1848,7 @@
   $('tabScene').addEventListener('click', () => setTab('scene'));
   $('tabMap').addEventListener('click', () => setTab('map'));
   $('tabCutscene').addEventListener('click', () => setTab('cutscene'));
+  $('tabLogic').addEventListener('click', () => setTab('logic'));
   function setLeftTab(which) {
     csMode = which === 'S';
     $('ltabH').classList.toggle('on', which === 'H');
@@ -2170,6 +2177,118 @@
     if (tab === 'cutscene') $('csView').classList.add('on');
   }
 
+  // ================= LOGIC (event-graph) node editor =================
+  const logicCanvas = $('logicCanvas'), lctx = logicCanvas.getContext('2d');
+  const ETYPES = (G.EventGraph && G.EventGraph.TYPES) || {};
+  const NODE_W = 152;
+  let logicCam = { x: 0, y: 0, zoom: 1 }, logicSel = null, logicDrag = null, logicWire = null, logicPan = null;
+
+  function graphOf() { const L = lvl(); if (!L) return null; if (!L.graph) L.graph = { nodes: [], links: [] }; return L.graph; }
+  function nodeById(id) { const g = graphOf(); return g ? g.nodes.find(n => n.id === id) : null; }
+  function nodeOuts(n) { const t = ETYPES[n.type] || {}; return t.outs || 0; }
+  function nodeH(n) { const t = ETYPES[n.type] || {}; return 26 + Math.max(1, t.outs || 1) * 14 + ((t.params || []).length ? 14 : 4); }
+  function kindCol(k) { return k === 'event' ? '#2f6e50' : k === 'cond' ? '#6e5c2f' : '#2f4d6e'; }
+  function L2S(x, y) { return { x: (x - logicCam.x) * logicCam.zoom + logicCanvas.width / 2, y: (y - logicCam.y) * logicCam.zoom + logicCanvas.height / 2 }; }
+  function S2L(x, y) { return { x: (x - logicCanvas.width / 2) / logicCam.zoom + logicCam.x, y: (y - logicCanvas.height / 2) / logicCam.zoom + logicCam.y }; }
+  function inPin(n) { return L2S(n.x, n.y + 11); }
+  function outPin(n, i) { return L2S(n.x + NODE_W, n.y + 26 + i * 14 + 7); }
+
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function wire(ctx, x0, y0, x1, y1, col) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); const dx = Math.max(30, Math.abs(x1 - x0) * 0.5); ctx.bezierCurveTo(x0 + dx, y0, x1 - dx, y1, x1, y1); ctx.stroke(); }
+  function pinDot(ctx, x, y, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.fill(); ctx.strokeStyle = '#0b0f12'; ctx.lineWidth = 1.5; ctx.stroke(); }
+
+  function drawLogic() {
+    const cv = logicCanvas, ctx = lctx, z = logicCam.zoom; const g = graphOf();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0c1014'; ctx.fillRect(0, 0, cv.width, cv.height);
+    const gs = 38 * z, ox = ((cv.width / 2 - logicCam.x * z) % gs + gs) % gs, oy = ((cv.height / 2 - logicCam.y * z) % gs + gs) % gs;
+    ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1;
+    for (let x = ox; x < cv.width; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); ctx.stroke(); }
+    for (let y = oy; y < cv.height; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cv.width, y); ctx.stroke(); }
+    if (!g) return;
+    for (const l of g.links) { const a = nodeById(l.from), b = nodeById(l.to); if (!a || !b) continue; const p0 = outPin(a, l.fp | 0), p1 = inPin(b); wire(ctx, p0.x, p0.y, p1.x, p1.y, 'rgba(111,214,168,.85)'); }
+    if (logicWire) { const a = nodeById(logicWire.from); if (a) { const p0 = outPin(a, logicWire.fp); wire(ctx, p0.x, p0.y, logicWire.mx, logicWire.my, '#cfe'); } }
+    ctx.textBaseline = 'middle';
+    for (const n of g.nodes) {
+      const t = ETYPES[n.type] || {}, s = L2S(n.x, n.y), w = NODE_W * z, h = nodeH(n) * z, sel = logicSel === n.id;
+      ctx.fillStyle = 'rgba(16,22,26,.97)'; rrect(ctx, s.x, s.y, w, h, 6 * z); ctx.fill();
+      ctx.save(); rrect(ctx, s.x, s.y, w, 22 * z, 6 * z); ctx.clip(); ctx.fillStyle = kindCol(t.kind); ctx.fillRect(s.x, s.y, w, 22 * z); ctx.restore();
+      ctx.fillStyle = '#eafffb'; ctx.font = (12 * z | 0) + 'px ui-monospace,Consolas,monospace'; ctx.textAlign = 'left';
+      ctx.fillText(t.title || n.type, s.x + 7 * z, s.y + 11 * z);
+      ctx.strokeStyle = sel ? '#9fe6c8' : 'rgba(120,180,160,.25)'; ctx.lineWidth = sel ? 2 : 1; rrect(ctx, s.x, s.y, w, h, 6 * z); ctx.stroke();
+      if ((t.ins || 0) > 0) { const p = inPin(n); pinDot(ctx, p.x, p.y, '#bfe6ff'); }
+      for (let i = 0; i < (t.outs || 0); i++) { const p = outPin(n, i); pinDot(ctx, p.x, p.y, '#6fd6a8'); if (t.outLabels) { ctx.fillStyle = '#9eccb8'; ctx.font = (9 * z | 0) + 'px ui-monospace'; ctx.textAlign = 'right'; ctx.fillText(t.outLabels[i], p.x - 8 * z, p.y); ctx.textAlign = 'left'; } }
+      const sum = (t.params || []).map(pp => pp.k + '=' + ((n.p && n.p[pp.k] !== undefined) ? n.p[pp.k] : (pp.def !== undefined ? pp.def : ''))).join('  ');
+      if (sum) { ctx.fillStyle = 'rgba(170,205,195,.75)'; ctx.font = (9 * z | 0) + 'px ui-monospace'; ctx.fillText(sum.slice(0, 26), s.x + 6 * z, s.y + 30 * z); }
+    }
+    ctx.fillStyle = 'rgba(160,200,180,.45)'; ctx.font = '12px ui-monospace,Consolas,monospace'; ctx.textAlign = 'left';
+    ctx.fillText('drag node = move · drag output→input = wire · click input = disconnect · Del = delete · wheel = zoom', 12, cv.height - 12);
+  }
+
+  function pointAt(e) { const r = logicCanvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function addLogicNode(type, atScreen) {
+    const g = graphOf(); if (!g || !ETYPES[type]) return;
+    let mid = 0; for (const n of g.nodes) mid = Math.max(mid, n.id || 0);
+    const c = atScreen ? S2L(atScreen.x, atScreen.y) : S2L(logicCanvas.width / 2, logicCanvas.height / 2);
+    const p = {}; for (const pp of (ETYPES[type].params || [])) p[pp.k] = pp.def;
+    g.nodes.push({ id: mid + 1, type, x: Math.round(c.x - NODE_W / 2), y: Math.round(c.y - 20), p });
+    logicSel = mid + 1; markDirty(); refreshInspector();
+  }
+  function logicDeleteSelected() {
+    const g = graphOf(); if (!g || logicSel == null) return;
+    g.nodes = g.nodes.filter(n => n.id !== logicSel);
+    g.links = g.links.filter(l => l.from !== logicSel && l.to !== logicSel);
+    logicSel = null; markDirty(); refreshInspector();
+  }
+  function buildLogicPalette() {
+    const pal = $('logicPalette'); pal.innerHTML = '';
+    const groups = [['event', 'Events'], ['cond', 'Conditions'], ['action', 'Actions']];
+    for (const [gk, glabel] of groups) {
+      el('div', { class: 'plabel' }, pal, glabel);
+      for (const tk in ETYPES) { if (ETYPES[tk].kind !== gk) continue; const btn = el('button', {}, pal, ETYPES[tk].title); btn.addEventListener('click', () => addLogicNode(tk)); }
+    }
+  }
+  function refreshLogicInspector(body) {
+    const n = logicSel != null ? nodeById(logicSel) : null;
+    if (!n) {
+      const g = graphOf();
+      el('div', { class: 'insNote' }, body, 'Event-graph logic for this room. Add nodes from the palette (top-left of the canvas); select a node to edit its fields.');
+      if (g) el('div', { class: 'insNote', style: 'opacity:.6' }, body, g.nodes.length + ' nodes · ' + g.links.length + ' links');
+      return;
+    }
+    const t = ETYPES[n.type] || {};
+    el('div', { class: 'insNote' }, body, 'NODE — ' + (t.title || n.type));
+    n.p = n.p || {};
+    for (const pp of (t.params || [])) {
+      const label = pp.label || pp.k, def = pp.def;
+      if (pp.type === 'bool') checkField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
+      else if (pp.type === 'color') colorField(body, label, () => n.p[pp.k] || def, v => { n.p[pp.k] = v || def; markDirty(); });
+      else if (typeof def === 'number') numField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); }, (pp.k === 'oid' || pp.k === 'pct') ? 1 : 0.1);
+      else textField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
+    }
+    el('div', { class: 'insNote', style: 'opacity:.6' }, body, 'Del to delete · drag pins to (re)wire.');
+  }
+
+  logicCanvas.addEventListener('pointerdown', e => {
+    if (tab !== 'logic') return;
+    const m = pointAt(e), g = graphOf(); if (!g) return;
+    for (const n of g.nodes) for (let i = 0; i < nodeOuts(n); i++) { const p = outPin(n, i); if (Math.hypot(p.x - m.x, p.y - m.y) < 10) { logicWire = { from: n.id, fp: i, mx: m.x, my: m.y }; logicCanvas.setPointerCapture(e.pointerId); return; } }
+    for (const n of g.nodes) { const t = ETYPES[n.type] || {}; if ((t.ins || 0) > 0) { const p = inPin(n); if (Math.hypot(p.x - m.x, p.y - m.y) < 10) { g.links = g.links.filter(l => l.to !== n.id); markDirty(); return; } } }
+    for (let k = g.nodes.length - 1; k >= 0; k--) { const n = g.nodes[k], s = L2S(n.x, n.y), w = NODE_W * logicCam.zoom, h = nodeH(n) * logicCam.zoom; if (m.x >= s.x && m.x <= s.x + w && m.y >= s.y && m.y <= s.y + h) { logicSel = n.id; const lp = S2L(m.x, m.y); logicDrag = { id: n.id, ox: lp.x - n.x, oy: lp.y - n.y }; logicCanvas.setPointerCapture(e.pointerId); refreshInspector(); return; } }
+    logicSel = null; logicPan = { mx: m.x, my: m.y, cx: logicCam.x, cy: logicCam.y }; logicCanvas.setPointerCapture(e.pointerId); refreshInspector();
+  });
+  logicCanvas.addEventListener('pointermove', e => {
+    if (tab !== 'logic') return; const m = pointAt(e);
+    if (logicWire) { logicWire.mx = m.x; logicWire.my = m.y; }
+    else if (logicDrag) { const lp = S2L(m.x, m.y), n = nodeById(logicDrag.id); if (n) { n.x = Math.round(lp.x - logicDrag.ox); n.y = Math.round(lp.y - logicDrag.oy); markDirty(); } }
+    else if (logicPan) { logicCam.x = logicPan.cx - (m.x - logicPan.mx) / logicCam.zoom; logicCam.y = logicPan.cy - (m.y - logicPan.my) / logicCam.zoom; }
+  });
+  logicCanvas.addEventListener('pointerup', e => {
+    if (tab !== 'logic') return; const m = pointAt(e);
+    if (logicWire) { const g = graphOf(); for (const n of g.nodes) { const t = ETYPES[n.type] || {}; if ((t.ins || 0) > 0 && n.id !== logicWire.from) { const p = inPin(n); if (Math.hypot(p.x - m.x, p.y - m.y) < 14) { g.links = g.links.filter(l => !(l.from === logicWire.from && (l.fp | 0) === logicWire.fp && l.to === n.id)); g.links.push({ from: logicWire.from, fp: logicWire.fp, to: n.id, tp: 0 }); markDirty(); break; } } } }
+    logicWire = null; logicDrag = null; logicPan = null;
+  });
+  logicCanvas.addEventListener('wheel', e => { if (tab !== 'logic') return; e.preventDefault(); logicCam.zoom = Math.max(0.4, Math.min(2.2, logicCam.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); }, { passive: false });
+
   // ---------------- keyboard ----------------
   addEventListener('keydown', e => {
     if (csPreview) { if (e.code === 'Escape') stopCsPreview(); else if (e.code === 'KeyR') replayCsPreview(); else if (e.code === 'Space') { e.preventDefault(); toggleCsPlay(); } return; }
@@ -2177,6 +2296,7 @@
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
     if (e.ctrlKey && e.code === 'KeyS') { e.preventDefault(); save(); return; }
     if (typing) return;
+    if (tab === 'logic') { if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); logicDeleteSelected(); } return; }
     if (csMode || tab === 'cutscene') return; // cutscene editing: no level shortcuts
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
     if (e.ctrlKey && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) { e.preventDefault(); doRedo(); return; }
@@ -2263,6 +2383,8 @@
       drawOverlay();
     } else if (tab === 'map') {
       drawMapTab();
+    } else if (tab === 'logic') {
+      drawLogic();
     }
     // tab === 'cutscene' renders nothing in 3D — the #csView DOM covers the viewport
     if (G.Profiler) G.Profiler.tick();
@@ -2302,7 +2424,10 @@
     setSel: v => { sel = v; }, setMulti: v => { multi = v; }, getMulti: () => multi, getSel: () => sel,
     getClip: () => clipboard, getPrefabs: () => prefabs, setLastWorld: (x, y) => { lastWorld = { x, y }; },
     openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
-    retileAll: () => retileWholeLevel()
+    retileAll: () => retileWholeLevel(),
+    logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
+    logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
+    logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected()
   };
 
   boot();

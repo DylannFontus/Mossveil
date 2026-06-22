@@ -1141,6 +1141,7 @@
     }
     room.biome = biome;
     room.lookState = { biome, grade: gradeOv || null, weather, water: waterOv || null };
+    if (G.EventGraph) G.EventGraph.load(def.graph || null);   // per-room visual-scripting graph
     // dynamic lighting: a gentle, slightly biome-tinted ambient that keeps the (often very
     // dark) gameplay art clearly visible — lights then brighten pools on top.
     if (G.Lights) {

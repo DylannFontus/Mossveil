@@ -85,6 +85,13 @@
   #gl, #overlay, #mapCanvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
   #overlay { pointer-events:none; }
   #mapCanvas { display:none; }
+  #logicCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; background:#0c1014; cursor:default; }
+  #logicCanvas.on { display:block; }
+  #logicPalette { position:absolute; left:10px; top:10px; display:none; flex-wrap:wrap; gap:4px; max-width:280px; z-index:5; }
+  #logicPalette.on { display:flex; }
+  #logicPalette button { font:11px ui-monospace,Consolas,monospace; color:#cfe; background:rgba(20,30,32,.92); border:1px solid rgba(120,200,180,.3); border-radius:5px; padding:3px 7px; cursor:pointer; }
+  #logicPalette button:hover { background:rgba(40,70,64,.95); }
+  #logicPalette .plabel { width:100%; color:#7fb39c; font:10px ui-monospace; margin-top:4px; opacity:.8; }
   #csView { position:absolute; inset:0; display:none; background:#0e0e13; overflow:auto; padding:16px 18px; }
   #csView.on { display:block; }
   #csView .cshead { color:#9fd8b8; font-size:15px; margin:2px 0 12px; }
@@ -182,6 +189,7 @@
     <button class="tbtn" id="tabScene">Scene</button>
     <button class="tbtn" id="tabMap">Map</button>
     <button class="tbtn" id="tabCutscene">Cutscene</button>
+    <button class="tbtn" id="tabLogic">Logic</button>
     <span class="tsep"></span>
     <button class="tbtn tool" data-tool="select" title="Select / move (1)">⬚ Select</button>
     <button class="tbtn tool" data-tool="solid" title="Paint solid tiles (2)">▦ Solid</button>
@@ -232,6 +240,8 @@
     <canvas id="gl"></canvas>
     <canvas id="overlay"></canvas>
     <canvas id="mapCanvas"></canvas>
+    <canvas id="logicCanvas"></canvas>
+    <div id="logicPalette"></div>
     <div id="csView"></div>
     <div id="viewportHint"></div>
     <div id="playFrame">
@@ -270,7 +280,7 @@
   var scripts = [
     '../lib/three.min.js',
     '../data/levels.js', '../data/cutscenes.js',
-    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js',
+    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js', '../src/eventgraph.js',
     '../src/world.js', '../src/weather.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
     '../src/bosses.js', '../src/cutscene.js', 'editor.js'
   ];

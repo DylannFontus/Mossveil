@@ -887,6 +887,7 @@
     }
     G.Audio.update(rdt);
     if (G.Lights) G.Lights.update(rdt, G.time);
+    if (G.EventGraph) G.EventGraph.update(rdt);
     updateCamera(dt, rdt);
 
     if (G.Post && G.Post.enabled) G.Post.render(rdt);
