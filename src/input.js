@@ -23,18 +23,19 @@
   for (const a in map) for (const c of map[a]) (codeToActions[c] = codeToActions[c] || []).push(a);
 
   const isDown = {}, wasPressed = {}, wasReleased = {};
-  let any = false;
+  let any = false, playbackMode = false;   // playbackMode: real keys ignored, input injected (Replay)
 
   const prevent = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
   addEventListener('keydown', e => {
     if (prevent.has(e.code)) e.preventDefault();
-    if (e.repeat) return;
+    if (e.repeat || playbackMode) return;
     any = true;
     const as = codeToActions[e.code];
     if (as) for (const a of as) { isDown[a] = true; wasPressed[a] = true; }
   });
   addEventListener('keyup', e => {
+    if (playbackMode) return;
     const as = codeToActions[e.code];
     if (as) for (const a of as) { isDown[a] = false; wasReleased[a] = true; }
   });
@@ -49,6 +50,18 @@
     // on-screen touch controls feed input through these (mirror keydown/keyup)
     virtualDown(a) { if (!isDown[a]) { isDown[a] = true; wasPressed[a] = true; any = true; } },
     virtualUp(a) { if (isDown[a]) { isDown[a] = false; wasReleased[a] = true; } },
+    // ---- record & replay (G.Replay) ----
+    snapshot() { const s = {}; for (const a in map) if (isDown[a]) s[a] = 1; return s; },
+    inject(snap) {                                   // set held state from a recorded snapshot, deriving edges
+      for (const a in map) {
+        const now = !!(snap && snap[a]), before = !!isDown[a];
+        if (now && !before) wasPressed[a] = true;
+        if (!now && before) wasReleased[a] = true;
+        isDown[a] = now;
+      }
+      any = true;
+    },
+    playback(on) { playbackMode = !!on; if (!on) for (const a in isDown) isDown[a] = false; },
     // call at end of frame
     update() {
       for (const a in wasPressed) wasPressed[a] = false;

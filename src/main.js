@@ -733,9 +733,10 @@
   // ---------------- main loop ----------------
   function loop(t) {
     requestAnimationFrame(loop);
-    const rdt = Math.min(0.033, Math.max(0.0001, (t - lastT) / 1000));
+    let rdt = Math.min(0.033, Math.max(0.0001, (t - lastT) / 1000));
     lastT = t;
     const I = G.Input;
+    if (G.Replay) rdt = G.Replay.frame(rdt);   // record/inject input + (on playback) override dt
 
     // global keys
     if (I.pressed('mute')) {
