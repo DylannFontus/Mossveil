@@ -861,6 +861,16 @@
         el('div', { class: 'insNote' }, body, 'Everything below the water line mirrors the scene above (ripple + tint). Low reflectivity = wet floor; higher = a pool.');
       }
       el('div', { class: 'insNote' }, body, 'Weather draws over the world (rain, snow, wind, fog, embers…) and nudges the look — storms/blizzards add lightning. Shown live in the viewport.');
+
+      // ---- per-level dynamic lighting ----
+      el('div', { class: 'hgroup' }, body, 'Dynamic lighting');
+      numField(body, 'Intensity', () => L.lightStrength !== undefined ? L.lightStrength : 1,
+        v => { const n = U.clamp(v, 0, 1); if (n >= 0.999) delete L.lightStrength; else L.lightStrength = +n.toFixed(2); if (G.Post) G.Post.lightStrength = n; markDirty(); }, 0.05);
+      numField(body, 'Edge glow', () => L.lightRim !== undefined ? L.lightRim : 0.55,
+        v => { const n = U.clamp(v, 0, 1.5); if (Math.abs(n - 0.55) < 0.001) delete L.lightRim; else L.lightRim = +n.toFixed(2); if (G.Post) G.Post.lightRim = n; markDirty(); }, 0.05);
+      checkField(body, 'Soft shadows', () => L.shadows !== false,
+        v => { if (v) delete L.shadows; else L.shadows = false; if (G.Post) G.Post.shadows = v; markDirty(); });
+      el('div', { class: 'insNote' }, body, 'Scales the real-time lighting for THIS room. Turn it down where the painted biome art already sets the mood — 0 = no dynamic lighting here. Place light sources from the Lights tab; each lamp / crystal / glow light also casts light.');
       return;
     }
     const p = it.ref;

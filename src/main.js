@@ -134,6 +134,7 @@
     { key: 'volume', label: 'Sound volume', type: 'slider' },
     { key: 'shake', label: 'Screen shake', type: 'toggle' },
     { key: 'quality', label: 'Visual quality', type: 'cycle', opts: ['low', 'medium', 'high'] },
+    { key: 'lighting', label: 'Dynamic lighting', type: 'toggle' },
     { key: 'bloom', label: 'Bloom glow', type: 'toggle' },
     { key: 'dof', label: 'Depth of field', type: 'toggle' },
     { key: 'reflections', label: 'Water reflections', type: 'toggle' },
@@ -141,7 +142,7 @@
     { key: 'aberration', label: 'Chromatic aberration', type: 'toggle' },
     { key: 'vignette', label: 'Vignette', type: 'toggle' }
   ];
-  G.settings = { volume: 0.8, shake: true, quality: 'high', bloom: true, dof: true, reflections: true, weather: true, aberration: true, vignette: true };
+  G.settings = { volume: 0.8, shake: true, quality: 'high', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, vignette: true };
   const fmtSetting = d => {
     const v = G.settings[d.key];
     if (d.type === 'slider') return Math.round(v * 100) + '%';
@@ -155,8 +156,10 @@
     if (G.Audio && G.Audio.setVolume) G.Audio.setVolume(s.volume);
     if (G.Post) {
       G.Post.quality = s.quality;
+      G.Post.lighting = s.lighting !== false;
       if (G.Post.setFX) G.Post.setFX({ bloom: s.bloom ? 1 : 0, dof: s.dof ? 1 : 0, reflections: s.reflections ? 1 : 0, aberr: s.aberration ? 1 : 0, vignette: s.vignette ? 1 : 0 });
     }
+    if (G.Lights) G.Lights.enabled = s.lighting !== false;
     if (G.Weather) G.Weather.userEnabled = s.weather !== false;
   }
   function loadSettings() {
@@ -879,6 +882,7 @@
       G.FX.update(dt);
     }
     G.Audio.update(rdt);
+    if (G.Lights) G.Lights.update(rdt, G.time);
     updateCamera(dt, rdt);
 
     if (G.Post && G.Post.enabled) G.Post.render(rdt);

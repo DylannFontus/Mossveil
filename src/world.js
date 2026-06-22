@@ -674,6 +674,7 @@
     const glow = U.glowSprite(pal.glow, 9, 0.38);
     glow.position.set(0, 1.74, 0.1);
     grp.add(glow);
+    if (G.Lights) G.Lights.add({ x: p.x, y: p.y + 1.74, color: pal.glow, radius: 11, intensity: 1.1, flicker: 0.28 });
     let t = U.rand(0, 9), emberT = U.rand(0.5, 2);
     return {
       type: 'lamp', x: p.x, y: p.y, group: grp,
@@ -699,6 +700,7 @@
     const glow = U.glowSprite(pal.glow, 6.5, 0.34);
     glow.position.set(0, 0.7, 0.1);
     grp.add(glow);
+    if (G.Lights) G.Lights.add({ x: p.x, y: p.y + 0.7, color: pal.glow, radius: 8, intensity: 0.85, flicker: 0.12 });
     let t = U.rand(0, 9);
     return {
       type: 'crystal', x: p.x, y: p.y, group: grp,
@@ -906,6 +908,7 @@
     const col = p.color ? parseInt(p.color.replace('#', ''), 16) : 0xffeecc;
     const glow = U.glowSprite(col, p.scale || 8, p.opacity !== undefined ? p.opacity : 0.3);
     grp.add(glow);
+    if (G.Lights) G.Lights.add({ x: p.x, y: p.y, color: col, radius: (p.scale || 8) * 1.3, intensity: 0.5 + (p.opacity !== undefined ? p.opacity : 0.3) * 2, flicker: p.flicker ? 0.3 : 0 });
     let t = U.rand(0, 9);
     const base = glow.material.opacity;
     return {
@@ -1138,6 +1141,31 @@
     }
     room.biome = biome;
     room.lookState = { biome, grade: gradeOv || null, weather, water: waterOv || null };
+    // dynamic lighting: a gentle, slightly biome-tinted ambient that keeps the (often very
+    // dark) gameplay art clearly visible — lights then brighten pools on top.
+    if (G.Lights) {
+      G.Lights.clear();
+      const a = new THREE.Color(pal.light); const mx = Math.max(a.r, a.g, a.b) || 1;
+      a.multiplyScalar(1 / mx); a.lerp(new THREE.Color(1, 1, 1), 0.55).multiplyScalar(0.82);
+      G.Lights.setAmbient(a);
+      // per-room dynamic-lighting overrides (editable in the editor's Level settings)
+      if (G.Post) {
+        G.Post.lightStrength = def.lightStrength != null ? def.lightStrength : 1;
+        G.Post.lightRim = def.lightRim != null ? def.lightRim : 0.55;
+        G.Post.shadows = def.shadows !== false;
+      }
+      // build the terrain occluder field this room casts soft shadows from
+      if (G.Lights.buildSDF) {
+        const res = 3, tw = def.w * res, th = def.h * res, Hd = def.h, gr = parsed.grid;
+        const occ = new Uint8Array(tw * th);
+        for (let j = 0; j < th; j++) for (let i = 0; i < tw; i++) {
+          const c = (i + 0.5) / res | 0, r = Hd - 1 - ((j + 0.5) / res | 0);
+          const ch = (gr[r] && gr[r][c]) || ' ';
+          if (SOLID_SET.has(ch)) occ[j * tw + i] = 1;
+        }
+        G.Lights.buildSDF(occ, tw, th, def.w, def.h);
+      }
+    }
 
     // ---- backdrop ----
     const bgPlane = new THREE.Mesh(
@@ -1161,8 +1189,10 @@
       const nPools = Math.max(3, (def.w / 14) | 0);
       for (let i = 0; i < nPools; i++) {
         const gl = U.glowSprite(pal.light, U.lerp(16, 30, rng()), U.lerp(0.05, 0.1, rng()));
-        gl.position.set(U.lerp(4, def.w - 4, rng()), U.lerp(def.h * 0.45, def.h * 1.05, rng()), -4);
+        const lx = U.lerp(4, def.w - 4, rng()), ly = U.lerp(def.h * 0.45, def.h * 1.05, rng());
+        gl.position.set(lx, ly, -4);
         group.add(gl);
+        if (G.Lights) G.Lights.add({ x: lx, y: ly, color: pal.light, radius: U.lerp(20, 34, rng()), intensity: 0.4, flicker: 0.08 });
         const ph = rng() * 9, base = gl.material.opacity;
         room.anims.push(t => { gl.material.opacity = base * (0.8 + 0.2 * Math.sin(t * 0.3 + ph)); });
       }

@@ -170,6 +170,8 @@
     G.scene.add(p.root);
     G.player = p;
     if (G.Charms) { G.Charms.apply(p); p.hp = p.maxHp; }
+    // the wanderer's lantern — a soft light that follows the player (survives room reloads)
+    if (G.Lights) { G.Lights.remove(p.lantern); p.lantern = G.Lights.add({ persistent: true, color: 0xbfe6da, radius: 8, intensity: 0.85, flicker: 0.06, follow: () => ({ x: p.body.x, y: p.body.y + 0.3 }) }); }
 
     p.update = dt => update(p, dt);
     return p;
