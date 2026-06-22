@@ -199,6 +199,7 @@
     </select>
     <select id="terrainMat" class="tsel" title="Solid terrain material"></select>
     <button class="tbtn" id="btnSmooth" title="Paint the curvy (smooth) variant — mixes freely with hard blocks">～ Curvy</button>
+    <button class="tbtn" id="btnAutotile" title="Auto-tile: exposed terrain edges become smooth, buried interior stays hard — updates as you paint/erase. Shift+click = retile the whole level now.">⊞ Auto</button>
     <span class="tsep"></span>
     <button class="tbtn" id="btnSnap" title="Snap objects to half-tiles">Snap</button>
     <button class="tbtn" id="btnGizmos" title="Show object gizmos (G)">Gizmos</button>
@@ -269,7 +270,7 @@
   var scripts = [
     '../lib/three.min.js',
     '../data/levels.js', '../data/cutscenes.js',
-    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js',
+    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js',
     '../src/world.js', '../src/weather.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
     '../src/bosses.js', '../src/cutscene.js', 'editor.js'
   ];

@@ -14,6 +14,7 @@
   let brushSize = 1, brushShape = 'pencil', paintStart = null;   // tile brush: pencil|rect|line|fill
   let terrainMat = '#';          // solid-tile material char (see G.World.TERRAIN_MATS)
   let terrainSmooth = false;     // paint the curvy (smooth) variant of the material
+  let autoTile = false;          // rule-tile: auto smooth/hard by neighbours while painting
   let dirty = false;
   let sel = null;               // {kind:'prop'|'enemy'|'zone'|'spawn', i | key}
   let multi = [];               // additional multi-selection (array of sel descriptors)
@@ -558,14 +559,39 @@
     if (tool !== 'solid') return tool === 'oneway' ? '=' : tool === 'spike' ? '^' : ' ';
     return terrainSmooth ? ((G.World.SMOOTH_CHAR && G.World.SMOOTH_CHAR[terrainMat]) || terrainMat) : terrainMat;
   }
+  // ---- rule-tile autotiling: exposed terrain edges become the smooth (curvy) variant,
+  //      buried interior stays hard. Re-evaluated on every paint/erase incl. the border. ----
+  function tileCh(c, r) { const L = lvl(); if (!L || c < 0 || r < 0 || c >= L.w || r >= L.h) return ' '; return (L.tiles[r] || '')[c] || ' '; }
+  function isSolidTerrain(ch) { return G.World.SOLID_SET ? G.World.SOLID_SET.has(ch) : '#dkspGDKSP'.indexOf(ch) >= 0; }
+  function autotileAt(c, r) {
+    const ch = tileCh(c, r);
+    if (!isSolidTerrain(ch)) return;
+    const fam = (G.World.HARD_CHAR && G.World.HARD_CHAR[ch]) || ch;     // hard base char of this family
+    const edge = !isSolidTerrain(tileCh(c, r - 1)) || !isSolidTerrain(tileCh(c, r + 1)) ||
+                 !isSolidTerrain(tileCh(c - 1, r)) || !isSolidTerrain(tileCh(c + 1, r));
+    const want = edge ? ((G.World.SMOOTH_CHAR && G.World.SMOOTH_CHAR[fam]) || fam) : fam;
+    if (want !== ch) setTile(c, r, want);
+  }
+  function autotileRegion(c0, r0, c1, r1) {
+    if (!autoTile || (tool !== 'solid' && tool !== 'erase')) return;
+    for (let r = r0 - 1; r <= r1 + 1; r++) for (let c = c0 - 1; c <= c1 + 1; c++) autotileAt(c, r);
+  }
+  function retileWholeLevel() {                    // apply the autotile rule across the whole level
+    const L = lvl(); if (!L) return;
+    const pt = tool, pa = autoTile; tool = 'solid'; autoTile = true;
+    for (let r = 0; r < L.h; r++) for (let c = 0; c < L.w; c++) autotileAt(c, r);
+    tool = pt; autoTile = pa; queueRebuild();
+  }
   function brushStamp(c, r, ch) {                 // a brushSize×brushSize square
     const h0 = Math.floor((brushSize - 1) / 2);
     for (let dy = 0; dy < brushSize; dy++) for (let dx = 0; dx < brushSize; dx++) setTile(c - h0 + dx, r - h0 + dy, ch);
+    autotileRegion(c - h0, r - h0, c - h0 + brushSize - 1, r - h0 + brushSize - 1);
   }
   function paintAt(w) { const t = worldToTile(w.x, w.y); brushStamp(t.c, t.r, paintCh()); }
   function fillRectTiles(a, b, ch) {
     const c0 = Math.min(a.c, b.c), c1 = Math.max(a.c, b.c), r0 = Math.min(a.r, b.r), r1 = Math.max(a.r, b.r);
     for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) setTile(c, r, ch);
+    autotileRegion(c0, r0, c1, r1);
   }
   function lineTiles(a, b, ch) {                   // Bresenham, stamped with the brush
     let x0 = a.c, y0 = a.r; const x1 = b.c, y1 = b.r;
@@ -585,6 +611,7 @@
       setTile(c, r, ch);
       stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]);
     }
+    if (autoTile && (tool === 'solid' || tool === 'erase')) autotileRegion(0, 0, L.w - 1, L.h - 1);
   }
 
   function placeAsset(wx, wy) {
@@ -1788,6 +1815,7 @@
     $('btnGizmos').classList.toggle('on', gizmos);
     $('btnScatter').classList.toggle('on', scatter);
     $('btnSmooth').classList.toggle('on', terrainSmooth);
+    $('btnAutotile').classList.toggle('on', autoTile);
   }
   document.querySelectorAll('.tool').forEach(b2 => {
     b2.addEventListener('click', () => { tool = b2.dataset.tool; setPlacing(null); refreshToolbar(); });
@@ -1805,6 +1833,10 @@
     sel.addEventListener('change', e => { terrainMat = e.target.value; if (tool !== 'solid') { tool = 'solid'; refreshToolbar(); } });
   })();
   $('btnSmooth').addEventListener('click', () => { terrainSmooth = !terrainSmooth; if (tool !== 'solid') tool = 'solid'; refreshToolbar(); });
+  $('btnAutotile').addEventListener('click', (e) => {
+    if (e.shiftKey) { pushUndo(); retileWholeLevel(); return; }   // shift+click = retile the whole level now
+    autoTile = !autoTile; if (autoTile && tool !== 'solid' && tool !== 'erase') tool = 'solid'; refreshToolbar();
+  });
   $('btnUndo').addEventListener('click', doUndo);
   $('btnRedo').addEventListener('click', doRedo);
   $('tabScene').addEventListener('click', () => setTab('scene'));
@@ -2233,6 +2265,7 @@
       drawMapTab();
     }
     // tab === 'cutscene' renders nothing in 3D — the #csView DOM covers the viewport
+    if (G.Profiler) G.Profiler.tick();
   }
 
   // ---------------- boot ----------------
@@ -2268,7 +2301,8 @@
     copySelection, pasteClipboard, savePrefab, stampPrefab, alignSelected, captureSelection, selectInBox,
     setSel: v => { sel = v; }, setMulti: v => { multi = v; }, getMulti: () => multi, getSel: () => sel,
     getClip: () => clipboard, getPrefabs: () => prefabs, setLastWorld: (x, y) => { lastWorld = { x, y }; },
-    openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t)
+    openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
+    retileAll: () => retileWholeLevel()
   };
 
   boot();

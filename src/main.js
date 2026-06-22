@@ -893,6 +893,7 @@
     else G.renderer.render(G.scene, G.camera);
     G.UI.draw(rdt);
     I.update();
+    if (G.Profiler) G.Profiler.tick();
   }
 
   // ---------------- go ----------------
