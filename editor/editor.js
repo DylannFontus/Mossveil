@@ -856,8 +856,9 @@
         v => { if (v) L.water = L.water || { y: Math.round(L.h * 0.16), strength: 0.5, color: '#9ec8e6' }; else delete L.water; });
       if (L.water) {
         numField(body, 'Water level Y', () => L.water.y, v => { L.water.y = v; }, 0.5);
-        numField(body, 'Reflectivity', () => L.water.strength !== undefined ? L.water.strength : 0.5, v => { L.water.strength = U.clamp(v, 0, 1); }, 0.05);
-        colorField(body, 'Water tint', () => L.water.color || '#9ec8e6', v => { L.water.color = v || '#9ec8e6'; });
+        numField(body, 'Reflectivity', () => L.water.strength !== undefined ? L.water.strength : 0.5, v => { L.water.strength = U.clamp(v, 0, 1); if (G.Post) G.Post.setWater(L.water); }, 0.05);
+        numField(body, 'Caustics', () => L.water.caustics !== undefined ? L.water.caustics : 0.5, v => { L.water.caustics = U.clamp(v, 0, 2); if (G.Post) G.Post.setWater(L.water); }, 0.05);
+        colorField(body, 'Water tint', () => L.water.color || '#9ec8e6', v => { L.water.color = v || '#9ec8e6'; if (G.Post) G.Post.setWater(L.water); });
         el('div', { class: 'insNote' }, body, 'Everything below the water line mirrors the scene above (ripple + tint). Low reflectivity = wet floor; higher = a pool.');
       }
       el('div', { class: 'insNote' }, body, 'Weather draws over the world (rain, snow, wind, fog, embers…) and nudges the look — storms/blizzards add lightning. Shown live in the viewport.');

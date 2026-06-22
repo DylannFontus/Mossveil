@@ -134,15 +134,17 @@
     { key: 'volume', label: 'Sound volume', type: 'slider' },
     { key: 'shake', label: 'Screen shake', type: 'toggle' },
     { key: 'quality', label: 'Visual quality', type: 'cycle', opts: ['low', 'medium', 'high'] },
+    { key: 'tonemap', label: 'Tone mapping', type: 'cycle', opts: ['Off', 'ACES', 'AgX'] },
     { key: 'lighting', label: 'Dynamic lighting', type: 'toggle' },
     { key: 'bloom', label: 'Bloom glow', type: 'toggle' },
     { key: 'dof', label: 'Depth of field', type: 'toggle' },
     { key: 'reflections', label: 'Water reflections', type: 'toggle' },
     { key: 'weather', label: 'Weather effects', type: 'toggle' },
     { key: 'aberration', label: 'Chromatic aberration', type: 'toggle' },
+    { key: 'motionblur', label: 'Motion blur', type: 'toggle' },
     { key: 'vignette', label: 'Vignette', type: 'toggle' }
   ];
-  G.settings = { volume: 0.8, shake: true, quality: 'high', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, vignette: true };
+  G.settings = { volume: 0.8, shake: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
   const fmtSetting = d => {
     const v = G.settings[d.key];
     if (d.type === 'slider') return Math.round(v * 100) + '%';
@@ -156,6 +158,8 @@
     if (G.Audio && G.Audio.setVolume) G.Audio.setVolume(s.volume);
     if (G.Post) {
       G.Post.quality = s.quality;
+      G.Post.tonemap = s.tonemap === 'AgX' ? 2 : (s.tonemap === 'Off' ? 0 : 1);
+      G.Post.motion = s.motionblur === false ? 0 : 0.6;
       G.Post.lighting = s.lighting !== false;
       if (G.Post.setFX) G.Post.setFX({ bloom: s.bloom ? 1 : 0, dof: s.dof ? 1 : 0, reflections: s.reflections ? 1 : 0, aberr: s.aberration ? 1 : 0, vignette: s.vignette ? 1 : 0 });
     }
