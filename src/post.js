@@ -415,8 +415,13 @@
 
     // 1b) depth pass (DOF and/or the lighting depth-gate need it)
     if (needDepth) {
+      // hide objects flagged userData.noLight (e.g. interior wall backdrops) so they don't
+      // contribute depth — the lighting then treats them as backdrop and leaves them unlit
+      const hidden = [];
+      G.scene.traverse(o => { if (o.visible && o.userData && o.userData.noLight) { o.visible = false; hidden.push(o); } });
       renderer.setRenderTarget(depthRT);          // grabs the scene's depth into depthRT.depthTexture
       renderer.render(G.scene, G.camera);
+      for (let i = 0; i < hidden.length; i++) hidden[i].visible = true;
     }
     // depth-of-field: a blurred copy of the scene
     if (dofOn) {

@@ -1240,6 +1240,7 @@
     uv.needsUpdate = true;
     const mat = new THREE.MeshBasicMaterial({ map: wallTex(p.style || 'wood'), fog: z < -3, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.noLight = true;   // skipped in the lighting depth pass -> reads as a flat, unlit interior backdrop
     mesh.position.set(p.x, p.y, z);                              // (x,y) = centre
     const grp = new THREE.Group(); grp.add(mesh);
     return { type: 'wall', x: p.x, y: p.y, group: grp, update() { } };

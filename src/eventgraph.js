@@ -26,7 +26,7 @@
     chance:      { kind: 'cond', title: 'Chance %', ins: 1, outs: 2, outLabels: ['hit', 'miss'], params: [{ k: 'pct', def: 50 }] },
     gate:        { kind: 'cond', title: 'Gate (once)', ins: 1, outs: 1, params: [] },
 
-    setActive:   { kind: 'action', title: 'Set Active', ins: 1, outs: 1, params: [{ k: 'oid', def: 0 }, { k: 'level', def: '' }, { k: 'on', type: 'bool', def: true }] },
+    setActive:   { kind: 'action', title: 'Set Active', ins: 1, outs: 1, params: [{ k: 'oid', type: 'objref', def: 0 }, { k: 'level', type: 'levelref', def: '' }, { k: 'on', type: 'bool', def: true }] },
     setFlag:     { kind: 'action', title: 'Set Flag', ins: 1, outs: 1, params: [{ k: 'flag', def: '' }, { k: 'on', type: 'bool', def: true }] },
     signal:      { kind: 'action', title: 'Emit Signal', ins: 1, outs: 1, params: [{ k: 'name', def: 'sig' }] },
     wait:        { kind: 'action', title: 'Wait', ins: 1, outs: 1, params: [{ k: 'secs', def: 1 }] },

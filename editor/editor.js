@@ -675,6 +675,7 @@
       L.props.push(p);
       sel = { kind: 'prop', i: L.props.length - 1 };
     }
+    ensureAllOids(L);                       // give the newly-placed object an id
     if (!keepPlacing) setPlacing(null);
     queueRebuild();
     refreshHierarchy(); refreshInspector();
@@ -828,6 +829,28 @@
     ref.oid = mx + 1;
     return ref.oid;
   }
+  // auto-assign a stable numeric oid to EVERY placed object in a level (props/enemies/zones)
+  function ensureAllOids(L) {
+    if (!L) return;
+    let mx = 0;
+    const scan = o => { if (o && typeof o.oid === 'number' && o.oid > mx) mx = o.oid; };
+    (L.props || []).forEach(scan); (L.enemies || []).forEach(scan); (L.transitions || []).forEach(scan);
+    let changed = false;
+    const give = o => { if (o && typeof o.oid !== 'number') { o.oid = ++mx; changed = true; } };
+    (L.props || []).forEach(give); (L.enemies || []).forEach(give); (L.transitions || []).forEach(give);
+    return changed;
+  }
+  // every placed object across the whole game (for the id picker) — each gets an oid on demand
+  function allGameObjects() {
+    const out = [];
+    for (const lid in G.LEVELS) {
+      const L = G.LEVELS[lid]; ensureAllOids(L);
+      (L.props || []).forEach((r, i) => out.push({ level: lid, kind: 'prop', i, ref: r, oid: r.oid, name: (r.type || 'prop') + (r.kind ? ':' + r.kind : '') + (r.boss ? ':' + r.boss : '') }));
+      (L.enemies || []).forEach((r, i) => out.push({ level: lid, kind: 'enemy', i, ref: r, oid: r.oid, name: 'enemy · ' + (r.type || '') }));
+      (L.transitions || []).forEach((r, i) => out.push({ level: lid, kind: 'zone', i, ref: r, oid: r.oid, name: 'portal → ' + (r.to || '?') }));
+    }
+    return out;
+  }
   function objLabel(kind, ref, i) {
     const x = Math.round(ref.x != null ? ref.x : (ref.rect ? ref.rect.x : 0));
     const y = Math.round(ref.y != null ? ref.y : (ref.rect ? ref.rect.y : 0));
@@ -835,6 +858,53 @@
     if (kind === 'zone') return `portal → ${ref.to} #${i}`;
     return `${ref.type}${ref.kind ? ':' + ref.kind : ''} #${i} @(${x},${y})`;
   }
+  // ---- premium id picker: a searchable popup of every object / level in the game ----
+  function pickRef(onPick, opts) {
+    opts = opts || {};
+    let m = document.getElementById('idPicker');
+    if (!m) {
+      m = el('div', { id: 'idPicker' }, document.body);
+      m.innerHTML = '<div class="idpBox"><div class="idpHead"><input id="idpSearch" placeholder="Search…" autocomplete="off" spellcheck="false"><button id="idpClose" title="Close (Esc)">✕</button></div><div class="idpTitle" id="idpTitle"></div><div id="idpList"></div></div>';
+      m.addEventListener('pointerdown', e => { if (e.target === m) m.style.display = 'none'; });
+      document.getElementById('idpClose').addEventListener('click', () => m.style.display = 'none');
+      document.getElementById('idpSearch').addEventListener('keydown', e => { if (e.key === 'Escape') m.style.display = 'none'; });
+    }
+    const listEl = document.getElementById('idpList'), search = document.getElementById('idpSearch');
+    document.getElementById('idpTitle').textContent = opts.levels ? 'Pick a level' : 'Pick an object  ·  click to insert its id';
+    const items = opts.levels
+      ? Object.keys(G.LEVELS).map(id => ({ name: G.LEVELS[id].title || id, level: id, oid: id, isLevel: true, w: G.LEVELS[id].w, h: G.LEVELS[id].h, biome: G.LEVELS[id].biome }))
+      : allGameObjects();
+    function render() {
+      listEl.innerHTML = '';
+      const f = (search.value || '').toLowerCase().trim();
+      let n = 0;
+      for (const it of items) {
+        const hay = (it.name + ' ' + it.oid + ' ' + it.level).toLowerCase();
+        if (f && !hay.includes(f)) continue;
+        if (n++ > 500) break;
+        const row = el('div', { class: 'idpRow' + (it.level === currentId ? ' here' : '') }, listEl);
+        el('div', { class: 'idpName' }, row, it.name);
+        el('div', { class: 'idpSub' }, row, it.isLevel ? ('level "' + it.level + '"  ·  ' + it.w + '×' + it.h + '  ·  ' + it.biome) : ('id ' + it.oid + '   ·   in “' + (G.LEVELS[it.level] ? (G.LEVELS[it.level].title || it.level) : it.level) + '”'));
+        row.addEventListener('click', () => { m.style.display = 'none'; onPick(it); });
+      }
+      if (!n) el('div', { class: 'idpEmpty' }, listEl, 'No matches.');
+    }
+    search.value = ''; render();
+    search.oninput = render;
+    m.style.display = 'flex'; setTimeout(() => search.focus(), 20);
+  }
+  // a number field with a ⌖ scope button that opens the object picker
+  function idField(body, label, getV, setV, onPick) {
+    const r = el('div', { class: 'frow idrow' }, body);
+    el('label', {}, r, label);
+    const inp = el('input', { type: 'number', step: 1 }, r);
+    inp.value = (getV() != null && getV() !== '') ? getV() : '';
+    inp.addEventListener('change', () => setV(inp.value === '' ? undefined : parseInt(inp.value)));
+    const btn = el('button', { class: 'scopeBtn', title: 'Find an object by name / id' }, r, '⌖');
+    btn.addEventListener('click', () => pickRef(it => { inp.value = it.oid; setV(it.oid); if (onPick) onPick(it); }));
+    return inp;
+  }
+
   // every togglable object in a level → { key:'kind:index', label, ref }
   function targetableList(levelId) {
     const L = G.LEVELS[levelId]; const out = [];
@@ -919,8 +989,14 @@
     // When off, the object isn't built into the game (it doesn't show or work). A Set-active
     // trigger can flip it on/off at runtime. Shown dimmed with "(off)" in the viewport.
     if (it.kind === 'prop' || it.kind === 'enemy' || it.kind === 'zone') {
+      if (typeof p.oid !== 'number') { p.oid = ensureOid(currentId, p); markDirty(); }
+      const idr = el('div', { class: 'frow idrow', style: 'align-items:center' }, body);
+      el('label', {}, idr, 'Object id');
+      const idIn = el('input', { type: 'text', readonly: 'readonly', style: 'flex:1;opacity:.85' }, idr); idIn.value = p.oid + '  ·  ' + currentId;
+      const cpy = el('button', { class: 'scopeBtn', title: 'Copy id' }, idr, '⧉');
+      cpy.addEventListener('click', () => { try { navigator.clipboard.writeText(String(p.oid)); } catch (e) { } idIn.value = 'copied: ' + p.oid; setTimeout(() => { idIn.value = p.oid + '  ·  ' + currentId; }, 900); });
+      el('div', { class: 'insNote', style: 'opacity:.55' }, body, 'Reference this object from the Logic graph (Set Active) or triggers by this id.');
       checkField(body, 'Active', () => p.active !== false, v => { if (v) delete p.active; else p.active = false; });
-      if (p.oid != null) el('div', { class: 'insNote', style: 'opacity:.6' }, body, 'Object id: ' + p.oid + '  (referenced by a Set-active trigger)');
     }
     if (it.kind !== 'zone' || p.rect) {
       if (it.kind === 'zone') {
@@ -1226,6 +1302,7 @@
     sel = null;
     undoStack.length = redoStack.length = 0;
     const L = lvl();
+    if (ensureAllOids(L)) markDirty();     // backfill ids for everything in this level
     camX = L.w / 2; camY = L.h / 2;
     camZ = Math.max(24, Math.min(80, L.w * 0.62));
     rebuild(false);
@@ -2350,7 +2427,9 @@
     n.p = n.p || {};
     for (const pp of (t.params || [])) {
       const label = pp.label || pp.k, def = pp.def;
-      if (pp.type === 'bool') checkField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
+      if (pp.type === 'objref') idField(body, label, () => n.p[pp.k], v => { n.p[pp.k] = v; markDirty(); }, it => { n.p[pp.k] = it.oid; if ((t.params || []).some(q => q.k === 'level')) n.p.level = it.level; markDirty(); refreshInspector(); });
+      else if (pp.type === 'levelref') selectField(body, label, [{ v: '', t: '(this room)' }].concat(Object.keys(G.LEVELS).map(id => ({ v: id, t: G.LEVELS[id].title || id }))), () => n.p[pp.k] || '', v => { n.p[pp.k] = v || ''; markDirty(); });
+      else if (pp.type === 'bool') checkField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
       else if (pp.type === 'color') colorField(body, label, () => n.p[pp.k] || def, v => { n.p[pp.k] = v || def; markDirty(); });
       else if (typeof def === 'number') numField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); }, (pp.k === 'oid' || pp.k === 'pct') ? 1 : 0.1);
       else textField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
