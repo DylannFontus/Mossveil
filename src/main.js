@@ -886,6 +886,18 @@
       else if (Main.state !== 'title' && Main.state !== 'prologue' && G.player) G.player.update(dt);
       G.FX.update(dt);
     }
+    // adaptive music: swell tension when alive enemies crowd the player
+    if (G.Audio.setIntensity) {
+      if (Main.state === 'play' && G.player && !G.player.dead && G.room) {
+        let danger = 0;
+        for (const e of G.room.entities) {
+          if (!e.isEnemy || !e.alive || e.type === 'boss') continue;
+          const d = Math.abs(e.body.x - G.player.body.x) + Math.abs(e.body.y - G.player.body.y) * 0.6;
+          if (d < 18) danger += (e.aggro ? 1 : 0.6) * (1 - d / 18);
+        }
+        G.Audio.setIntensity(Math.min(1, danger * 0.5));
+      } else G.Audio.setIntensity(0);
+    }
     G.Audio.update(rdt);
     if (G.Lights) G.Lights.update(rdt, G.time);
     if (G.EventGraph) G.EventGraph.update(rdt);

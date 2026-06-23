@@ -4,9 +4,15 @@
   let muted = false, started = false, volume = 0.8;
   const masterLevel = () => (muted ? 0 : 0.55 * volume);
   let droneNodes = [], windGain = null;
-  let dripT = 2, pluckT = 3, bossPulseT = 0;
+  let dripT = 2, pluckT = 3, bossPulseT = 0, combatPulseT = 0;
   let areaRoot = 220, bossOn = false;
   let bossPulseGain = null;
+  // adaptive music: a combat-tension layer that swells with on-screen danger
+  let combatGain = null, combatPad = null, intensity = 0, targetIntensity = 0;
+  // reverb that changes per zone (big hall vs tight tunnel); applied once audio starts
+  let pendingReverb = null, reverbWet = 0.4;
+  // tone()/noiseHit() connect here; sfxAt() temporarily redirects it through a panner for positional one-shots
+  let sfxTarget = null;
 
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
@@ -29,9 +35,11 @@
     verb.connect(verbGain); verbGain.connect(master);
     sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9;
     sfxBus.connect(master); sfxBus.connect(verb);
+    sfxTarget = sfxBus;
     ambBus = ctx.createGain(); ambBus.gain.value = 0.05;   // gentler ambient bed (less invasive)
     ambBus.connect(master); ambBus.connect(verb);
     startAmbience();
+    if (pendingReverb) { G.Audio.setReverb(pendingReverb.wet, pendingReverb.dur, pendingReverb.decay); pendingReverb = null; }
   }
 
   function startAmbience() {
@@ -70,11 +78,35 @@
     // boss pulse bus (silent until boss)
     bossPulseGain = ctx.createGain(); bossPulseGain.gain.value = 0;
     bossPulseGain.connect(master);
+    // combat-tension layer: two saws a tritone apart, lowpassed — silent until danger swells it
+    combatGain = ctx.createGain(); combatGain.gain.value = 0;
+    combatGain.connect(master); combatGain.connect(verb);
+    const padA = ctx.createOscillator(); padA.type = 'sawtooth';
+    const padB = ctx.createOscillator(); padB.type = 'sawtooth';
+    const padLp = ctx.createBiquadFilter(); padLp.type = 'lowpass'; padLp.frequency.value = 440; padLp.Q.value = 0.7;
+    const padG = ctx.createGain(); padG.gain.value = 0.5;
+    padA.connect(padLp); padB.connect(padLp); padLp.connect(padG); padG.connect(combatGain);
+    padA.start(); padB.start();
+    combatPad = { a: padA, b: padB };
+    retune();
   }
 
   function retune() {
     if (!droneNodes.length) return;
     droneNodes.forEach(n => n.o.frequency.setTargetAtTime(areaRoot * n.mult, ctx.currentTime, 2.5));
+    if (combatPad) {                                   // root + a tense tritone above
+      combatPad.a.frequency.setTargetAtTime(areaRoot * 0.5, ctx.currentTime, 2);
+      combatPad.b.frequency.setTargetAtTime(areaRoot * 0.5 * Math.pow(2, 6 / 12), ctx.currentTime, 2);
+    }
+  }
+
+  // distance/pan of a world point relative to the camera (the camera tracks the player)
+  function spatial(x, y) {
+    const c = G.camera && G.camera.position;
+    const cx = c ? c.x : x, cy = c ? c.y : (y || 0);
+    const dx = x - cx, dy = (y || 0) - cy;
+    const dist = Math.abs(dx) + Math.abs(dy) * 0.5;
+    return { gain: Math.max(0.04, Math.min(1, 1 / (1 + Math.pow(dist / 9, 2)))), pan: Math.max(-1, Math.min(1, dx / 14)) };
   }
 
   // one-shot helpers --------------------------------------------------
@@ -90,7 +122,7 @@
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(o.vol || 0.2, t0 + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + (o.t || 0.2));
-    osc.connect(g); g.connect(o.dry ? master : sfxBus);
+    osc.connect(g); g.connect(o.dry ? master : (sfxTarget || sfxBus));
     osc.start(t0); osc.stop(t0 + (o.t || 0.2) + 0.05);
   }
 
@@ -112,7 +144,7 @@
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(o.vol || 0.25, t0 + (o.a || 0.004));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(f); f.connect(g); g.connect(sfxBus);
+    src.connect(f); f.connect(g); g.connect(sfxTarget || sfxBus);
     src.start(t0); src.stop(t0 + dur + 0.05);
   }
 
@@ -226,6 +258,46 @@
       droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
       if (windGain) windGain.gain.setTargetAtTime(on ? 0.16 : 0.10, ctx.currentTime, 1.5);
     },
+    // adaptive music: 0 = calm exploration, 1 = full combat tension (driven by on-screen danger)
+    setIntensity(v) { targetIntensity = Math.max(0, Math.min(1, v || 0)); },
+    setMusicState(state) {
+      if (state === 'boss') { this.setBoss(true); targetIntensity = Math.max(targetIntensity, 0.6); }
+      else if (state === 'combat' || state === 'tense') targetIntensity = 0.8;
+      else { targetIntensity = 0; }   // calm / explore
+    },
+    // per-zone reverb: wet level + tail length (swaps the convolver impulse live)
+    setReverb(wet, dur, decay) {
+      if (typeof wet === 'number') reverbWet = wet;
+      if (!started) { pendingReverb = { wet, dur, decay }; return; }
+      verbGain.gain.setTargetAtTime(reverbWet, ctx.currentTime, 0.7);
+      if (dur) verb.buffer = impulse(dur, decay || 2.6);
+    },
+    // positional one-shot: any named SFX, attenuated + panned by distance to the camera
+    sfxAt(name, x, y) {
+      if (!started || !SFX[name]) return;
+      const sp = spatial(x, y);
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      const g = ctx.createGain(); g.gain.value = sp.gain;
+      let head = g;
+      if (pan) { pan.pan.value = sp.pan; pan.connect(g); head = pan; }
+      g.connect(sfxBus);
+      const prev = sfxTarget; sfxTarget = head;
+      try { SFX[name](); } finally { sfxTarget = prev; }
+      setTimeout(() => { try { g.disconnect(); if (pan) pan.disconnect(); } catch (e) { } }, 2500);
+    },
+    // surface-aware footstep: soft filtered tick whose timbre depends on the ground material
+    footstep(surface, x, y) {
+      if (!started) return;
+      const s = surface || 'stone';
+      const mk = (o) => { const prev = sfxTarget; const sp = (x !== undefined) ? spatial(x, y) : { gain: 1, pan: 0 };
+        const g = ctx.createGain(); g.gain.value = sp.gain * 0.7; g.connect(sfxBus); sfxTarget = g;
+        try { noiseHit(o); } finally { sfxTarget = prev; } setTimeout(() => { try { g.disconnect(); } catch (e) { } }, 600); };
+      if (s === 'wood') mk({ f0: 320, f1: 160, t: 0.07, vol: 0.12, ftype: 'lowpass', q: 1.1 });
+      else if (s === 'water') mk({ f0: 1400, f1: 600, t: 0.12, vol: 0.09, ftype: 'bandpass', q: 0.8 });
+      else if (s === 'grass' || s === 'moss') mk({ f0: 2600, f1: 1200, t: 0.06, vol: 0.06, ftype: 'highpass', q: 0.7 });
+      else if (s === 'metal') { mk({ f0: 2200, f1: 1400, t: 0.05, vol: 0.08, q: 2 }); }
+      else mk({ f0: 600, f1: 300, t: 0.06, vol: 0.10, ftype: 'lowpass', q: 1 });   // stone (default)
+    },
     toggleMute() {
       muted = !muted;
       if (master) master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.1);
@@ -275,16 +347,28 @@
     },
     update(dt) {
       if (!started) return;
+      // smooth the combat-tension layer toward its target and drive the bus gain
+      intensity += (targetIntensity - intensity) * Math.min(1, dt * 2.2);
+      if (combatGain) combatGain.gain.value = intensity * 0.22;
       dripT -= dt;
       if (dripT <= 0) { dripT = 2.5 + Math.random() * 7; SFX.drop(); }
       pluckT -= dt;
       if (pluckT <= 0) {
-        pluckT = bossOn ? 999 : 5 + Math.random() * 9;
+        pluckT = bossOn ? 999 : (5 + Math.random() * 9) * (1 - intensity * 0.6);   // denser melody under tension
         const step = PENTA[(Math.random() * PENTA.length) | 0];
-        bell(areaRoot * 2 * Math.pow(2, step / 12), 0.05, 2.5 + Math.random() * 1.5);
-        if (Math.random() < 0.4) {
+        bell(areaRoot * 2 * Math.pow(2, step / 12), 0.05 + intensity * 0.03, 2.5 + Math.random() * 1.5);
+        if (Math.random() < 0.4 + intensity * 0.3) {
           const s2 = PENTA[(Math.random() * PENTA.length) | 0];
           setTimeout(() => { if (started) bell(areaRoot * 2 * Math.pow(2, s2 / 12), 0.04, 2.5); }, 700 + Math.random() * 600);
+        }
+      }
+      // combat pulse: a low heartbeat that quickens with intensity
+      if (intensity > 0.12 && !bossOn) {
+        combatPulseT -= dt;
+        if (combatPulseT <= 0) {
+          combatPulseT = 0.85 - intensity * 0.35;
+          const prev = sfxTarget; sfxTarget = combatGain;
+          try { tone({ type: 'sine', f0: 70, f1: 46, t: 0.18, vol: 0.10 + intensity * 0.16 }); } finally { sfxTarget = prev; }
         }
       }
       if (bossOn) {

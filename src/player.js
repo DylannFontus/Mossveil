@@ -114,7 +114,7 @@
       focusT: 0, focusing: false, castPressT: -1,
       wingUsed: false, wingAnimT: 0,
       wallSliding: false, lastSafe: { x, y }, safeAccum: 0, spikeRespawnT: 0,
-      bobPh: 0, blinkT: U.rand(2, 5), blinkAnim: 0, landAnim: 0, stretch: 1,
+      bobPh: 0, blinkT: U.rand(2, 5), blinkAnim: 0, landAnim: 0, stretch: 1, stepT: 0,
       gainSoul(n) {
         if (this.dead) return;
         this.soul = Math.min(SOUL_MAX, this.soul + n);
@@ -491,7 +491,11 @@
       if (!wasGround) {
         const impact = Math.min(1, -b.vyLand / 22 || 0.4);
         G.FX.burst('land', b.x, b.y - 0.62);
-        if (p.dashT <= 0) G.Audio.sfx('drop');
+        if (p.dashT <= 0) {
+          const surf = G.World.surfaceAt ? G.World.surfaceAt(b.x, b.y - b.h / 2 - 0.1) : 'stone';
+          G.Audio.footstep(surf, b.x, b.y - b.h / 2);
+        }
+        p.stepT = 0.16;
         p.landAnim = 0.18;
         p.stretch = 0.72 - impact * 0.12;
         if (impact > 0.45) {        // hard landing — just a bit of extra dust (no screen shake/jolt)
@@ -501,6 +505,15 @@
       p.safeAccum += dt;
       if (p.safeAccum > 0.25 && !G.Physics.spikeTouch({ x: b.x, y: b.y - 1, w: 2, h: 2 })) {
         p.lastSafe = { x: b.x, y: b.y + 0.05 };
+      }
+      // surface-aware footstep cadence while running
+      if (Math.abs(b.vx) > 1.6 && p.dashT <= 0) {
+        p.stepT -= dt;
+        if (p.stepT <= 0) {
+          p.stepT = U.clamp(2.6 / (Math.abs(b.vx) + 0.1), 0.2, 0.5);
+          const surf = G.World.surfaceAt ? G.World.surfaceAt(b.x, b.y - b.h / 2 - 0.1) : 'stone';
+          G.Audio.footstep(surf, b.x, b.y - b.h / 2);
+        }
       }
     } else {
       p.safeAccum = 0;

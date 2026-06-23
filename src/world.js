@@ -223,6 +223,15 @@
   };
   W.BIOMES = Object.keys(PAL);
 
+  // per-biome reverb character [wet, tail-seconds, decay] — big stone halls ring, forges are dry
+  const REVERB = W.REVERB = {
+    _default: [0.40, 2.4, 2.6],
+    verdant: [0.34, 2.2, 2.4], gloom: [0.46, 2.8, 2.6], warm: [0.40, 2.4, 2.6],
+    city: [0.50, 3.2, 2.8], tombs: [0.52, 3.4, 3.0], archive: [0.48, 3.0, 2.6],
+    forge: [0.30, 1.6, 2.0], mine: [0.42, 2.2, 2.4], village: [0.28, 1.8, 2.2],
+    garden: [0.24, 1.5, 2.2]
+  };
+
   // ============================ SILHOUETTE GENERATORS ============================
   function shapeMesh(shape, mat, x, y, seg) {
     const m = new THREE.Mesh(new THREE.ShapeGeometry(shape, seg || 8), mat);
@@ -1322,6 +1331,20 @@
     'P': { id: 'pale', label: 'Pale stone', foliage: false, smooth: true, col: () => 0x30323a }
   };
   const SOLID_SET = new Set(Object.keys(TERRAIN_MATS));
+  // what's underfoot at (x,y) — for surface-aware footsteps (wood / grass / stone / metal)
+  W.surfaceAt = function (x, y) {
+    let best = null, bestTop = -Infinity;
+    for (const s of G.Physics.solids) {
+      if (Math.abs(x - s.x) * 2 > s.w) continue;
+      const top = s.y + s.h / 2;
+      if (top <= y + 0.35 && top > bestTop) { bestTop = top; best = s; }
+    }
+    const id = best && TERRAIN_MATS[best.mat] ? TERRAIN_MATS[best.mat].id : 'stone';
+    if (id === 'wood') return 'wood';
+    if (id === 'grass') return 'grass';
+    if (G.room && G.room.biome === 'forge') return 'metal';
+    return 'stone';
+  };
   W.SMOOTH_CHAR = { '#': 'G', 'd': 'D', 'k': 'K', 's': 'S', 'p': 'P' };   // hard → smooth
   W.HARD_CHAR = { 'G': '#', 'D': 'd', 'K': 'k', 'S': 's', 'P': 'p' };     // smooth → hard
 
@@ -1793,6 +1816,7 @@
 
     G.scene.add(group);
     G.Audio.setArea(pal.root);
+    if (G.Audio.setReverb) { const rv = REVERB[biome] || REVERB._default; G.Audio.setReverb(rv[0], rv[1], rv[2]); }
 
     // visited tracking for the world map
     if (G.save) {
