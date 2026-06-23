@@ -886,6 +886,17 @@
         if (I.down('down')) mv.pan.y += panSpd;
         if (I.down('zoomIn')) mv.zoom = Math.min(8, mv.zoom * (1 + rdt * 2));
         if (I.down('zoomOut')) mv.zoom = Math.max(0.8, mv.zoom * (1 - rdt * 2));
+        if (I.pressed('jump')) {            // drop a pin at the view centre
+          G.save.pins = G.save.pins || [];
+          G.save.pins.push({ x: mv.pan.x, y: mv.pan.y });
+          if (G.save.pins.length > 12) G.save.pins.shift();
+          Main.persist(); G.Audio.sfx('uiBell');
+        }
+        if (I.pressed('attack') && (G.save.pins || []).length) {   // clear the nearest pin
+          let bi = -1, bd = 1e9;
+          G.save.pins.forEach((p, i) => { const d = Math.hypot(p.x - mv.pan.x, p.y - mv.pan.y); if (d < bd) { bd = d; bi = i; } });
+          if (bi >= 0) { G.save.pins.splice(bi, 1); Main.persist(); G.Audio.sfx('clink'); }
+        }
         break;
       }
       case 'play':

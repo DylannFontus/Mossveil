@@ -172,6 +172,32 @@
     cx.restore();
   }
 
+  // a subtle edge arrow pointing to the nearest bench in this room when it's off-screen
+  function drawCompass() {
+    if (!G.player || !G.room || !G.room.entities) return;
+    let best = null, bd = 1e9;
+    for (const e of G.room.entities) {
+      if (e.type !== 'bench') continue;
+      const ex = e.x !== undefined ? e.x : (e.body ? e.body.x : 0), ey = e.y !== undefined ? e.y : (e.body ? e.body.y : 0);
+      const d = Math.hypot(ex - G.player.body.x, ey - G.player.body.y);
+      if (d < bd) { bd = d; best = { x: ex, y: ey }; }
+    }
+    if (!best || bd < 7) return;
+    const s = U.toScreen(best.x, best.y), m = 48;
+    if (s.x > m && s.x < w - m && s.y > m && s.y < h - m) return;   // already on-screen
+    const ex = U.clamp(s.x, m, w - m), ey = U.clamp(s.y, m, h - m);
+    const ang = Math.atan2(s.y - h / 2, s.x - w / 2);
+    cx.save();
+    cx.globalAlpha = 0.8;
+    cx.translate(ex, ey); cx.rotate(ang);
+    cx.fillStyle = 'rgba(255,220,150,0.9)'; cx.strokeStyle = 'rgba(20,16,8,0.6)'; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.moveTo(13, 0); cx.lineTo(-6, -7); cx.lineTo(-6, 7); cx.closePath(); cx.fill(); cx.stroke();
+    cx.restore();
+    cx.save(); cx.globalAlpha = 0.65; cx.fillStyle = 'rgba(255,232,184,0.9)';
+    cx.font = `11px ${serif}`; cx.textAlign = 'center';
+    cx.fillText('bench', ex, ey + (ey > h / 2 ? -15 : 21)); cx.restore();
+  }
+
   function drawPrompts() {
     cx.textAlign = 'center';
     for (const pr of prompts) {
@@ -1004,15 +1030,29 @@
       current: G.room ? G.room.id : null,
       playerPos: G.player ? { x: G.player.body.x, y: G.player.body.y } : null
     });
+    // player-placed pins (map space = same frame as view.pan)
+    const pins = (G.save && G.save.pins) || [];
+    for (const pin of pins) {
+      const sx = (pin.x - mv.pan.x) * mv.zoom + w / 2, sy = (pin.y - mv.pan.y) * mv.zoom + h / 2;
+      cx.fillStyle = '#ffcf6a'; cx.strokeStyle = 'rgba(20,16,8,0.8)'; cx.lineWidth = 1.5;
+      cx.beginPath(); cx.moveTo(sx, sy); cx.lineTo(sx - 5, sy - 11); cx.lineTo(sx + 5, sy - 11); cx.closePath();
+      cx.fill(); cx.stroke();
+      cx.beginPath(); cx.arc(sx, sy - 11, 4.5, 0, U.TAU); cx.fillStyle = '#ffe9b0'; cx.fill(); cx.stroke();
+    }
     cx.globalAlpha = 1;
     cx.drawImage(vignette, 0, 0, w, h);
     cx.textAlign = 'center';
     cx.font = `26px ${serif}`;
     cx.fillStyle = 'rgba(232,240,236,0.9)';
     cx.fillText("WANDERER'S MAP", w / 2, 52);
+    // exploration completion
+    const total = Object.keys(G.LEVELS || {}).length || 1;
+    const seen = Object.keys((G.save && G.save.visited) || {}).length;
+    cx.font = `15px ${serif}`; cx.fillStyle = 'rgba(170,210,190,0.8)';
+    cx.fillText('Explored  ' + Math.round(seen / total * 100) + '%   ·   ' + seen + ' / ' + total + ' chambers', w / 2, 76);
     cx.font = `14px ${serif}`;
     cx.fillStyle = 'rgba(180,195,190,0.7)';
-    cx.fillText('arrows — pan      + / −  — zoom      M — close', w / 2, h - 26);
+    cx.fillText('arrows — pan      + / −  — zoom      Z — drop pin      X — clear pin      M — close', w / 2, h - 26);
     cx.restore();
   }
 
@@ -1065,6 +1105,7 @@
 
     if (st === 'play' || st === 'dead' || st === 'pause' || st === 'transition') {
       drawHud(dt);
+      if (st === 'play') drawCompass();
       drawPrompts();
       drawAreaTitle(dt);
       drawBossBar(dt);
