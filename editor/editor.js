@@ -273,6 +273,10 @@
     if (p.type === 'windzone') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 9 };
     if (p.type === 'spiketrap') return { x: p.x, y: p.y + 0.35, w: p.w || 2.4, h: 1 };
     if (p.type === 'platform' || p.type === 'crusher' || p.type === 'conveyor' || p.type === 'fallfloor') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 1 };
+    if (p.type === 'breakable') return { x: p.x, y: p.y, w: p.w || 2, h: p.h || 4 };
+    if (p.type === 'door') return { x: p.x, y: p.y + (p.h || 5) / 2, w: p.w || 1.2, h: p.h || 5 };
+    if (p.type === 'lever') return { x: p.x, y: p.y + 0.7, w: 1, h: 1.6 };
+    if (p.type === 'plate') return { x: p.x, y: p.y + 0.12, w: p.w || 1.8, h: 0.5 };
     const s = PROP_SIZE[p.type] || [1.5, 1.5];
     const k = p.type === 'decor' ? (p.scale || 1) : 1;
     return { x: p.x, y: p.y + (p.type === 'textTrigger' ? 0 : s[1] * k / 2 - 0.2), w: s[0] * k, h: s[1] * k };
@@ -767,6 +771,9 @@
       if (it.ref.type === 'platform' || it.ref.type === 'conveyor') col = '#8fb0ff';
       if (it.ref.type === 'crusher' || it.ref.type === 'spiketrap') col = '#ff8f8f';
       if (it.ref.type === 'fallfloor') col = '#d8b070';
+      if (it.ref.type === 'breakable') col = '#b0a090';
+      if (it.ref.type === 'lever' || it.ref.type === 'plate') col = '#ffd060';
+      if (it.ref.type === 'door') col = '#a0b0c0';
       // moving-platform travel path
       if (it.ref.type === 'platform' && (it.ref.dx || it.ref.dy)) {
         const a = U.toScreen(it.ref.x, it.ref.y), b = U.toScreen(it.ref.x + it.ref.dx, it.ref.y + it.ref.dy);
@@ -1241,6 +1248,39 @@
           el('div', { class: 'insNote' }, body, 'Extends and retracts on a timer — only dangerous while out. Offset Phase to alternate several.');
           break;
         }
+        case 'breakable': {
+          numField(body, 'Width', () => p.w || 2, v => { p.w = Math.max(0.5, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 4, v => { p.h = Math.max(0.5, v); }, 0.5);
+          numField(body, 'Hits to break', () => p.hp || 3, v => { p.hp = Math.max(1, Math.round(v)); }, 1);
+          colorField(body, 'Colour', () => p.color || '#3a4047', v => { p.color = v || undefined; });
+          flagField(body, 'Stays-broken flag', () => p.flag || '', v => { p.flag = v || undefined; });
+          textField(body, 'Signal on break', () => p.signal || '', v => { p.signal = v || undefined; });
+          el('div', { class: 'insNote' }, body, 'Break it with the nail to reveal a passage. A flag keeps it broken across visits; a signal can drive the Logic graph.');
+          break;
+        }
+        case 'lever': {
+          textField(body, 'Switch / signal name', () => p.signal || '', v => { p.signal = v || undefined; });
+          flagField(body, 'Saved flag (optional)', () => p.flag || '', v => { p.flag = v || undefined; });
+          el('div', { class: 'insNote' }, body, 'Interact to toggle. Doors with the same switch name open/close; the name also fires as a Logic signal.');
+          break;
+        }
+        case 'plate': {
+          numField(body, 'Width', () => p.w || 1.8, v => { p.w = Math.max(0.5, v); }, 0.5);
+          textField(body, 'Switch / signal name', () => p.signal || '', v => { p.signal = v || undefined; });
+          checkField(body, 'Latch (stay pressed)', () => p.latch, v => { p.latch = v; });
+          flagField(body, 'Saved flag (optional)', () => p.flag || '', v => { p.flag = v || undefined; });
+          el('div', { class: 'insNote' }, body, 'On while stood on (or latches). Drives doors/Logic with the same switch name.');
+          break;
+        }
+        case 'door': {
+          numField(body, 'Width', () => p.w || 1.2, v => { p.w = Math.max(0.5, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 5, v => { p.h = Math.max(1, v); }, 0.5);
+          textField(body, 'Opens on switch', () => p.signal || '', v => { p.signal = v || undefined; });
+          flagField(body, 'Or saved flag', () => p.flag || '', v => { p.flag = v || undefined; });
+          checkField(body, 'Invert (open by default)', () => p.invert, v => { p.invert = v; });
+          el('div', { class: 'insNote' }, body, 'Opens when a lever/plate with this switch name is on (or the flag is set). Solid while closed.');
+          break;
+        }
         case 'decor': {
           const kinds = [...G.World.DECOR_KINDS.standing, ...G.World.DECOR_KINDS.hanging];
           selectField(body, 'Kind', kinds.map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
@@ -1533,7 +1573,11 @@
         { cat: 'prop', id: 'conveyor', label: 'Conveyor belt', ico: '➡️', defaults: { w: 5, h: 0.7, speed: 3 } },
         { cat: 'prop', id: 'windzone', label: 'Wind current', ico: '🌬️', defaults: { w: 6, h: 9, fx: 0, fy: 14 } },
         { cat: 'prop', id: 'fallfloor', label: 'Collapsing floor', ico: '🧱', defaults: { w: 3, h: 0.7, delay: 0.55, respawn: 3 } },
-        { cat: 'prop', id: 'spiketrap', label: 'Timed spikes', ico: '🔺', defaults: { w: 2.4, period: 2, onTime: 0.9, phase: 0 } }
+        { cat: 'prop', id: 'spiketrap', label: 'Timed spikes', ico: '🔺', defaults: { w: 2.4, period: 2, onTime: 0.9, phase: 0 } },
+        { cat: 'prop', id: 'breakable', label: 'Breakable wall', ico: '🧱', defaults: { w: 2, h: 4, hp: 3 } },
+        { cat: 'prop', id: 'lever', label: 'Lever', ico: '🎚️', defaults: { signal: '' } },
+        { cat: 'prop', id: 'plate', label: 'Pressure plate', ico: '⏺️', defaults: { w: 1.8, signal: '', latch: false } },
+        { cat: 'prop', id: 'door', label: 'Door (switch)', ico: '🚪', defaults: { w: 1.2, h: 5, signal: '', invert: false } }
       ];
       case 'lights': return [
         { cat: 'prop', id: 'light', label: 'Glow light', ico: '✨', defaults: { color: '#ffeecc', scale: 8, opacity: 0.3, flicker: false } },

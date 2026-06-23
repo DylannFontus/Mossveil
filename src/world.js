@@ -1439,6 +1439,102 @@
     };
   };
 
+  const setFlag = (name, v) => { if (!name) return; G.save.flags = G.save.flags || {}; G.save.flags[name] = v; if (G.Main && G.Main.persist) G.Main.persist(); };
+  const fireSignal = name => { if (name && G.EventGraph && G.EventGraph.signal) G.EventGraph.signal(name); };
+
+  // a wall you can break with the nail to reveal a secret passage (latches a flag once broken)
+  mkProp.breakable = (p) => {
+    const w = p.w || 2, h = p.h || 4, hpMax = p.hp || 3, col = p.color ? parseInt(p.color.replace('#', ''), 16) : 0x3a4047;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    grp.add(U.flat(U.poly([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]]), col, {}));
+    const cracks = U.flat(U.poly([[-0.12, -h / 2], [0.12, -h / 2], [0.04, 0.1], [0.22, 0.3], [-0.04, h / 2], [-0.24, 0.1], [-0.1, 0]]), 0x0c1016, { z: 0.02, opacity: 0 });
+    grp.add(cracks);
+    const collider = { x: p.x, y: p.y, w, h };
+    const already = !!(p.flag && G.save && G.save.flags && G.save.flags[p.flag]);
+    if (!already) addSolid(collider);
+    let hp = hpMax;
+    return {
+      type: 'breakable', x: p.x, y: p.y, group: grp, breakable: true, alive: !already, dead: already, body: collider,
+      hurt(dmg) {
+        if (!this.alive) return;
+        hp -= (dmg || 1); cracks.material.opacity = Math.min(1, (1 - hp / hpMax) * 1.3);
+        G.FX.burst('spark', p.x, p.y, { n: 5, color: 0xcfd8dc }); G.Audio.sfx('clink');
+        if (hp <= 0) {
+          this.alive = false; this.dead = true; rmSolid(collider);
+          G.FX.burst('gib', p.x, p.y, { n: 16, color: col }); G.FX.burst('dust', p.x, p.y, { n: 10 });
+          G.FX.shake(0.22, 0.28); G.Audio.sfx('stomp');
+          setFlag(p.flag, true); fireSignal(p.signal);
+        }
+      },
+      update() { }
+    };
+  };
+
+  // a lever you flip (interact) to toggle a named room switch (+ fires a signal / saves a flag)
+  mkProp.lever = (p) => {
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    grp.add(U.flat(U.poly([[-0.3, 0], [0.3, 0], [0.25, 0.5], [-0.25, 0.5]]), 0x2a2f33, {}));
+    const armG = new THREE.Group(); armG.position.y = 0.45;
+    armG.add(U.flat(U.poly([[-0.07, 0], [0.07, 0], [0.05, 1], [-0.05, 1]]), 0x8a6a3a, { z: 0.02 }));
+    armG.add(U.flat(U.ellipse(0.16, 0.16), 0xd86a4a, { z: 0.03, y: 1 }));
+    grp.add(armG);
+    const name = p.signal || ('lever' + (p.oid || ''));
+    let on = !!(p.flag && G.save.flags && G.save.flags[p.flag]), cd = 0;
+    return {
+      type: 'lever', x: p.x, y: p.y, group: grp, switchName: name,
+      update(dt) {
+        cd -= dt; const pl = G.player;
+        if (pl && !pl.dead && Math.abs(pl.body.x - p.x) < 1.7 && Math.abs(pl.body.y - p.y) < 2.2) {
+          G.UI.prompt(p.x, p.y + 1.7, 'pull — E or ↑');
+          if (cd <= 0 && (G.Input.pressed('interact') || G.Input.pressed('up'))) {
+            on = !on; cd = 0.4;
+            G.room.switches = G.room.switches || {}; G.room.switches[name] = on;
+            G.Audio.sfx('clink'); G.FX.burst('spark', p.x, p.y + 1, { n: 6, color: 0xffd060 });
+            fireSignal(name); setFlag(p.flag, on);
+          }
+        }
+        armG.rotation.z = U.damp(armG.rotation.z, on ? -0.7 : 0.7, 10, dt);
+      }
+    };
+  };
+
+  // a pressure plate: the switch is on while the player stands on it (or latches once pressed)
+  mkProp.plate = (p) => {
+    const w = p.w || 1.8;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    const pad = U.flat(U.poly([[-w / 2, 0], [w / 2, 0], [w / 2, 0.24], [-w / 2, 0.24]]), 0x6a6a72, {}); grp.add(pad);
+    const name = p.signal || ('plate' + (p.oid || ''));
+    let pressed = false;
+    return {
+      type: 'plate', x: p.x, y: p.y, group: grp, switchName: name,
+      update(dt) {
+        const pl = G.player, on = pl && !pl.dead && Math.abs(pl.body.x - p.x) * 2 < w + pl.body.w && Math.abs((pl.body.y - pl.body.h / 2) - p.y) < 0.55;
+        if (on && !pressed) { pressed = true; G.room.switches = G.room.switches || {}; G.room.switches[name] = true; G.Audio.sfx('clink'); fireSignal(name); setFlag(p.flag, true); }
+        else if (!on && pressed && !p.latch) { pressed = false; if (G.room.switches) G.room.switches[name] = false; }
+        pad.scale.y = U.damp(pad.scale.y, pressed ? 0.4 : 1, 12, dt);
+      }
+    };
+  };
+
+  // a door that opens when its switch/flag is on (solid while closed)
+  mkProp.door = (p) => {
+    const w = p.w || 1.2, h = p.h || 5;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.1);
+    const panel = U.flat(U.poly([[-w / 2, 0], [w / 2, 0], [w / 2, h], [-w / 2, h]]), 0x161b20, {});
+    grp.add(panel);
+    const collider = { x: p.x, y: p.y + h / 2, w, h }; addSolid(collider);
+    const name = p.signal; let open = false;
+    const isOn = () => { let v = (name && G.room.switches) ? !!G.room.switches[name] : false; if (p.flag && G.save.flags && G.save.flags[p.flag]) v = true; return p.invert ? !v : v; };
+    return {
+      type: 'door', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        const want = isOn();
+        if (want !== open) { open = want; if (open) rmSolid(collider); else addSolid(collider); G.FX.burst('dust', p.x, p.y + 0.5, { n: 7 }); G.Audio.sfx('stomp'); }
+        panel.scale.y = U.damp(panel.scale.y, open ? 0.05 : 1, 8, dt);
+      }
+    };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);

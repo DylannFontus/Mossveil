@@ -277,6 +277,12 @@
         G.FX.burst('spark', (hb.x + e.body.x) / 2, e.body.y + 0.2, { n: p.isArt ? 14 : 9, dir: kdir });
         G.FX.burst('soul', e.body.x, e.body.y + 0.3, { n: 5 });
       }
+      if (e.breakable && e.alive && !p.atkHit.has(e) && U.overlap(hb, e.body)) {
+        p.atkHit.add(e);
+        e.hurt(p.isArt ? 3 : 1, p.atkDir === 'side' ? p.facing : (e.body.x >= p.body.x ? 1 : -1));
+        landed = true;
+        if (p.atkDir === 'down') pogo = true;
+      }
       if (e.type === 'projectile' && !e.friendly && !e.dead && !p.atkHit.has(e) && U.overlap(hb, e.body)) {
         p.atkHit.add(e);
         e.pop();
