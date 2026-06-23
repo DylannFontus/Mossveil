@@ -262,7 +262,11 @@
         p.atkHit.add(e);
         const kdir = p.atkDir === 'side' ? p.facing : (e.body.x >= p.body.x ? 1 : -1);
         const dmg = p.isArt ? (p.nailDmg || 1) * 2 + 1 : (p.nailDmg || 1);
+        const wasUntouched = !e._damaged;               // had it taken any damage before this hit?
         e.hurt(dmg, kdir, p.atkDir);
+        if (p.isArt && wasUntouched && !e.alive && e.type !== 'boss') {
+          G.FX.slowMo(0.4, 1.5);                        // the charge attack one-shot a full-health foe
+        }
         if (p.isArt && e.alive) {                       // heavy: extra shove + guaranteed stagger
           e.body.vx += kdir * 7;
           if (G.Enemies.stagger) G.Enemies.stagger(e, 0.6);

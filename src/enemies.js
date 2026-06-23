@@ -31,6 +31,7 @@
 
   function baseHurt(ent, dmg, dir, opts = {}) {
     if (!ent.alive) return;
+    ent._damaged = true;                 // remember it's been hit (for one-shot detection)
     ent.hp -= dmg;
     U.flashGroup(ent.group, 0.07);
     if (!opts.noKb) {
