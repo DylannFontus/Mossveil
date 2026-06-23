@@ -127,12 +127,14 @@
   };
   Main.charmIndex = 0;
   Main.journalIndex = 0;
+  Main.ctrlIndex = 0; Main.ctrlListening = false;
   Main.settingsIndex = 0;
 
   // ---------------- settings ----------------
   const SETTINGS_KEY = 'mossveil-settings';
   // schema drives the menu, the adjust logic, and the saved keys
   const SETTINGS_DEFS = [
+    { key: 'controls', label: 'Controls / key bindings', type: 'action' },
     { key: 'volume', label: 'Sound volume', type: 'slider' },
     { key: 'shake', label: 'Screen shake', type: 'toggle' },
     { key: 'quality', label: 'Visual quality', type: 'cycle', opts: ['low', 'medium', 'high'] },
@@ -148,6 +150,7 @@
   ];
   G.settings = { volume: 0.8, shake: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
   const fmtSetting = d => {
+    if (d.type === 'action') return '▶';
     const v = G.settings[d.key];
     if (d.type === 'slider') return Math.round(v * 100) + '%';
     if (d.type === 'cycle') return ('' + v).charAt(0).toUpperCase() + ('' + v).slice(1);
@@ -173,8 +176,10 @@
     applySettings();
   }
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) { } }
+  function openControls() { Main.ctrlIndex = 0; Main.ctrlListening = false; G.Input.cancelCapture(); menuGo('controls'); }
   function settingsAdjust(dir) {
     const d = SETTINGS_DEFS[Main.settingsIndex]; if (!d) return;
+    if (d.type === 'action') { if (dir > 0 && d.key === 'controls') openControls(); return; }
     const s = G.settings;
     if (d.type === 'slider') s[d.key] = U.clamp(+(s[d.key] + dir * 0.1).toFixed(2), 0, 1);
     else if (d.type === 'cycle') s[d.key] = d.opts[(d.opts.indexOf(s[d.key]) + dir + d.opts.length) % d.opts.length];
@@ -376,6 +381,15 @@
       } else if (Main.state === 'settings') {
         const b = hitButton(e, G.UI.settingsButtons);
         if (b) { Main.settingsIndex = b.index; settingsAdjust(1); }
+      } else if (Main.state === 'controls') {
+        if (Main.ctrlListening) return;
+        const b = hitButton(e, G.UI.controlButtons);
+        if (b) {
+          Main.ctrlIndex = b.index;
+          const items = G.Input.BINDABLE;
+          if (b.index >= items.length) { G.Input.resetBindings(); G.Audio.sfx('uiBell'); }
+          else { Main.ctrlListening = true; G.Audio.sfx('clink'); const action = items[b.index][0]; G.Input.captureKey(code => { if (code !== 'Escape') G.Input.rebind(action, code); Main.ctrlListening = false; }); }
+        }
       } else if (Main.state === 'bench') {
         const b = hitButton(e, G.UI.benchButtons);
         if (b) { Main.benchIndex = b.index; benchSelect(); }
@@ -880,6 +894,23 @@
         if (I.pressed('left')) settingsAdjust(-1);
         else if (I.pressed('right') || I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) settingsAdjust(1);
         if (I.pressed('pause')) { G.Audio.sfx('clink'); menuGo(Main._settingsReturn || 'pause'); }
+        break;
+      }
+      case 'controls': {
+        dt = 0;
+        if (Main.ctrlListening) break;                 // waiting for a key — the input capture handles it
+        const items = G.Input.BINDABLE, n = items.length + 1;   // +1 = "Reset to defaults" row
+        if (I.pressed('up')) { Main.ctrlIndex = (Main.ctrlIndex - 1 + n) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.ctrlIndex = (Main.ctrlIndex + 1) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) {
+          if (Main.ctrlIndex >= items.length) { G.Input.resetBindings(); G.Audio.sfx('uiBell'); }
+          else {
+            Main.ctrlListening = true; G.Audio.sfx('clink');
+            const action = items[Main.ctrlIndex][0];
+            G.Input.captureKey(code => { if (code !== 'Escape') G.Input.rebind(action, code); Main.ctrlListening = false; });
+          }
+        }
+        if (I.pressed('pause')) { G.Audio.sfx('clink'); menuGo('settings'); }
         break;
       }
       case 'map': {

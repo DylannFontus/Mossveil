@@ -118,6 +118,10 @@ The map fills in as you discover rooms (with an exploration-% readout); drop pin
 mark spots, and an on-screen compass points to the nearest bench when it's off-screen.
 Rest at benches to record your journey.
 
+**Rebind any control** — *Settings → Controls / key bindings* opens a menu of every action and
+its current key; select one and press a new key to rebind it (or *Reset to defaults*). Your
+bindings are saved and persist across sessions.
+
 **Combat feel** — strikes land a real crescent slash that sweeps and follows through.
 **Hold Strike** to charge a **Great Slash** nail art (a lunging heavy blow that staggers
 and knocks back). Enemies build **poise** and stagger when it breaks; time a swing into an

@@ -958,11 +958,15 @@
 
     const rows = (G.Main.settingsRows && G.Main.settingsRows()) || [];
     G.UI.settingsButtons = [];
-    const ang = -0.05, lx = w * 0.44, ly = h * 0.27, step = Math.min(h * 0.07, 50), fs = Math.round(Math.min(h * 0.04, 25));
-    const cos = Math.cos(ang), sin = Math.sin(ang), colW = Math.min(w * 0.44, 520);
+    const ang = -0.05, lx = w * 0.44, ly = h * 0.22, step = Math.min(h * 0.06, 44), fs = Math.round(Math.min(h * 0.036, 23));
+    const cos = Math.cos(ang), sin = Math.sin(ang), colW = Math.min(w * 0.46, 540);
+    const idx = G.Main.settingsIndex || 0;
+    const visible = Math.min(rows.length, Math.floor((h * 0.68) / step));
+    const top = U.clamp(idx - (visible >> 1), 0, Math.max(0, rows.length - visible));
     cx.save(); cx.translate(lx, ly); cx.rotate(ang); cx.textBaseline = 'middle';
-    for (let i = 0; i < rows.length; i++) {
-      const sel = i === G.Main.settingsIndex, yy = i * step;
+    for (let r = 0; r < visible; r++) {
+      const i = top + r; if (i >= rows.length) break;
+      const sel = i === idx, yy = r * step;
       if (sel) {
         const sw = colW, sh = fs * 1.2;
         cx.save(); cx.globalAlpha = 0.92; cx.fillStyle = pmAcc;
@@ -985,7 +989,52 @@
 
     cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
     cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
-    cx.fillText('↑ ↓  select        ← →  adjust        Esc  back', w - 32, h - 32);
+    cx.fillText('↑ ↓  select        ← →  adjust / open        Esc  back', w - 32, h - 32);
+    cx.restore();
+  }
+
+  // Controls / key-binding menu — same pause-style chrome; each row shows an action + its key,
+  // selectable to rebind (the next key pressed becomes the binding). Scrolls like Settings.
+  function drawControls() {
+    pmAcc = biomeAccent();
+    menuChrome();
+    menuHeader('CONTROLS');
+    const items = G.Input.BINDABLE || [];
+    const rows = items.map(([a, label]) => ({ label, value: G.Input.bindingLabel(a) }));
+    rows.push({ label: 'Reset to defaults', value: '↺', reset: true });
+    G.UI.controlButtons = [];
+    const ang = -0.05, lx = w * 0.44, ly = h * 0.21, step = Math.min(h * 0.052, 38), fs = Math.round(Math.min(h * 0.032, 21));
+    const cos = Math.cos(ang), sin = Math.sin(ang), colW = Math.min(w * 0.46, 540);
+    const idx = U.clamp(G.Main.ctrlIndex || 0, 0, rows.length - 1);
+    const visible = Math.min(rows.length, Math.floor((h * 0.70) / step));
+    const top = U.clamp(idx - (visible >> 1), 0, Math.max(0, rows.length - visible));
+    cx.save(); cx.translate(lx, ly); cx.rotate(ang); cx.textBaseline = 'middle';
+    for (let r = 0; r < visible; r++) {
+      const i = top + r; if (i >= rows.length) break;
+      const sel = i === idx, yy = r * step, listening = sel && G.Main.ctrlListening;
+      if (sel) {
+        const sw = colW, sh = fs * 1.2;
+        cx.save(); cx.globalAlpha = 0.92; cx.fillStyle = listening ? '#caa24a' : pmAcc;
+        cx.beginPath();
+        cx.moveTo(-16, yy - sh * 0.5); cx.lineTo(sw, yy - sh * 0.55);
+        cx.lineTo(sw + sh * 0.65, yy + sh * 0.5); cx.lineTo(-16 + sh * 0.35, yy + sh * 0.5);
+        cx.closePath(); cx.fill(); cx.restore();
+      }
+      cx.font = `${sel ? '900' : '700'} ${fs}px ${menuFont}`; cx.textAlign = 'left';
+      if (!sel) { cx.lineWidth = 1; cx.strokeStyle = 'rgba(120,180,160,0.25)'; cx.strokeText(rows[i].label.toUpperCase(), 6, yy); }
+      cx.fillStyle = sel ? '#06120e' : 'rgba(202,226,216,0.9)';
+      cx.fillText(rows[i].label.toUpperCase(), 6, yy);
+      cx.textAlign = 'right'; cx.font = `${Math.round(fs * 0.85)}px ${serif}`;
+      cx.fillStyle = sel ? '#06120e' : '#cfe8d8';
+      cx.fillText(listening ? 'press a key…' : rows[i].value, colW - 8, yy);
+      const scx = lx + (-16) * cos - yy * sin, scy = ly + (-16) * sin + yy * cos;
+      G.UI.controlButtons.push({ x: scx, y: scy - fs * 0.85, w: colW + 40, h: fs * 1.6, index: i });
+    }
+    cx.restore();
+
+    cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText(G.Main.ctrlListening ? 'press a key to bind…        Esc  cancel' : '↑ ↓  select        Enter / Z  rebind        Esc  back', w - 32, h - 32);
     cx.restore();
   }
 
@@ -1137,6 +1186,7 @@
     if (st === 'charms') drawCharms();
     if (st === 'journal') drawJournal();
     if (st === 'settings') drawSettings();
+    if (st === 'controls') drawControls();
     if (st === 'bench') drawBench();
     if (st === 'travel') { drawTravel(); drawToasts(dt); }
     if (st === 'shop') { drawShop(); drawToasts(dt); }
