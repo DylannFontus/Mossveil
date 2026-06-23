@@ -211,19 +211,26 @@
     G.FX.slash(b.x + ox, b.y + oy, ang + (p.swingFlip ? 0.12 : -0.12), false, 0xeef6ff, p.swingFlip);
   }
 
-  // Great Slash — the charged nail art: a heavy forward lunge that staggers and knocks back
+  // Great Slash — the charged nail art: a heavy lunge in the aimed direction that staggers + knocks back
   function greatSlash(p) {
-    const b = p.body;
+    const I = G.Input, b = p.body;
     p.atkCdT = ATK_CD * 1.5;
     p.atkT = 0.0001; p.atkHit = new Set();
-    p.atkDir = 'side'; p.isArt = true;
+    if (I.down('up')) p.atkDir = 'up';                 // aim it: up / down (in air) / sideways
+    else if (I.down('down') && !b.onGround) p.atkDir = 'down';
+    else p.atkDir = 'side';
+    p.isArt = true;
     p.artReady = false; p.atkHoldT = 0;
     p.swingFlip = !p.swingFlip;
-    b.vx += p.facing * 9;                              // lunge
-    const ang = p.facing > 0 ? 0 : Math.PI;
+    const ang = p.atkDir === 'up' ? Math.PI / 2 : p.atkDir === 'down' ? -Math.PI / 2 : (p.facing > 0 ? 0 : Math.PI);
+    const ox = p.atkDir === 'side' ? p.facing * 1.4 : 0;
+    const oy = p.atkDir === 'up' ? 1.6 : p.atkDir === 'down' ? -1.6 : 0.1;
+    if (p.atkDir === 'side') b.vx += p.facing * 9;     // directional lunge
+    else if (p.atkDir === 'up') b.vy += 6;
+    else b.vy -= 10;
     G.Audio.sfx('swing');
-    G.FX.slash(b.x + p.facing * 1.4, b.y + 0.1, ang, true, 0xffe39a, p.swingFlip);
-    G.FX.slash(b.x + p.facing * 1.7, b.y + 0.1, ang, true, 0xfff4d0, !p.swingFlip);  // doubled = thick blade
+    G.FX.slash(b.x + ox, b.y + oy, ang, true, 0xffe39a, p.swingFlip);
+    G.FX.slash(b.x + ox * 1.18, b.y + oy * 1.18, ang, true, 0xfff4d0, !p.swingFlip);  // doubled = thick blade
     G.FX.shake(0.22, 0.2);
     if (G.Main.camPunch) G.Main.camPunch(1.2);
     if (G.Post) G.Post.punch(0.9);
@@ -231,7 +238,11 @@
 
   function attackHitbox(p) {
     const b = p.body;
-    if (p.isArt) return { x: b.x + p.facing * 1.7, y: b.y + 0.1, w: 3.6, h: 1.9 };
+    if (p.isArt) {                                     // big, aimed art hitboxes
+      if (p.atkDir === 'up') return { x: b.x, y: b.y + 1.9, w: 2.6, h: 2.7 };
+      if (p.atkDir === 'down') return { x: b.x, y: b.y - 1.9, w: 2.4, h: 2.7 };
+      return { x: b.x + p.facing * 1.7, y: b.y + 0.1, w: 3.6, h: 1.9 };
+    }
     if (p.atkDir === 'up') return { x: b.x, y: b.y + 1.45, w: 1.7, h: 1.6 };
     if (p.atkDir === 'down') return { x: b.x, y: b.y - 1.45, w: 1.55, h: 1.6 };
     return { x: b.x + p.facing * 1.2, y: b.y + 0.1, w: 2.05, h: 1.45 };
@@ -430,13 +441,22 @@
     // charged nail art: keep holding attack to ready a Great Slash, release to unleash it
     if (I.down('attack') && p.hurtT <= 0 && p.dashT <= 0) {
       p.atkHoldT += dt;
-      if (!p.artReady && p.atkHoldT >= ART_CHARGE) {
-        p.artReady = true;
-        G.Audio.sfx('focus');
-        if (G.Main.camPunch) G.Main.camPunch(0.3);
+      if (!p.artReady) {
+        // charging: white energy gathers from around the wanderer, drawn inward
+        for (let i = 0; i < 2; i++) {
+          if (!U.chance(dt * 34)) continue;
+          const a = U.rand(0, Math.PI * 2), r = U.rand(1.4, 2.1), sp = r / U.rand(0.16, 0.26);
+          G.FX.p(true, { x: b.x + Math.cos(a) * r, y: b.y + 0.3 + Math.sin(a) * r, vx: -Math.cos(a) * sp, vy: -Math.sin(a) * sp, life: r / sp, size: U.rand(0.13, 0.24), color: 0xffffff, alpha: 0.95 });
+        }
+        if (p.atkHoldT >= ART_CHARGE) {
+          p.artReady = true;
+          G.Audio.sfx('focus');
+          // ready signal: a single ring that grows slightly then fades fast
+          G.FX.ring(b.x, b.y + 0.3, { r0: 1.05, r1: 1.7, life: 0.24, color: 0xffffff, alpha: 0.85 });
+          G.FX.burst('spark', b.x, b.y + 0.3, { n: 8, color: 0xffffff });
+          if (G.Main.camPunch) G.Main.camPunch(0.4);
+        }
       }
-      if (p.artReady && U.chance(dt * 26))
-        G.FX.burst('soul', b.x + U.rand(-0.45, 0.45), b.y + U.rand(-0.1, 0.7), { n: 1, color: 0xffe7a0 });
     } else {
       if (p.artReady && I.released('attack') && p.hurtT <= 0) greatSlash(p);
       if (I.released('attack')) { p.atkHoldT = 0; p.artReady = false; }
