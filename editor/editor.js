@@ -419,7 +419,7 @@
     // The cutscene tab (timeline DOM + preview bar) and the playtest overlay (with its
     // Stop button) handle their own input. Bail out BEFORE capturing the pointer —
     // otherwise vpEl steals pointerup and clicks on those buttons never fire.
-    if (tab === 'cutscene' || tab === 'logic' || $('playFrame').classList.contains('on')) return;
+    if (tab === 'cutscene' || tab === 'logic' || tab === 'models' || $('playFrame').classList.contains('on')) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { vpEl.setPointerCapture(e.pointerId); } catch (_) { }
 
@@ -470,7 +470,7 @@
   addEventListener('pointermove', e => {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (gesturing && pointers.size >= 2) { updateGesture(); return; }
-    if (tab === 'cutscene' || tab === 'logic') return;
+    if (tab === 'cutscene' || tab === 'logic' || tab === 'models') return;
     if (tab === 'map') { if (mapDrag) mapMouseMove(e); return; }
     if (panning) {
       const r = vpEl.getBoundingClientRect();
@@ -548,7 +548,7 @@
     pinch = now;
   }
   $('viewportWrap').addEventListener('wheel', e => {
-    if (tab === 'logic') return;            // the logic canvas handles its own zoom
+    if (tab === 'logic' || tab === 'models') return;   // those tabs handle their own zoom
     e.preventDefault();
     if (tab === 'map') {
       mapView.zoom = U.clamp(mapView.zoom * (e.deltaY > 0 ? 0.88 : 1.14), 0.4, 12);
@@ -623,6 +623,7 @@
     if (snap) { x = Math.round(x * 2) / 2; y = Math.round(y * 2) / 2; }
     x = +x.toFixed(2); y = +y.toFixed(2);
     const a = placing;
+    if (a.cat === 'none') { setPlacing(null); return; }
     // prefab: stamp a saved cluster of objects
     if (a.cat === 'prefab') { stampPrefab(a.prefab, x, y); if (!keepPlacing) setPlacing(null); queueRebuild(); refreshHierarchy(); refreshInspector(); return; }
     // building generator: stamp a procedural Victorian building (walls/floors as tiles + furniture as props)
@@ -672,6 +673,7 @@
       if (a.id === 'bossTrigger') p.boss = a.boss || 'mossSovereign';
       if (a.id === 'decor') p.kind = a.kind || 'tree';
       if (a.id === 'furniture') p.kind = a.kind || 'sofa';
+      if (a.id === 'model') p.model = a.model || '';
       L.props.push(p);
       sel = { kind: 'prop', i: L.props.length - 1 };
     }
@@ -920,6 +922,7 @@
     const body = $('insBody');
     body.innerHTML = '';
     if (tab === 'logic') return refreshLogicInspector(body);
+    if (tab === 'models') return refreshModelInspector(body);
     const it = selectedItem();
     $('stSel').textContent = it ? `selected: ${it.kind} ${it.ref.type || it.ref.to || it.key || ''}` : '';
     if (!it) {
@@ -1154,6 +1157,14 @@
           }
           break;
         }
+        case 'model': {
+          selectField(body, 'Model', (G.Models ? G.Models.list() : []).map(m => ({ v: m, t: m })), () => p.model || '', v => { p.model = v; });
+          selectField(body, 'Depth', [{ v: '0', t: 'gameplay layer' }, { v: '-0.3', t: 'just behind' }, { v: '-9', t: 'background' }, { v: '5', t: 'foreground' }], () => String(p.z !== undefined ? p.z : 0), v => { p.z = parseFloat(v); });
+          numField(body, 'Scale', () => p.scale || 1, v => { p.scale = Math.max(0.1, v); }, 0.1);
+          checkField(body, 'Flip', () => p.flip, v => { p.flip = v; });
+          el('div', { class: 'insNote' }, body, 'A custom model from the Models tab. Edit the model there; changes apply on reload.');
+          break;
+        }
         case 'wall': {
           selectField(body, 'Style', (G.World.WALL_STYLES || ['wood', 'brick', 'wallpaper']).map(k => ({ v: k, t: k })), () => p.style || 'wood', v => { p.style = v; });
           numField(body, 'Width', () => p.w || 16, v => { p.w = Math.max(1, v); }, 1);
@@ -1369,6 +1380,7 @@
     { id: 'props', label: 'Props' },
     { id: 'decor', label: 'Decor' },
     { id: 'furniture', label: 'Furniture' },
+    { id: 'mymodels', label: 'My Models' },
     { id: 'build', label: 'Build' },
     { id: 'lights', label: 'Lights' },
     { id: 'enemies', label: 'Enemies' },
@@ -1399,6 +1411,7 @@
         return out;
       }
       case 'furniture': return Object.keys(G.World.FURN || {}).map(k => ({ cat: 'prop', id: 'furniture', kind: k, label: k, ico: '🛋️' }));
+      case 'mymodels': { const ms = (G.Models ? G.Models.list() : []); return ms.length ? ms.map(name => ({ cat: 'prop', id: 'model', model: name, label: name, ico: '🧍' })) : [{ cat: 'none', label: '(build models in the Models tab)', ico: '🧱' }]; }
       case 'build': return [
         { cat: 'build', id: 'building', label: 'House (small)', ico: '🏠', defaults: { w: 22, h: 28, seed: 3 } },
         { cat: 'build', id: 'building', label: 'House', ico: '🏠', defaults: { w: 30, h: 46, seed: 5 } },
@@ -1446,7 +1459,7 @@
       if (a.cat === 'enemy') { const e = G.Enemies.make(a.id, 0, 0); return e && e.group ? e.group : null; }
       if (a.id === 'bossTrigger') return G.Bosses.preview(a.boss || 'mossSovereign');
       if (a.cat === 'prop' && G.World.mkProp && G.World.mkProp[a.id]) {
-        const params = Object.assign({ x: 0, y: 0, kind: a.kind, boss: a.boss }, JSON.parse(JSON.stringify(a.defaults || {})));
+        const params = Object.assign({ x: 0, y: 0, kind: a.kind, boss: a.boss, model: a.model }, JSON.parse(JSON.stringify(a.defaults || {})));
         const e = G.World.mkProp[a.id](params, pal);
         return e && e.group ? e.group : null;
       }
@@ -1786,13 +1799,19 @@
     $('tabCutscene').classList.toggle('on', t === 'cutscene');
     $('tabLogic').classList.toggle('on', t === 'logic');
     mapCanvas.style.display = t === 'map' ? 'block' : 'none';
-    glCanvas.style.display = t === 'scene' ? 'block' : 'none';
+    glCanvas.style.display = (t === 'scene' || t === 'models') ? 'block' : 'none';
+    overlay.style.display = (t === 'models') ? 'none' : 'block';   // overlay sits over #gl; hide it for the model viewport
     $('csView').classList.toggle('on', t === 'cutscene');
     $('logicCanvas').classList.toggle('on', t === 'logic');
     $('logicPalette').classList.toggle('on', t === 'logic');
+    $('tabModels').classList.toggle('on', t === 'models');
+    $('modelPanel').classList.toggle('on', t === 'models');
+    $('modelBar').classList.toggle('on', t === 'models');
+    if (t === 'models') $('modelBar').textContent = 'left-drag part = move · drag empty = orbit · right-drag = pan · wheel = zoom · Del = delete part';
     $('viewportHint').textContent = '';
     if (t === 'cutscene') { setLeftTab('S'); refreshCsTab(); }
     if (t === 'logic') { resize(); buildLogicPalette(); refreshInspector(); }
+    if (t === 'models') { resize(); rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
   }
 
   // ---------------- cutscene editor ----------------
@@ -2074,6 +2093,7 @@
   $('tabMap').addEventListener('click', () => setTab('map'));
   $('tabCutscene').addEventListener('click', () => setTab('cutscene'));
   $('tabLogic').addEventListener('click', () => setTab('logic'));
+  $('tabModels').addEventListener('click', () => setTab('models'));
   function setLeftTab(which) {
     csMode = which === 'S';
     $('ltabH').classList.toggle('on', which === 'H');
@@ -2406,7 +2426,7 @@
     showCsBar(false);
     csPreview = null;
     rebuild();                       // restore the editor's working level
-    glCanvas.style.display = (tab === 'scene') ? 'block' : 'none';
+    glCanvas.style.display = (tab === 'scene' || tab === 'models') ? 'block' : 'none';
     if (tab === 'cutscene') $('csView').classList.add('on');
   }
 
@@ -2562,6 +2582,154 @@
   });
   logicCanvas.addEventListener('wheel', e => { if (tab !== 'logic') return; e.preventDefault(); logicCam.zoom = Math.max(0.4, Math.min(2.2, logicCam.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); }, { passive: false });
 
+  // ================= MODEL editor (build character / object models from primitives) =================
+  let modelScene = null, modelCam = null, modelGroup = null, modelMeshes = [];
+  let modelDoc = { name: 'untitled', parts: [] }, modelSel = -1;
+  const modelOrbit = { theta: 0.7, phi: 1.15, radius: 7, tx: 0, ty: 1, tz: 0 };
+  let modelDrag = null, modelOrbiting = null, modelPan = null;
+  const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
+  const PART_COLORS = ['#c9cdd6', '#7a8aa0', '#c08a5a', '#9a5a5a', '#5a8a6a', '#caa24a', '#7a5a8a', '#2e3540'];
+
+  function ensureModelScene() {
+    if (modelScene) return;
+    modelScene = new THREE.Scene(); modelScene.background = new THREE.Color(0x0e141a);
+    modelCam = new THREE.PerspectiveCamera(42, 1.6, 0.05, 200);
+    G.Models.ensureLight(modelScene);
+    const grid = new THREE.GridHelper(12, 12, 0x2a3a44, 0x18242c); modelScene.add(grid);
+    const ax = new THREE.AxesHelper(1.4); ax.position.y = 0.002; modelScene.add(ax);
+    modelGroup = new THREE.Group(); modelScene.add(modelGroup);
+  }
+  function rebuildModelMeshes() {
+    ensureModelScene();
+    while (modelGroup.children.length) { const c = modelGroup.children.pop(); if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); }
+    modelMeshes = [];
+    for (const p of modelDoc.parts) { const m = G.Models.mesh(p); modelGroup.add(m); modelMeshes.push(m); }
+    highlightModelSel();
+  }
+  function highlightModelSel() {
+    modelMeshes.forEach((m, i) => { m.material.emissive.setHex(i === modelSel ? 0x223a30 : 0x000000); });
+  }
+  function updateModelCam() {
+    const o = modelOrbit, sp = Math.sin(o.phi), cp = Math.cos(o.phi);
+    modelCam.position.set(o.tx + o.radius * sp * Math.sin(o.theta), o.ty + o.radius * cp, o.tz + o.radius * sp * Math.cos(o.theta));
+    modelCam.lookAt(o.tx, o.ty, o.tz);
+    modelCam.aspect = (G.viewW || 1) / (G.viewH || 1); modelCam.updateProjectionMatrix();
+  }
+  function drawModels() { ensureModelScene(); updateModelCam(); renderer.render(modelScene, modelCam); }
+
+  function modelAdd(shape) {
+    const c = PART_COLORS[modelDoc.parts.length % PART_COLORS.length];
+    modelDoc.parts.push({ shape, x: 0, y: 1, z: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1, color: c, name: shape });
+    modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector();
+  }
+  function modelDeletePart(i) { modelDoc.parts.splice(i, 1); if (modelSel >= modelDoc.parts.length) modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function modelDupPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.x += 0.4; modelDoc.parts.splice(i + 1, 0, p); modelSel = i + 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function modelMirrorPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.x = -p.x; p.ry = -p.ry; p.rz = -p.rz; p.name = (p.name || p.shape) + ' (mirror)'; modelDoc.parts.push(p); modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+
+  function newModel() { modelDoc = { name: uniqueModelName('model'), parts: [] }; modelSel = -1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function uniqueModelName(base) { let n = base, i = 2; while (G.Models.get(n)) n = base + i++; return n; }
+  function saveModel() { if (!modelDoc.name) modelDoc.name = uniqueModelName('model'); G.Models.save(modelDoc.name, modelDoc); refreshModelPanel(); }
+  function loadModel(name) { const m = G.Models.get(name); if (!m) return; modelDoc = JSON.parse(JSON.stringify(m)); modelDoc.name = name; modelSel = -1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+
+  function refreshModelPanel() {
+    const box = $('modelPanel'); if (!box) return; box.innerHTML = '';
+    el('div', { class: 'mlabel' }, box, 'MODEL');
+    const nameRow = el('div', { class: 'mrow' }, box);
+    const nin = el('input', { type: 'text', value: modelDoc.name, style: 'flex:1;min-width:0' }, nameRow);
+    nin.addEventListener('change', () => { const nn = nin.value.trim() || 'model'; modelDoc.name = nn; });
+    const libRow = el('div', { class: 'mrow' }, box);
+    const sel = el('select', { style: 'flex:1;min-width:0' }, libRow);
+    el('option', { value: '' }, sel, '— load saved —');
+    for (const n of G.Models.list()) el('option', { value: n }, sel, n);
+    sel.addEventListener('change', () => { if (sel.value) loadModel(sel.value); });
+    const ctl = el('div', { class: 'mrow' }, box);
+    el('button', {}, ctl, '＋ New').addEventListener('click', newModel);
+    el('button', {}, ctl, '💾 Save').addEventListener('click', saveModel);
+    el('button', { class: 'danger' }, ctl, '🗑 Delete').addEventListener('click', () => { if (G.Models.get(modelDoc.name) && confirm('Delete saved model “' + modelDoc.name + '”?')) { G.Models.remove(modelDoc.name); refreshModelPanel(); } });
+    el('div', { class: 'mlabel' }, box, 'ADD PART');
+    const grid = el('div', { class: 'mrow' }, box);
+    for (const s of G.Models.SHAPES) el('button', { title: 'Add ' + s }, grid, s).addEventListener('click', () => modelAdd(s));
+    el('div', { class: 'mlabel' }, box, 'PARTS (' + modelDoc.parts.length + ')');
+    const list = el('div', { class: 'mparts' }, box);
+    modelDoc.parts.forEach((p, i) => {
+      const row = el('div', { class: 'mpart' + (i === modelSel ? ' sel' : '') }, list);
+      const sw = el('div', { class: 'mswatch' }, row); sw.style.background = p.color || '#ccc';
+      el('div', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis' }, row, (p.name || p.shape));
+      row.addEventListener('click', () => { modelSel = i; highlightModelSel(); refreshModelPanel(); refreshInspector(); });
+    });
+  }
+  function refreshModelInspector(body) {
+    const p = modelSel >= 0 ? modelDoc.parts[modelSel] : null;
+    if (!p) { el('div', { class: 'insNote' }, body, 'Model editor — add primitive parts from the panel (top-left), then select one to shape it. Left-drag a part to move it; drag empty space to orbit; wheel to zoom; right-drag to pan.'); return; }
+    el('div', { class: 'insNote' }, body, 'PART — ' + (p.shape));
+    textField(body, 'Name', () => p.name || p.shape, v => { p.name = v; refreshModelPanel(); });
+    selectField(body, 'Shape', G.Models.SHAPES.map(s => ({ v: s, t: s })), () => p.shape, v => { p.shape = v; rebuildModelMeshes(); refreshModelPanel(); });
+    const v3 = (lbl, kx, ky, kz, step) => { el('div', { class: 'mlabel', style: 'color:#7fb39c;margin-top:6px' }, body, lbl);
+      numField(body, 'X', () => p[kx], v => { p[kx] = v; rebuildModelMeshes(); }, step);
+      numField(body, 'Y', () => p[ky], v => { p[ky] = v; rebuildModelMeshes(); }, step);
+      numField(body, 'Z', () => p[kz], v => { p[kz] = v; rebuildModelMeshes(); }, step); };
+    v3('Position', 'x', 'y', 'z', 0.1);
+    v3('Rotation°', 'rx', 'ry', 'rz', 5);
+    v3('Scale', 'sx', 'sy', 'sz', 0.1);
+    colorField(body, 'Colour', () => p.color || '#c8c8c8', v => { p.color = v || '#c8c8c8'; rebuildModelMeshes(); refreshModelPanel(); });
+    const btns = el('div', { class: 'frow', style: 'margin-top:10px;gap:5px' }, body);
+    el('button', { class: 'tbtn' }, btns, 'Duplicate').addEventListener('click', () => modelDupPart(modelSel));
+    el('button', { class: 'tbtn' }, btns, 'Mirror X').addEventListener('click', () => modelMirrorPart(modelSel));
+    el('button', { class: 'tbtn dangerBtn' }, btns, 'Delete').addEventListener('click', () => modelDeletePart(modelSel));
+  }
+
+  // ---- model viewport interaction (on the gl canvas while the Models tab is active) ----
+  function modelPick(mx, my) {
+    const r = glCanvas.getBoundingClientRect();
+    _ndc.set((mx / r.width) * 2 - 1, -(my / r.height) * 2 + 1);
+    _ray.setFromCamera(_ndc, modelCam);
+    const hits = _ray.intersectObjects(modelMeshes, false);
+    return hits.length ? modelMeshes.indexOf(hits[0].object) : -1;
+  }
+  function modelPlaneHit(mx, my, point) {
+    const r = glCanvas.getBoundingClientRect();
+    _ndc.set((mx / r.width) * 2 - 1, -(my / r.height) * 2 + 1);
+    _ray.setFromCamera(_ndc, modelCam);
+    const nrm = new THREE.Vector3(); modelCam.getWorldDirection(nrm);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(nrm, point);
+    const hit = new THREE.Vector3();
+    return _ray.ray.intersectPlane(plane, hit) ? hit : null;
+  }
+  glCanvas.addEventListener('pointerdown', e => {
+    if (tab !== 'models') return;
+    const r = glCanvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    try { glCanvas.setPointerCapture(e.pointerId); } catch (_) { }
+    if (e.button === 1 || e.button === 2) { modelPan = { mx, my, tx: modelOrbit.tx, ty: modelOrbit.ty, tz: modelOrbit.tz }; return; }
+    const i = modelPick(mx, my);
+    if (i >= 0) {
+      modelSel = i; highlightModelSel(); refreshModelPanel(); refreshInspector();
+      const p = modelDoc.parts[i], pos = new THREE.Vector3(p.x, p.y, p.z), hit = modelPlaneHit(mx, my, pos);
+      modelDrag = { i, off: hit ? pos.clone().sub(hit) : new THREE.Vector3(), moved: false };
+    } else { modelOrbiting = { mx, my, theta: modelOrbit.theta, phi: modelOrbit.phi }; }
+  });
+  glCanvas.addEventListener('pointermove', e => {
+    if (tab !== 'models') return;
+    const r = glCanvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (modelDrag) {
+      const p = modelDoc.parts[modelDrag.i], hit = modelPlaneHit(mx, my, new THREE.Vector3(p.x, p.y, p.z));
+      if (hit) { const np = hit.add(modelDrag.off); p.x = +np.x.toFixed(2); p.y = +np.y.toFixed(2); p.z = +np.z.toFixed(2); modelDrag.moved = true; const m = modelMeshes[modelDrag.i]; if (m) m.position.set(p.x, p.y, p.z); refreshInspectorThrottled(); }
+    } else if (modelOrbiting) {
+      modelOrbit.theta = modelOrbiting.theta - (mx - modelOrbiting.mx) * 0.01;
+      modelOrbit.phi = Math.max(0.12, Math.min(3.0, modelOrbiting.phi - (my - modelOrbiting.my) * 0.01));
+    } else if (modelPan) {
+      const k = modelOrbit.radius * 0.0016;
+      const right = new THREE.Vector3(Math.cos(modelOrbit.theta), 0, -Math.sin(modelOrbit.theta));
+      modelOrbit.tx = modelPan.tx - (mx - modelPan.mx) * k * right.x;
+      modelOrbit.tz = modelPan.tz - (mx - modelPan.mx) * k * right.z;
+      modelOrbit.ty = modelPan.ty + (my - modelPan.my) * k;
+    }
+  });
+  glCanvas.addEventListener('pointerup', e => { if (tab !== 'models') return; modelDrag = null; modelOrbiting = null; modelPan = null; });
+  glCanvas.addEventListener('contextmenu', e => { if (tab === 'models') e.preventDefault(); });
+  glCanvas.addEventListener('wheel', e => { if (tab !== 'models') return; e.preventDefault(); modelOrbit.radius = Math.max(1.2, Math.min(40, modelOrbit.radius * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+  let _insThrottle = 0;
+  function refreshInspectorThrottled() { const now = performance.now(); if (now - _insThrottle > 120) { _insThrottle = now; refreshInspector(); } }
+
   // ---------------- keyboard ----------------
   addEventListener('keydown', e => {
     if (csPreview) { if (e.code === 'Escape') stopCsPreview(); else if (e.code === 'KeyR') replayCsPreview(); else if (e.code === 'Space') { e.preventDefault(); toggleCsPlay(); } return; }
@@ -2570,6 +2738,7 @@
     if (e.ctrlKey && e.code === 'KeyS') { e.preventDefault(); save(); return; }
     if (typing) return;
     if (tab === 'logic') { if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); logicDeleteSelected(); } return; }
+    if (tab === 'models') { if ((e.code === 'Delete' || e.code === 'Backspace') && modelSel >= 0) { e.preventDefault(); modelDeletePart(modelSel); } else if (e.code === 'KeyD' && e.ctrlKey && modelSel >= 0) { e.preventDefault(); modelDupPart(modelSel); } return; }
     if (csMode || tab === 'cutscene') return; // cutscene editing: no level shortcuts
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
     if (e.ctrlKey && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) { e.preventDefault(); doRedo(); return; }
@@ -2658,6 +2827,8 @@
       drawMapTab();
     } else if (tab === 'logic') {
       drawLogic();
+    } else if (tab === 'models') {
+      drawModels();
     }
     // tab === 'cutscene' renders nothing in 3D — the #csView DOM covers the viewport
     if (G.Profiler) G.Profiler.tick();
@@ -2701,7 +2872,8 @@
     logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
     logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
-    csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); }
+    csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); },
+    modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; }
   };
 
   boot();

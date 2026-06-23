@@ -122,6 +122,25 @@
   #guide .gEntry { padding:5px 10px; }
   #guide .gName { color:#eafffb; font:600 12px ui-monospace,Consolas,monospace; }
   #guide .gDesc { color:#9bbcb0; font:11px/1.45 ui-monospace,Consolas,monospace; margin-top:1px; }
+  /* model editor */
+  #modelPanel { position:absolute; left:10px; top:10px; width:212px; max-height:calc(100% - 56px); display:none; flex-direction:column; gap:6px;
+    background:rgba(14,20,26,.94); border:1px solid rgba(120,200,180,.26); border-radius:10px; padding:9px; z-index:6; overflow:auto;
+    font:11px ui-monospace,Consolas,monospace; color:#cfe; box-shadow:0 10px 36px rgba(0,0,0,.5); }
+  #modelPanel.on { display:flex; }
+  #modelPanel .mlabel { color:#7fb39c; font-size:10px; letter-spacing:.04em; margin:4px 0 1px; opacity:.85; }
+  #modelPanel .mrow { display:flex; gap:4px; flex-wrap:wrap; }
+  #modelPanel button { font:11px ui-monospace; color:#cfe; background:#0e161c; border:1px solid rgba(120,200,180,.28); border-radius:5px; padding:3px 7px; cursor:pointer; }
+  #modelPanel button:hover { background:#1c3027; border-color:#5fd6a8; }
+  #modelPanel button.danger { color:#ffb0a0; border-color:rgba(220,120,100,.4); }
+  #modelPanel select, #modelPanel input { background:#0b1117; border:1px solid rgba(120,200,180,.28); border-radius:5px; color:#dfeee8; font:11px ui-monospace; padding:4px 6px; outline:none; }
+  #modelPanel .mparts { display:flex; flex-direction:column; gap:2px; max-height:230px; overflow:auto; }
+  #modelPanel .mpart { display:flex; align-items:center; gap:6px; padding:3px 6px; border-radius:5px; cursor:pointer; border:1px solid transparent; }
+  #modelPanel .mpart:hover { background:rgba(95,214,168,.1); }
+  #modelPanel .mpart.sel { background:rgba(95,214,168,.16); border-color:rgba(95,214,168,.4); }
+  #modelPanel .mswatch { width:11px; height:11px; border-radius:3px; flex:0 0 auto; border:1px solid rgba(0,0,0,.4); }
+  #modelBar { position:absolute; left:50%; bottom:10px; transform:translateX(-50%); display:none; z-index:6;
+    color:rgba(200,230,220,.5); font:11px ui-monospace; background:rgba(8,12,12,.6); padding:5px 12px; border-radius:8px; pointer-events:none; }
+  #modelBar.on { display:block; }
   #csView { position:absolute; inset:0; display:none; background:#0e0e13; overflow:auto; padding:16px 18px; }
   #csView.on { display:block; }
   #csView .cshead { color:#9fd8b8; font-size:15px; margin:2px 0 12px; }
@@ -220,6 +239,7 @@
     <button class="tbtn" id="tabMap">Map</button>
     <button class="tbtn" id="tabCutscene">Cutscene</button>
     <button class="tbtn" id="tabLogic">Logic</button>
+    <button class="tbtn" id="tabModels">Models</button>
     <span class="tsep"></span>
     <button class="tbtn tool" data-tool="select" title="Select / move (1)">⬚ Select</button>
     <button class="tbtn tool" data-tool="solid" title="Paint solid tiles (2)">▦ Solid</button>
@@ -274,6 +294,8 @@
     <canvas id="mapCanvas"></canvas>
     <canvas id="logicCanvas"></canvas>
     <div id="logicPalette"></div>
+    <div id="modelPanel"></div>
+    <div id="modelBar"></div>
     <div id="csView"></div>
     <div id="viewportHint"></div>
     <div id="playFrame">
@@ -312,7 +334,7 @@
   var scripts = [
     '../lib/three.min.js',
     '../data/levels.js', '../data/cutscenes.js',
-    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js', '../src/eventgraph.js',
+    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js', '../src/eventgraph.js', '../src/models.js',
     '../src/world.js', '../src/weather.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
     '../src/bosses.js', '../src/cutscene.js', 'editor.js'
   ];

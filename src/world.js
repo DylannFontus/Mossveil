@@ -1246,6 +1246,15 @@
     return { type: 'wall', x: p.x, y: p.y, group: grp, update() { } };
   };
 
+  // a custom model built in the editor's Model tab (G.Models)
+  mkProp.model = (p) => {
+    const grp = new THREE.Group();
+    grp.position.set(p.x, p.y, p.z !== undefined ? p.z : 0);
+    const s = p.scale || 1; grp.scale.set(p.flip ? -s : s, s, s);
+    if (G.Models) { G.Models.ensureLight(G.scene); const g = G.Models.buildByName(p.model); if (g) grp.add(g); }
+    return { type: 'model', x: p.x, y: p.y, group: grp, update() { } };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);
