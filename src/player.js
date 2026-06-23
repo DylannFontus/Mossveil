@@ -192,7 +192,7 @@
     const ang = p.atkDir === 'up' ? Math.PI / 2 : p.atkDir === 'down' ? -Math.PI / 2 : (p.facing > 0 ? 0 : Math.PI);
     const ox = p.atkDir === 'side' ? p.facing * 1.0 : 0;
     const oy = p.atkDir === 'up' ? 1.25 : p.atkDir === 'down' ? -1.25 : 0.2;
-    G.FX.slash(b.x + ox, b.y + oy, ang + (p.swingFlip ? 0.12 : -0.12), false);
+    G.FX.slash(b.x + ox, b.y + oy, ang + (p.swingFlip ? 0.12 : -0.12), false, 0xeef6ff, p.swingFlip);
   }
 
   function attackHitbox(p) {

@@ -190,44 +190,69 @@
     }
   };
 
-  // ---------------- slash arc ----------------
-  FX.slash = (x, y, angle, big = false, color = 0xeef6ff) => {
-    const r = big ? 2.6 : 1.9;
-    const geo = new THREE.RingGeometry(r * 0.45, r, 26, 1, 0, Math.PI * 0.85);
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, 0.5);
-    m.rotation.z = angle - Math.PI * 0.425;
+  // ---------------- slash arc (crescent blade) ----------------
+  // A real curved blade: sharp tips, a fat belly and a concave back edge, that sweeps
+  // (tip -> tip) and follows through. `flip` reverses the sweep so alternating swings read
+  // as up-stroke / down-stroke. `angle` is the direction the blade bulges toward.
+  FX.slash = (x, y, angle, big = false, color = 0xeef6ff, flip = false) => {
+    const R = big ? 2.35 : 1.7;                       // arc radius (distance of the belly)
+    const span = big ? Math.PI * 1.0 : Math.PI * 0.86; // how far the blade curves
+    const halfW = big ? 0.52 : 0.36;                  // thickness at the belly
+    // crescent over the arc window [a,b] (f in 0..1); the local profile keeps BOTH ends of
+    // the revealed window sharp, so a partial window looks like the blade mid-stroke
+    function crescentGeo(a, b) {
+      const N = 30, lo = Math.max(0, a), hi = Math.min(1, b), len = Math.max(0.001, hi - lo);
+      const pts = [];
+      for (let i = 0; i <= N; i++) {                  // outer (leading) edge
+        const th = -span / 2 + (lo + (i / N) * len) * span;
+        const prof = Math.pow(Math.sin(Math.PI * (i / N)), 0.8);
+        pts.push([Math.cos(th) * (R + halfW * prof), Math.sin(th) * (R + halfW * prof)]);
+      }
+      for (let i = N; i >= 0; i--) {                  // inner (back) edge — cuts in, makes it a crescent
+        const th = -span / 2 + (lo + (i / N) * len) * span;
+        const prof = Math.pow(Math.sin(Math.PI * (i / N)), 0.8);
+        pts.push([Math.cos(th) * (R - halfW * prof * 1.5), Math.sin(th) * (R - halfW * prof * 1.5)]);
+      }
+      const sh = new THREE.Shape();
+      sh.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], pts[i][1]);
+      sh.closePath();
+      return new THREE.ShapeGeometry(sh);
+    }
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(crescentGeo(flip ? 0.82 : 0, flip ? 1 : 0.18), mat);
+    m.position.set(x, y, 0.5); m.rotation.z = angle;
     G.scene.add(m);
+    // bright thin glint that races along the leading tip
+    const cmat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const cm = new THREE.Mesh(crescentGeo(0, 0.16), cmat);
+    cm.position.set(x, y, 0.52); cm.rotation.z = angle;
+    G.scene.add(cm);
+    const DUR = 0.16, REV = 0.5, dir = flip ? -1 : 1;
     let t = 0;
     anims.push({
       update(dt) {
-        t += dt / 0.14;
-        if (t >= 1) { G.scene.remove(m); geo.dispose(); mat.dispose(); return false; }
-        const e = U.ease.outCubic(t);
-        m.scale.setScalar(0.55 + e * 0.65);
-        mat.opacity = 0.95 * (1 - t * t);
-        m.rotation.z += dt * 2.2;
+        t += dt / DUR;
+        if (t >= 1) { G.scene.remove(m); G.scene.remove(cm); m.geometry.dispose(); cm.geometry.dispose(); mat.dispose(); cmat.dispose(); return false; }
+        const rev = U.clamp(t / REV, 0, 1), e = U.ease.outCubic(rev);
+        let a, b;
+        if (flip) { b = 1; a = U.lerp(0.82, 0, e); } else { a = 0; b = U.lerp(0.18, 1, e); }
+        m.geometry.dispose(); m.geometry = crescentGeo(a, b);
+        const tip = flip ? a : b, gw = 0.16;          // leading glint window
+        cm.geometry.dispose(); cm.geometry = crescentGeo(flip ? tip : Math.max(0, tip - gw), flip ? Math.min(1, tip + gw) : tip);
+        const fade = t < REV ? 1 : 1 - (t - REV) / (1 - REV);
+        mat.opacity = 0.96 * fade; cmat.opacity = 0.9 * (1 - t);
+        m.scale.setScalar(0.9 + 0.18 * e);
+        m.rotation.z = angle + dir * 0.22 * e;        // follow-through twist
+        cm.scale.copy(m.scale); cm.rotation.z = m.rotation.z;
         return true;
       }
     });
-    // streak core
-    const geo2 = new THREE.RingGeometry(r * 0.72, r * 0.86, 22, 1, Math.PI * 0.12, Math.PI * 0.6);
-    const mat2 = mat.clone(); mat2.color = new THREE.Color(0xffffff);
-    const m2 = new THREE.Mesh(geo2, mat2);
-    m2.position.set(x, y, 0.52);
-    m2.rotation.z = angle - Math.PI * 0.42;
-    G.scene.add(m2);
-    let t2 = 0;
-    anims.push({
-      update(dt) {
-        t2 += dt / 0.1;
-        if (t2 >= 1) { G.scene.remove(m2); geo2.dispose(); mat2.dispose(); return false; }
-        m2.scale.setScalar(0.6 + U.ease.outCubic(t2) * 0.6);
-        mat2.opacity = 1 - t2;
-        return true;
-      }
-    });
+    // tangential motion streaks flung off the belly
+    const tang = angle + Math.PI / 2 * dir, bx = Math.cos(angle) * R * 0.9, by = Math.sin(angle) * R * 0.9;
+    for (let i = 0; i < (big ? 5 : 3); i++) {
+      FX.p(true, { x: x + bx, y: y + by, vx: Math.cos(tang) * U.rand(4, 9) + Math.cos(angle) * 2, vy: Math.sin(tang) * U.rand(4, 9) + Math.sin(angle) * 2, life: U.rand(0.12, 0.22), size: U.rand(0.12, 0.26), color });
+    }
   };
 
   // ---------------- expanding ring ----------------
