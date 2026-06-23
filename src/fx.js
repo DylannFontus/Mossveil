@@ -298,6 +298,9 @@
 
   // ---------------- camera shake & hit-stop ----------------
   FX.shake = (amp, dur) => {
+    // controller rumble rides along with screen shake (so all impacts vibrate), unless muted in Settings
+    if (G.Input && G.Input.rumble && !(G.settings && G.settings.rumble === false))
+      G.Input.rumble(Math.min(1, amp * 1.4), Math.min(1, amp), Math.max(40, Math.min(400, dur * 1000)));
     if (G.settings && G.settings.shake === false) return;   // respect the shake setting
     shakeAmp = Math.max(shakeAmp, amp); shakeDur = shakeT = Math.max(shakeDur, dur);
   };

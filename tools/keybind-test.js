@@ -52,7 +52,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     console.log('RESULT:', JSON.stringify(o), ' reloadDash:', persistAcrossReload);
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
     const ok = o.hasBindable && /Z/.test(o.jumpLabel) && o.jumpAfter === 'KeyB' && o.persisted
-      && o.newKeyWorks && o.oldKeyDead && o.captured === 'KeyO' && o.resetJump === 'KeyZ,Space'
+      && o.newKeyWorks && o.oldKeyDead && o.captured === 'KeyO' && o.resetJump === 'KeyZ,Space,Pad0'
       && persistAcrossReload === 'KeyG' && !errs.length;
     console.log(ok ? 'KEYBIND TEST: PASS' : 'KEYBIND TEST: FAIL');
     process.exitCode = ok ? 0 : 2;

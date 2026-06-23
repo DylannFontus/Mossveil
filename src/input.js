@@ -1,20 +1,20 @@
 // MOSSVEIL — input.js : keyboard input with edge detection + rebindable, saved bindings
 (function () {
   const DEFAULT_MAP = {
-    left: ['ArrowLeft', 'KeyA'],
-    right: ['ArrowRight', 'KeyD'],
-    up: ['ArrowUp', 'KeyW'],
-    down: ['ArrowDown', 'KeyS'],
-    jump: ['KeyZ', 'Space'],
-    attack: ['KeyX', 'KeyJ'],
-    dash: ['KeyC', 'KeyK', 'ShiftLeft', 'ShiftRight'],
-    cast: ['KeyF', 'KeyL'],
-    interact: ['KeyE'],
-    pause: ['Escape', 'KeyP'],
-    map: ['KeyM'],
+    left: ['ArrowLeft', 'KeyA', 'Pad14'],
+    right: ['ArrowRight', 'KeyD', 'Pad15'],
+    up: ['ArrowUp', 'KeyW', 'Pad12'],
+    down: ['ArrowDown', 'KeyS', 'Pad13'],
+    jump: ['KeyZ', 'Space', 'Pad0'],
+    attack: ['KeyX', 'KeyJ', 'Pad2'],
+    dash: ['KeyC', 'KeyK', 'ShiftLeft', 'ShiftRight', 'Pad1', 'Pad5'],
+    cast: ['KeyF', 'KeyL', 'Pad3'],
+    interact: ['KeyE', 'Pad7'],
+    pause: ['Escape', 'KeyP', 'Pad9'],
+    map: ['KeyM', 'Pad8'],
     mute: ['KeyU'],
-    zoomIn: ['Equal', 'NumpadAdd'],
-    zoomOut: ['Minus', 'NumpadSubtract'],
+    zoomIn: ['Equal', 'NumpadAdd', 'Pad5'],
+    zoomOut: ['Minus', 'NumpadSubtract', 'Pad4'],
     confirm: ['Enter'],
     newgame: ['KeyN'],
     del: ['Delete', 'Backspace']
@@ -54,8 +54,13 @@
     Equal: '=', Minus: '−', NumpadAdd: 'Num +', NumpadSubtract: 'Num −', Backquote: '`',
     Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']', Backslash: '\\'
   };
+  // gamepad button glyphs (index -> label), auto-switched for Xbox vs PlayStation pads
+  const XBOX = { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Back', 9: 'Start', 10: 'L3', 11: 'R3', 12: 'D↑', 13: 'D↓', 14: 'D←', 15: 'D→', 16: 'Guide' };
+  const PS = { 0: '✕', 1: '○', 2: '□', 3: '△', 4: 'L1', 5: 'R1', 6: 'L2', 7: 'R2', 8: 'Share', 9: 'Options', 10: 'L3', 11: 'R3', 12: 'D↑', 13: 'D↓', 14: 'D←', 15: 'D→', 16: 'PS' };
+  let padGlyphs = XBOX;
   function keyLabel(code) {
     if (!code) return '—';
+    if (code.indexOf('Pad') === 0) { const g = padGlyphs[+code.slice(3)]; return g ? ('🎮' + g) : ('🎮' + code.slice(3)); }
     if (PRETTY[code]) return PRETTY[code];
     if (code.indexOf('Key') === 0) return code.slice(3);
     if (code.indexOf('Digit') === 0) return code.slice(5);
@@ -84,12 +89,59 @@
   });
   addEventListener('blur', () => { for (const a in isDown) isDown[a] = false; });
 
+  // ---- gamepad: polled once per frame; buttons feed the same action edges as keys,
+  // the left stick reads live for movement (so it never fights held keys/d-pad) ----
+  let padIndex = -1, lastAxX = 0, lastAxY = 0;
+  const padPrev = [], stickPrev = {};
+  const STICK = 0.5;
+  function detectGlyphs(id) {
+    id = id || '';
+    if (/xbox|xinput|045e/i.test(id)) return XBOX;
+    return /playstation|dualshock|dualsense|054c|wireless controller/i.test(id) ? PS : XBOX;
+  }
+  function stickEdge(a, on) { if (on && !stickPrev[a]) { wasPressed[a] = true; any = true; } else if (!on && stickPrev[a]) { wasReleased[a] = true; } stickPrev[a] = on; }
+  function pollGamepad() {
+    if (playbackMode || typeof navigator === 'undefined' || !navigator.getGamepads) return;
+    let gp = null; const pads = navigator.getGamepads();
+    for (const p of pads) if (p && p.connected) { gp = p; break; }
+    if (!gp) { padIndex = -1; return; }
+    if (padIndex !== gp.index) { padIndex = gp.index; padGlyphs = detectGlyphs(gp.id); }
+    for (let i = 0; i < gp.buttons.length; i++) {
+      const pressed = gp.buttons[i].pressed || gp.buttons[i].value > 0.5, was = padPrev[i];
+      if (pressed && !was) {
+        if (captureCb) { const cb = captureCb; captureCb = null; cb('Pad' + i); }
+        else { const as = codeToActions['Pad' + i]; if (as) for (const a of as) { isDown[a] = true; wasPressed[a] = true; any = true; } }
+      } else if (!pressed && was) {
+        const as = codeToActions['Pad' + i]; if (as) for (const a of as) { isDown[a] = false; wasReleased[a] = true; }
+      }
+      padPrev[i] = pressed;
+    }
+    lastAxX = gp.axes[0] || 0; lastAxY = gp.axes[1] || 0;
+    stickEdge('left', lastAxX < -STICK); stickEdge('right', lastAxX > STICK);
+    stickEdge('up', lastAxY < -STICK); stickEdge('down', lastAxY > STICK);
+  }
+  // held state including the live analog stick (stick never mutates isDown — read fresh here)
+  function held(a) {
+    if (isDown[a]) return true;
+    if (a === 'left') return lastAxX < -STICK; if (a === 'right') return lastAxX > STICK;
+    if (a === 'up') return lastAxY < -STICK; if (a === 'down') return lastAxY > STICK;
+    return false;
+  }
+  function rumble(strong, weak, ms) {
+    if (typeof navigator === 'undefined' || !navigator.getGamepads || padIndex < 0) return;
+    const gp = navigator.getGamepads()[padIndex];
+    const act = gp && (gp.vibrationActuator || (gp.hapticActuators && gp.hapticActuators[0]));
+    if (act && act.playEffect) { try { act.playEffect('dual-rumble', { duration: ms || 120, strongMagnitude: Math.min(1, strong || 0.4), weakMagnitude: Math.min(1, weak != null ? weak : strong || 0.4) }); } catch (e) { } }
+  }
+
   G.Input = {
-    down: a => !!isDown[a],
+    down: held,
     pressed: a => !!wasPressed[a],
     released: a => !!wasReleased[a],
-    axisX: () => (isDown.right ? 1 : 0) - (isDown.left ? 1 : 0),
+    axisX: () => (held('right') ? 1 : 0) - (held('left') ? 1 : 0),
     anyPressed: () => any,
+    pollGamepad, rumble,
+    padConnected: () => padIndex >= 0,
     // on-screen touch controls feed input through these (mirror keydown/keyup)
     virtualDown(a) { if (!isDown[a]) { isDown[a] = true; wasPressed[a] = true; any = true; } },
     virtualUp(a) { if (isDown[a]) { isDown[a] = false; wasReleased[a] = true; } },

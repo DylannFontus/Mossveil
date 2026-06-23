@@ -137,6 +137,7 @@
     { key: 'controls', label: 'Controls / key bindings', type: 'action' },
     { key: 'volume', label: 'Sound volume', type: 'slider' },
     { key: 'shake', label: 'Screen shake', type: 'toggle' },
+    { key: 'rumble', label: 'Controller rumble', type: 'toggle' },
     { key: 'quality', label: 'Visual quality', type: 'cycle', opts: ['low', 'medium', 'high'] },
     { key: 'tonemap', label: 'Tone mapping', type: 'cycle', opts: ['Off', 'ACES', 'AgX'] },
     { key: 'lighting', label: 'Dynamic lighting', type: 'toggle' },
@@ -148,7 +149,7 @@
     { key: 'motionblur', label: 'Motion blur', type: 'toggle' },
     { key: 'vignette', label: 'Vignette', type: 'toggle' }
   ];
-  G.settings = { volume: 0.8, shake: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
+  G.settings = { volume: 0.8, shake: true, rumble: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
   const fmtSetting = d => {
     if (d.type === 'action') return '▶';
     const v = G.settings[d.key];
@@ -789,6 +790,7 @@
     let rdt = Math.min(0.033, Math.max(0.0001, (t - lastT) / 1000));
     lastT = t;
     const I = G.Input;
+    if (I.pollGamepad) I.pollGamepad();         // fold controller input into the action layer
     if (G.Replay) rdt = G.Replay.frame(rdt);   // record/inject input + (on playback) override dt
 
     // global keys
