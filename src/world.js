@@ -1076,6 +1076,114 @@
     return ent;
   };
 
+  // ---- detailed, full-colour Victorian furniture (NOT silhouettes) ----------------------
+  const _fmat = {};
+  function fmat(hex) { return _fmat[hex] || (_fmat[hex] = new THREE.MeshBasicMaterial({ color: hex, side: THREE.DoubleSide, fog: false })); }
+  function fadd(grp, geo, hex, z) { const m = new THREE.Mesh(geo, fmat(hex)); m.position.z = z || 0; grp.add(m); return m; }
+  function frect(grp, x0, y0, x1, y1, hex, z) { return fadd(grp, new THREE.ShapeGeometry(U.poly([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])), hex, z); }
+  function fspl(grp, pts, hex, z, seg) { return fadd(grp, new THREE.ShapeGeometry(U.splineShape(pts), seg || 10), hex, z); }
+  function fpoly(grp, pts, hex, z) { return fadd(grp, new THREE.ShapeGeometry(U.poly(pts)), hex, z); }
+  function fcirc(grp, r, hex, x, y, z) { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 12), fmat(hex)); m.position.set(x, y, z || 0); grp.add(m); return m; }
+  const FURN = W.FURN = {
+    sofa(g, s, r) {
+      frect(g, -1.7 * s, 0.18 * s, 1.7 * s, 0.98 * s, '#5a141a');
+      frect(g, -1.62 * s, 0.82 * s, 1.62 * s, 1.55 * s, '#7a1f24', 0.01);
+      fspl(g, [[-1.6 * s, 0.78 * s], [1.6 * s, 0.78 * s], [1.5 * s, 1.52 * s], [-1.5 * s, 1.52 * s]], '#8e2f35', 0.02, 8);
+      for (let i = -1; i <= 1; i++) fspl(g, [[i * 1.08 * s - 0.5 * s, 0.6 * s], [i * 1.08 * s + 0.5 * s, 0.6 * s], [i * 1.08 * s + 0.44 * s, 1.04 * s], [i * 1.08 * s - 0.44 * s, 1.04 * s]], '#9c3b41', 0.03, 6);
+      fspl(g, [[-1.92 * s, 0.18 * s], [-1.34 * s, 0.18 * s], [-1.3 * s, 1.36 * s], [-1.62 * s, 1.56 * s], [-1.96 * s, 1.3 * s]], '#681920', 0.04, 8);
+      fspl(g, [[1.34 * s, 0.18 * s], [1.92 * s, 0.18 * s], [1.96 * s, 1.3 * s], [1.62 * s, 1.56 * s], [1.3 * s, 1.36 * s]], '#681920', 0.04, 8);
+      frect(g, -1.5 * s, -0.16 * s, -1.2 * s, 0.22 * s, '#2e1d10'); frect(g, 1.2 * s, -0.16 * s, 1.5 * s, 0.22 * s, '#2e1d10');
+      for (let i = -2; i <= 2; i++) fcirc(g, 0.045 * s, '#c8a64e', i * 0.56 * s, 1.12 * s, 0.05);
+    },
+    chair(g, s) {
+      frect(g, -0.5 * s, 0.55 * s, 0.5 * s, 0.75 * s, '#7a1f24', 0.02);
+      frect(g, -0.5 * s, 0.7 * s, 0.5 * s, 1.7 * s, '#3e2a18', 0.01);
+      frect(g, -0.42 * s, 0.78 * s, 0.42 * s, 1.6 * s, '#7a1f24', 0.02);
+      frect(g, -0.48 * s, 0, -0.32 * s, 0.6 * s, '#2e1d10'); frect(g, 0.32 * s, 0, 0.48 * s, 0.6 * s, '#2e1d10');
+    },
+    fireplace(g, s) {
+      frect(g, -1.75 * s, 0, 1.75 * s, 2.35 * s, '#7c3e2c');
+      for (let i = 0; i < 6; i++) frect(g, -1.75 * s, i * 0.42 * s, 1.75 * s, i * 0.42 * s + 0.05 * s, '#5a2a1c', 0.005);
+      frect(g, -1.08 * s, 0, 1.08 * s, 1.6 * s, '#120c08', 0.01);
+      frect(g, -1.0 * s, 1.45 * s, 1.0 * s, 1.6 * s, '#3a2414', 0.015);
+      frect(g, -2.0 * s, 2.22 * s, 2.0 * s, 2.7 * s, '#4a3320', 0.03);
+      frect(g, -1.9 * s, 2.62 * s, 1.9 * s, 2.7 * s, '#5c4026', 0.03);
+      frect(g, -0.75 * s, 0.1 * s, 0.75 * s, 0.34 * s, '#3a2414', 0.02);
+      const fire = fspl(g, [[-0.62 * s, 0.18 * s], [0.62 * s, 0.18 * s], [0.32 * s, 1.02 * s], [0, 1.34 * s], [-0.32 * s, 1.02 * s]], '#ff7a22', 0.03, 10);
+      fspl(g, [[-0.36 * s, 0.22 * s], [0.36 * s, 0.22 * s], [0.16 * s, 0.84 * s], [0, 1.0 * s], [-0.16 * s, 0.84 * s]], '#ffd24a', 0.04, 10);
+      return { fire, fy: fire.position.y };
+    },
+    painting(g, s, r) {
+      frect(g, -0.88 * s, -0.06 * s, 0.88 * s, 1.18 * s, '#a07c30');
+      frect(g, -0.78 * s, 0.04 * s, 0.78 * s, 1.08 * s, '#caa24a', 0.005);
+      frect(g, -0.68 * s, 0.12 * s, 0.68 * s, 1.0 * s, '#23201a', 0.01);
+      if (!r || r() < 0.5) {                       // landscape
+        frect(g, -0.68 * s, 0.56 * s, 0.68 * s, 1.0 * s, '#566f93', 0.02);
+        fspl(g, [[-0.68 * s, 0.56 * s], [-0.2 * s, 0.74 * s], [0.3 * s, 0.6 * s], [0.68 * s, 0.72 * s], [0.68 * s, 0.4 * s], [-0.68 * s, 0.4 * s]], '#39513a', 0.03, 8);
+        fcirc(g, 0.09 * s, '#e8d088', 0.34 * s, 0.86 * s, 0.025);
+      } else {                                      // portrait
+        frect(g, -0.68 * s, 0.12 * s, 0.68 * s, 1.0 * s, '#2b2230', 0.02);
+        fspl(g, [[-0.34 * s, 0.18 * s], [0.34 * s, 0.18 * s], [0.28 * s, 0.7 * s], [-0.28 * s, 0.7 * s]], '#3a2c40', 0.03, 6);
+        fcirc(g, 0.22 * s, '#d8c0a0', 0, 0.78 * s, 0.04);
+      }
+    },
+    bookshelf(g, s, r) {
+      r = r || Math.random;
+      frect(g, -1.05 * s, 0, 1.05 * s, 2.85 * s, '#3a2718');
+      frect(g, -1.05 * s, 0, 1.05 * s, 0.12 * s, '#2a1c10', 0.005);
+      const cols = ['#8a2a2a', '#2a5a3a', '#28386a', '#6a4a2a', '#5a2a5a', '#246a6a', '#7a5a26', '#3a3a4a'];
+      for (let row = 0; row < 4; row++) {
+        const by = row * 0.7 * s + 0.12 * s;
+        frect(g, -0.98 * s, by + 0.58 * s, 0.98 * s, by + 0.66 * s, '#2a1c10', 0.01);
+        let bx = -0.94 * s;
+        while (bx < 0.86 * s) { const bw = (0.08 + r() * 0.07) * s, bh = (0.42 + r() * 0.13) * s; frect(g, bx, by, bx + bw, by + bh, cols[(r() * cols.length) | 0], 0.02); bx += bw + 0.02 * s; }
+      }
+    },
+    table(g, s) {
+      frect(g, -1.2 * s, 0.78 * s, 1.2 * s, 0.95 * s, '#5a3f24', 0.02);
+      frect(g, -1.2 * s, 0.92 * s, 1.2 * s, 0.98 * s, '#6b4a28', 0.025);
+      frect(g, -1.0 * s, 0, -0.78 * s, 0.78 * s, '#3e2a18'); frect(g, 0.78 * s, 0, 1.0 * s, 0.78 * s, '#3e2a18');
+      frect(g, -0.6 * s, 0.95 * s, 0.6 * s, 1.02 * s, '#7a1f24', 0.03);            // red runner
+      fspl(g, [[-0.2 * s, 1.0 * s], [0.2 * s, 1.0 * s], [0.13 * s, 1.5 * s], [-0.13 * s, 1.5 * s]], '#caa24a', 0.04, 6); // candlestick
+      fcirc(g, 0.06 * s, '#ffd24a', 0, 1.56 * s, 0.05);
+    },
+    rug(g, s) {
+      frect(g, -2.6 * s, 0, 2.6 * s, 0.18 * s, '#6e1818');
+      frect(g, -2.6 * s, 0, -2.3 * s, 0.18 * s, '#b89a52', 0.005); frect(g, 2.3 * s, 0, 2.6 * s, 0.18 * s, '#b89a52', 0.005);
+      frect(g, -2.6 * s, 0.14 * s, 2.6 * s, 0.18 * s, '#b89a52', 0.005);
+      fpoly(g, [[-0.5 * s, 0.02 * s], [0, 0.16 * s], [0.5 * s, 0.02 * s], [0, -0.0 * s]], '#caa24a', 0.01);
+    },
+    chandelier(g, s) {
+      frect(g, -0.05 * s, -1.3 * s, 0.05 * s, 0, '#5a4a20');
+      fspl(g, [[-1.35 * s, -1.25 * s], [0, -0.78 * s], [1.35 * s, -1.25 * s], [0.7 * s, -1.92 * s], [0, -1.55 * s], [-0.7 * s, -1.92 * s]], '#c2a24a', 0.01, 10);
+      for (let i = -2; i <= 2; i++) { fcirc(g, 0.05 * s, '#fff0c0', i * 0.5 * s, -1.18 * s, 0.03); }
+    },
+    plant(g, s, r) {
+      r = r || Math.random;
+      fspl(g, [[-0.42 * s, 0], [0.42 * s, 0], [0.32 * s, 0.66 * s], [-0.32 * s, 0.66 * s]], '#9a5230', 0.01, 6);
+      frect(g, -0.34 * s, 0.5 * s, 0.34 * s, 0.62 * s, '#7a3e22', 0.012);
+      for (let i = 0; i < 6; i++) { const a = U.lerp(0.7, 2.45, r()), len = U.lerp(0.9, 1.9, r()) * s; fspl(g, [[-0.1 * s, 0.55 * s], [0.1 * s, 0.55 * s], [Math.cos(a) * len * 0.5, 0.55 * s + Math.sin(a) * len], [Math.cos(a) * len, 0.55 * s + Math.sin(a) * len * 0.92]], i % 2 ? '#2f6e3a' : '#3a824a', 0.02, 6); }
+    }
+  };
+  mkProp.furniture = (p, pal) => {
+    const grp = new THREE.Group();
+    const z = p.z !== undefined ? p.z : -0.2;
+    grp.position.set(p.x, p.y, z);
+    const s = p.scale || 1;
+    const rng = U.mulberry32((p.seed || 1) * 131 + Math.round(p.x * 7) + Math.round(p.y * 13));
+    const kind = FURN[p.kind] ? p.kind : 'sofa';
+    const out = FURN[kind](grp, s, rng) || {};
+    if (p.flip) grp.scale.x = -1;
+    if (kind === 'fireplace' && G.Lights) G.Lights.add({ x: p.x, y: p.y + 0.7, color: 0xff7a30, radius: 7, intensity: 1.0, flicker: 0.4 });
+    if (kind === 'chandelier' && G.Lights) G.Lights.add({ x: p.x, y: p.y - 0.9, color: 0xffcf86, radius: 7.5, intensity: 0.85, flicker: 0.16 });
+    let t = rng() * 9;
+    const fire = out.fire;
+    return {
+      type: 'furniture', x: p.x, y: p.y, group: grp,
+      update(dt) { if (fire) { t += dt; fire.scale.set(1 + Math.sin(t * 13) * 0.05, 1 + Math.sin(t * 9) * 0.14 + Math.sin(t * 19) * 0.06, 1); } }
+    };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);
@@ -1166,29 +1274,19 @@
       set(gap, fy, ' '); set(gap + 1, fy, ' ');
       floors.push(fy + 1);
     }
-    // interior per storey
-    const FURN = ['sofa', 'fireplace', 'bookshelf', 'table', 'plant', 'painting'];
+    // interior per storey — full-colour Victorian furniture
+    const FK = ['sofa', 'fireplace', 'bookshelf', 'table', 'plant', 'painting', 'chair'];
     for (const fy of floors) {
       const ix0 = bx + 2, ix1 = bx + bw - 3, cxm = (ix0 + ix1) / 2 + 0.5;
-      prop({ type: 'decor', kind: 'rug', x: cxm, y: fy + 0.04, scale: Math.max(1, (ix1 - ix0) / 7.5), color: '#360c0c', z: -0.24 });
+      prop({ type: 'furniture', kind: 'rug', x: cxm, y: fy + 0.02, scale: Math.max(1, (ix1 - ix0) / 9), z: -0.24 });
       let cx = ix0 + 1.5;
       while (cx < ix1 - 1.5) {
-        const k = FURN[(rng() * FURN.length) | 0];
-        if (k === 'painting') prop({ type: 'decor', kind: 'painting', x: cx, y: fy + 1.7 + rng(), color: '#7a5a32', z: -0.2 });
-        else if (k === 'fireplace') {
-          prop({ type: 'decor', kind: 'fireplace', x: cx, y: fy + 0.05, color: '#2b2622', z: -0.22 });
-          prop({ type: 'light', x: cx, y: fy + 0.7, color: '#ff8a3c', scale: 5, opacity: 0.32, flicker: true });
-        } else {
-          const col = k === 'sofa' ? '#7a1f1f' : k === 'bookshelf' ? '#3a2718' : k === 'table' ? '#4a3320' : '#2f5e3a';
-          prop({ type: 'decor', kind: k, x: cx, y: fy + 0.05, color: col, z: -0.2 });
-        }
+        const k = FK[(rng() * FK.length) | 0];
+        const yy = (k === 'painting') ? fy + 1.7 + rng() * 0.8 : fy + 0.04;
+        prop({ type: 'furniture', kind: k, x: cx + 0.5, y: yy, scale: 0.85 + rng() * 0.25, seed: ((cx * 31 + fy * 17) | 0) + 1, z: -0.2, flip: rng() < 0.4 });
         cx += 3 + rng() * 3;
       }
-      if (storeyH >= 6) {
-        const cy = fy + storeyH - 1.6;
-        prop({ type: 'decor', kind: 'chandelier', x: cxm, y: cy, color: '#caa24a', z: -0.32 });
-        prop({ type: 'light', x: cxm, y: cy - 0.8, color: '#ffcf86', scale: 7, opacity: 0.28, flicker: true });
-      }
+      if (storeyH >= 6) prop({ type: 'furniture', kind: 'chandelier', x: cxm, y: fy + storeyH - 0.7, scale: 1, z: -0.32 });
     }
     // exterior wall lamps for the City-of-Tears glow
     for (let cy = by + 4; cy < by + bh - 2; cy += storeyH) {

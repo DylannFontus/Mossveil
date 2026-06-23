@@ -95,6 +95,11 @@ G.LEVELS = {
     "spawn": "P",
     "x": -6.5,
     "y": -1
+   },
+   {
+    "side": "L",
+    "to": "forge",
+    "spawn": "R"
    }
   ],
   "intro": "intro"
@@ -1015,101 +1020,2324 @@ G.LEVELS = {
     "y": null
    }
   ]
+ },
+ "watercity": {
+  "id": "watercity",
+  "title": "City of Tears",
+  "area": "C I T Y   O F   T E A R S",
+  "biome": "city",
+  "w": 100,
+  "h": 100,
+  "mapPos": {
+   "mx": 150,
+   "my": 0
+  },
+  "weather": "rain",
+  "water": {
+   "y": 4,
+   "strength": 0.55,
+   "caustics": 0.5,
+   "color": "#74b0e0"
+  },
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bw  wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwb                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bww  wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwb                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bwwwwwwwwwwwwwwwwwwwwwwwwwwwww  wwwwwwwb                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bwwwwwwww  wwwwwwwwwwwwwwwwwwwwwwwwwwwwb                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                      bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "    bwwwwwwwwwwwwwwwwwww  wwwwwwwwwwwwwwwwwb                      bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bww  wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwb        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                 ",
+   "    b                                      b        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                 ",
+   "    b                                      b                                            bbbbbbbbbbbb",
+   "    b                                      b                                            bbbbbbbbbbbb",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww  wwwwwb                                                        ",
+   "    b                                      b                bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "    b                                      b                bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    b                                      b                                                        ",
+   "    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb                                                        ",
+   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "spawns": {
+   "1": {
+    "x": 96,
+    "y": 6
+   },
+   "P": {
+    "x": 52,
+    "y": 6
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "bench",
+    "x": 52,
+    "y": 5
+   },
+   {
+    "type": "sign",
+    "x": 49,
+    "y": 6,
+    "text": "City of Tears\nA Victorian house stands to the west"
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 6.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 8,
+    "y": 6.04,
+    "scale": 0.8590466581168584,
+    "seed": 335,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 11.622784945648164,
+    "y": 6.04,
+    "scale": 1.0529040381312371,
+    "seed": 447,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 14.774735584389418,
+    "y": 8.327236313559116,
+    "scale": 0.954504561284557,
+    "seed": 545,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 19.451630046823993,
+    "y": 6.04,
+    "scale": 0.9364459815202281,
+    "seed": 690,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 24.662428023293614,
+    "y": 8.290471591055393,
+    "scale": 0.8532542555127293,
+    "seed": 852,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 29.41597400815226,
+    "y": 6.04,
+    "scale": 1.0046745006926359,
+    "seed": 999,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 33.310994101688266,
+    "y": 6.04,
+    "scale": 0.951276115339715,
+    "seed": 1120,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 38.553025618428364,
+    "y": 6.04,
+    "scale": 0.9729486531228758,
+    "seed": 1282,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 14.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 15.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 8,
+    "y": 15.04,
+    "scale": 0.8900643630418926,
+    "seed": 488,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 11.358817050466314,
+    "y": 15.04,
+    "scale": 0.8658357066102326,
+    "seed": 592,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "bookshelf",
+    "x": 17.120096394093707,
+    "y": 15.04,
+    "scale": 0.8597954637603834,
+    "seed": 771,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 22.25504196761176,
+    "y": 15.04,
+    "scale": 1.085998317366466,
+    "seed": 930,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 27.231055242940784,
+    "y": 17.0494086638093,
+    "scale": 0.9184652248746715,
+    "seed": 1084,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 30.97745714755729,
+    "y": 15.04,
+    "scale": 0.9197710448293946,
+    "seed": 1200,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 36.840481834253296,
+    "y": 17.482952721789477,
+    "scale": 0.8878042767406441,
+    "seed": 1382,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 23.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 24.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 8,
+    "y": 24.04,
+    "scale": 0.8866153871291317,
+    "seed": 641,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 13.089209515601397,
+    "y": 24.04,
+    "scale": 1.0957505614147522,
+    "seed": 799,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 16.966543041169643,
+    "y": 24.04,
+    "scale": 0.9946893389220349,
+    "seed": 919,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 21.697783849202096,
+    "y": 24.04,
+    "scale": 0.9921686308458447,
+    "seed": 1066,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 27.322936264332384,
+    "y": 24.04,
+    "scale": 0.8801426623482257,
+    "seed": 1240,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 31.879039720166475,
+    "y": 24.04,
+    "scale": 0.9627110259840265,
+    "seed": 1381,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 37.27686913567595,
+    "y": 24.04,
+    "scale": 1.0603431330178865,
+    "seed": 1549,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 32.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 33.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 8,
+    "y": 33.04,
+    "scale": 0.8918397524044849,
+    "seed": 794,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 12.491067800438032,
+    "y": 33.04,
+    "scale": 1.0829631262109616,
+    "seed": 933,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 18.195845417212695,
+    "y": 33.04,
+    "scale": 0.8748977789888158,
+    "seed": 1110,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 22.838089763186872,
+    "y": 33.04,
+    "scale": 0.8975176415638998,
+    "seed": 1254,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 27.256145992316306,
+    "y": 33.04,
+    "scale": 1.0803678662865424,
+    "seed": 1391,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "bookshelf",
+    "x": 31.51353958202526,
+    "y": 33.04,
+    "scale": 0.9578958096913993,
+    "seed": 1523,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 36.97218514070846,
+    "y": 33.04,
+    "scale": 1.0973337509436534,
+    "seed": 1692,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 41.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 42.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "bookshelf",
+    "x": 8,
+    "y": 42.04,
+    "scale": 1.0287701354478487,
+    "seed": 947,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 13.621726431651041,
+    "y": 42.04,
+    "scale": 0.875120630452875,
+    "seed": 1121,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 18.124687540810555,
+    "y": 42.04,
+    "scale": 0.9319000874762423,
+    "seed": 1261,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "bookshelf",
+    "x": 23.16475018975325,
+    "y": 42.04,
+    "scale": 1.0751899882685394,
+    "seed": 1417,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 26.7326873508282,
+    "y": 42.04,
+    "scale": 0.8743981832172721,
+    "seed": 1528,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 32.349353798665106,
+    "y": 42.04,
+    "scale": 0.86446588820545,
+    "seed": 1702,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "bookshelf",
+    "x": 37.94518693606369,
+    "y": 42.04,
+    "scale": 0.9079757639206946,
+    "seed": 1875,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 50.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 51.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 8,
+    "y": 51.04,
+    "scale": 0.9097549367812462,
+    "seed": 1100,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 11.238387276651338,
+    "y": 51.04,
+    "scale": 1.0640176531975158,
+    "seed": 1200,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 14.554404975147918,
+    "y": 52.83852982223034,
+    "scale": 1.0020810801885092,
+    "seed": 1303,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 18.330739807803184,
+    "y": 51.04,
+    "scale": 0.9503324926714413,
+    "seed": 1420,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 24.261559357866645,
+    "y": 51.04,
+    "scale": 0.9019715710543096,
+    "seed": 1604,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "table",
+    "x": 28.699626344954595,
+    "y": 51.04,
+    "scale": 1.016614022688009,
+    "seed": 1742,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 32.68307204125449,
+    "y": 51.04,
+    "scale": 0.9958019305719062,
+    "seed": 1865,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 38.601360221393406,
+    "y": 51.04,
+    "scale": 1.0517434354056605,
+    "seed": 2049,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 59.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 60.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 8,
+    "y": 61.75572186596692,
+    "scale": 1.0249570416286589,
+    "seed": 1253,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 11.053103757090867,
+    "y": 60.04,
+    "scale": 0.9680617638747208,
+    "seed": 1348,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 16.107694304082543,
+    "y": 60.04,
+    "scale": 0.8969087287201546,
+    "seed": 1504,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 19.232967467047274,
+    "y": 62.089951509237295,
+    "scale": 1.0455774555681274,
+    "seed": 1601,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "bookshelf",
+    "x": 24.413685150444508,
+    "y": 60.04,
+    "scale": 0.9708989500300959,
+    "seed": 1762,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 29.546110685914755,
+    "y": 60.04,
+    "scale": 0.9454390639672056,
+    "seed": 1921,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 32.99032056820579,
+    "y": 60.04,
+    "scale": 0.9802314348286018,
+    "seed": 2028,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 36.92943614930846,
+    "y": 60.04,
+    "scale": 1.0800310280406848,
+    "seed": 2150,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 68.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "furniture",
+    "kind": "rug",
+    "x": 24,
+    "y": 69.02,
+    "scale": 3.888888888888889,
+    "z": -0.24
+   },
+   {
+    "type": "furniture",
+    "kind": "painting",
+    "x": 8,
+    "y": 70.85219286698849,
+    "scale": 0.9437628768733702,
+    "seed": 1406,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chair",
+    "x": 11.904751811409369,
+    "y": 69.04,
+    "scale": 1.0518534051603639,
+    "seed": 1527,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 15.821503651328385,
+    "y": 69.04,
+    "scale": 0.9863826084998436,
+    "seed": 1648,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 19.497094243299216,
+    "y": 69.04,
+    "scale": 0.943230341328308,
+    "seed": 1762,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 23.555861276341602,
+    "y": 69.04,
+    "scale": 0.8980728739057667,
+    "seed": 1888,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "fireplace",
+    "x": 27.57695712381974,
+    "y": 69.04,
+    "scale": 1.027616011351347,
+    "seed": 2013,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "sofa",
+    "x": 32.99947823048569,
+    "y": 69.04,
+    "scale": 0.9111191003699787,
+    "seed": 2181,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 36.032085614977404,
+    "y": 69.04,
+    "scale": 0.9328431556001305,
+    "seed": 2275,
+    "z": -0.2,
+    "flip": false
+   },
+   {
+    "type": "furniture",
+    "kind": "plant",
+    "x": 39.54586698603816,
+    "y": 69.04,
+    "scale": 0.8916901048738509,
+    "seed": 2384,
+    "z": -0.2,
+    "flip": true
+   },
+   {
+    "type": "furniture",
+    "kind": "chandelier",
+    "x": 24,
+    "y": 77.3,
+    "scale": 1,
+    "z": -0.32
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 9,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 9,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 18,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 18,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 27,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 27,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 36,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 36,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 45,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 45,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 54,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 54,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 63,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 63,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 3.7,
+    "y": 72,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   },
+   {
+    "type": "light",
+    "x": 43.3,
+    "y": 72,
+    "color": "#a6d4ff",
+    "scale": 6,
+    "opacity": 0.22
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "tombs",
+    "spawn": "R"
+   }
+  ]
+ },
+ "forge": {
+  "id": "forge",
+  "title": "The Iron Forge",
+  "area": "A S H F O R G E",
+  "biome": "forge",
+  "w": 64,
+  "h": 26,
+  "mapPos": {
+   "mx": 0,
+   "my": 60
+  },
+  "weather": "embers",
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "                                     #  #                 #     ",
+   "                                     #  #                 #     ",
+   "                                     #  #                 #     ",
+   "                                   #######                #     ",
+   "            ###                #     #  #                 #     ",
+   "     ###    ###   ####   #######     #  #   #####    ######     ",
+   "            ###          #######     #  #            ######     ",
+   "            ###          #######     #  #            ######     ",
+   "################################################################",
+   "################################################################",
+   "################################################################"
+  ],
+  "spawns": {
+   "P": {
+    "x": 3.5,
+    "y": 4.5
+   },
+   "R": {
+    "x": 60.5,
+    "y": 4.5
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 3.5,
+    "y": 3.02,
+    "color": "#2c2018",
+    "scale": 1.104059282061644,
+    "z": -0.3770472907926887
+   },
+   {
+    "type": "light",
+    "x": 3.5,
+    "y": 3.8,
+    "color": "#ff7a30",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "anvil",
+    "x": 10.5,
+    "y": 3.02,
+    "color": "#2e2018",
+    "scale": 1.0652527558384464,
+    "z": -0.3823209751397372
+   },
+   {
+    "type": "decor",
+    "kind": "brokenPillar",
+    "x": 15.5,
+    "y": 3.02,
+    "color": "#241008",
+    "scale": 1.0099878754233942,
+    "z": -0.4010622767498717
+   },
+   {
+    "type": "decor",
+    "kind": "anvil",
+    "x": 21.5,
+    "y": 3.02,
+    "color": "#2e2018",
+    "scale": 0.9380531808827073,
+    "z": -0.3187752758152783
+   },
+   {
+    "type": "decor",
+    "kind": "anvil",
+    "x": 26.5,
+    "y": 3.02,
+    "color": "#2e2018",
+    "scale": 1.0985409795073793,
+    "z": -0.3729616251308471
+   },
+   {
+    "type": "decor",
+    "kind": "gear",
+    "x": 43.5,
+    "y": 3.02,
+    "color": "#3a2c22",
+    "scale": 0.8281167684588582,
+    "z": -0.422273128433153
+   },
+   {
+    "type": "decor",
+    "kind": "anvil",
+    "x": 50.5,
+    "y": 3.02,
+    "color": "#2e2018",
+    "scale": 1.1717757251579315,
+    "z": -0.30416422977577895
+   },
+   {
+    "type": "decor",
+    "kind": "brokenPillar",
+    "x": 56.5,
+    "y": 3.02,
+    "color": "#241008",
+    "scale": 0.8716091819340364,
+    "z": -0.4549121339339763
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 6.5,
+    "y": 6.02,
+    "color": "#2c2018",
+    "scale": 0.9352153931511566,
+    "z": -0.35060255965217946
+   },
+   {
+    "type": "light",
+    "x": 6.5,
+    "y": 6.8,
+    "color": "#ff7a30",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 13.5,
+    "y": 7.02,
+    "color": "#2c2018",
+    "scale": 1.292186619550921,
+    "z": -0.32845730052795263
+   },
+   {
+    "type": "light",
+    "x": 13.5,
+    "y": 7.8,
+    "color": "#ff7a30",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "brokenPillar",
+    "x": 20.5,
+    "y": 6.02,
+    "color": "#241008",
+    "scale": 0.9501911741215736,
+    "z": -0.3664388560224324
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 28.5,
+    "y": 6.02,
+    "color": "#2c2018",
+    "scale": 0.8627396727213636,
+    "z": -0.3107529551722109
+   },
+   {
+    "type": "light",
+    "x": 28.5,
+    "y": 6.8,
+    "color": "#ff7a30",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "brokenPillar",
+    "x": 38.5,
+    "y": 8.02,
+    "color": "#241008",
+    "scale": 1.093578937300481,
+    "z": -0.33045768956653776
+   },
+   {
+    "type": "decor",
+    "kind": "gear",
+    "x": 46.5,
+    "y": 6.02,
+    "color": "#3a2c22",
+    "scale": 0.8617461067158729,
+    "z": -0.22392839845269918
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 55.5,
+    "y": 6.02,
+    "color": "#2c2018",
+    "scale": 1.2422041254583747,
+    "z": -0.488410518784076
+   },
+   {
+    "type": "light",
+    "x": 55.5,
+    "y": 6.8,
+    "color": "#ff7a30",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "steps",
+    "spawn": "2"
+   },
+   {
+    "side": "R",
+    "to": "mine",
+    "spawn": "P"
+   }
+  ]
+ },
+ "mine": {
+  "id": "mine",
+  "title": "Slate Mineworks",
+  "area": "D E E P D E L V E",
+  "biome": "mine",
+  "w": 70,
+  "h": 28,
+  "mapPos": {
+   "mx": 70,
+   "my": 60
+  },
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "                                    #          #                      ",
+   "                              #     #          #                      ",
+   "                              #     #          #                      ",
+   "                              #   # #          #            ######    ",
+   "                              ##### #          #     ####             ",
+   "     ######   ###  #######    #   # # #####  #####                    ",
+   "     ######                   #   # #          #                      ",
+   "     ######                   #   # #          #                      ",
+   "######################################################################",
+   "######################################################################",
+   "######################################################################"
+  ],
+  "spawns": {
+   "P": {
+    "x": 3.5,
+    "y": 4.5
+   },
+   "R": {
+    "x": 66.5,
+    "y": 4.5
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "decor",
+    "kind": "cartRail",
+    "x": 3.5,
+    "y": 3.02,
+    "color": "#2a2e36",
+    "scale": 0.9125899655744434,
+    "z": -0.2615952776744962
+   },
+   {
+    "type": "decor",
+    "kind": "gear",
+    "x": 13.5,
+    "y": 3.02,
+    "color": "#30353e",
+    "scale": 0.8082610319368542,
+    "z": -0.23219115210231395
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 17.5,
+    "y": 3.02,
+    "color": "#262a32",
+    "scale": 0.8770918579073623,
+    "z": -0.36562122805044056
+   },
+   {
+    "type": "decor",
+    "kind": "stalactite",
+    "x": 21.5,
+    "y": 3.02,
+    "color": "#1c2026",
+    "scale": 1.132840305985883,
+    "z": -0.43235509565565733
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 25.5,
+    "y": 3.02,
+    "color": "#262a32",
+    "scale": 0.802301664557308,
+    "z": -0.21427190669346602
+   },
+   {
+    "type": "decor",
+    "kind": "cartRail",
+    "x": 31.5,
+    "y": 3.02,
+    "color": "#2a2e36",
+    "scale": 0.9315855517750606,
+    "z": -0.44490475838538257
+   },
+   {
+    "type": "decor",
+    "kind": "cartRail",
+    "x": 35.5,
+    "y": 3.02,
+    "color": "#2a2e36",
+    "scale": 0.9466642167652026,
+    "z": -0.28868411839939656
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 39.5,
+    "y": 3.02,
+    "color": "#262a32",
+    "scale": 0.8607230350142345,
+    "z": -0.20084217661060394
+   },
+   {
+    "type": "decor",
+    "kind": "stalactite",
+    "x": 44.5,
+    "y": 3.02,
+    "color": "#1c2026",
+    "scale": 1.1097271589795128,
+    "z": -0.2112415175419301
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 48.5,
+    "y": 3.02,
+    "color": "#262a32",
+    "scale": 1.2132235592696816,
+    "z": -0.2599711354356259
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 53.5,
+    "y": 3.02,
+    "color": "#262a32",
+    "scale": 1.2487189567880705,
+    "z": -0.32583124663215135
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 57.5,
+    "y": 3.02,
+    "color": "#262a32",
+    "scale": 1.1604220277629793,
+    "z": -0.3572183785028756
+   },
+   {
+    "type": "decor",
+    "kind": "stalactite",
+    "x": 8.5,
+    "y": 6.02,
+    "color": "#1c2026",
+    "scale": 1.0397034788737074,
+    "z": -0.4635612124344334
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 15.5,
+    "y": 6.02,
+    "color": "#262a32",
+    "scale": 0.9971010189736262,
+    "z": -0.2888879800448194
+   },
+   {
+    "type": "decor",
+    "kind": "stalactite",
+    "x": 22.5,
+    "y": 6.02,
+    "color": "#1c2026",
+    "scale": 0.9836591737810523,
+    "z": -0.3689163189614192
+   },
+   {
+    "type": "decor",
+    "kind": "cartRail",
+    "x": 32.5,
+    "y": 7.02,
+    "color": "#2a2e36",
+    "scale": 1.2551276536658407,
+    "z": -0.3286429262254387
+   },
+   {
+    "type": "decor",
+    "kind": "gear",
+    "x": 40.5,
+    "y": 6.02,
+    "color": "#30353e",
+    "scale": 0.819725118065253,
+    "z": -0.3793167255120352
+   },
+   {
+    "type": "decor",
+    "kind": "pipe",
+    "x": 47.5,
+    "y": 6.02,
+    "color": "#262a32",
+    "scale": 0.9109135665465147,
+    "z": -0.2026932175969705
+   },
+   {
+    "type": "decor",
+    "kind": "stalactite",
+    "x": 63.5,
+    "y": 8.02,
+    "color": "#1c2026",
+    "scale": 0.8408908454701305,
+    "z": -0.29889149544760585
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "forge",
+    "spawn": "R"
+   },
+   {
+    "side": "R",
+    "to": "village",
+    "spawn": "P"
+   }
+  ]
+ },
+ "village": {
+  "id": "village",
+  "title": "Lantern Village",
+  "area": "E M B E R H O L L O W",
+  "biome": "village",
+  "w": 66,
+  "h": 24,
+  "mapPos": {
+   "mx": 146,
+   "my": 60
+  },
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "                              #####                               ",
+   "     #######                #                                     ",
+   "                      #######                                     ",
+   "                            #        ###                          ",
+   "               ####         #               ######   #####        ",
+   "                            #                        #####        ",
+   "                            #                        #####        ",
+   "                            #                        #####        ",
+   "##################################################################",
+   "##################################################################",
+   "##################################################################"
+  ],
+  "spawns": {
+   "P": {
+    "x": 3.5,
+    "y": 4.5
+   },
+   "R": {
+    "x": 62.5,
+    "y": 4.5
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "decor",
+    "kind": "lamppost",
+    "x": 3.5,
+    "y": 3.02,
+    "color": "#241a0e",
+    "scale": 1.110041549615562,
+    "z": -0.20491926793474705
+   },
+   {
+    "type": "light",
+    "x": 3.5,
+    "y": 3.8,
+    "color": "#ffcf86",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": false
+   },
+   {
+    "type": "decor",
+    "kind": "fern",
+    "x": 13.5,
+    "y": 3.02,
+    "color": "#264a1e",
+    "scale": 1.2813691982999444,
+    "z": -0.2967292759567499
+   },
+   {
+    "type": "decor",
+    "kind": "fern",
+    "x": 20.5,
+    "y": 3.02,
+    "color": "#264a1e",
+    "scale": 1.227784366765991,
+    "z": -0.3885015154024586
+   },
+   {
+    "type": "decor",
+    "kind": "hut",
+    "x": 26.5,
+    "y": 3.02,
+    "color": "#33240f",
+    "scale": 0.9373419349547476,
+    "z": -0.4514386664144695
+   },
+   {
+    "type": "decor",
+    "kind": "lamppost",
+    "x": 36.5,
+    "y": 3.02,
+    "color": "#241a0e",
+    "scale": 1.2162158023100347,
+    "z": -0.40172708991449324
+   },
+   {
+    "type": "light",
+    "x": 36.5,
+    "y": 3.8,
+    "color": "#ffcf86",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": false
+   },
+   {
+    "type": "decor",
+    "kind": "fern",
+    "x": 41.5,
+    "y": 3.02,
+    "color": "#264a1e",
+    "scale": 1.1493750480702147,
+    "z": -0.3071244462626055
+   },
+   {
+    "type": "decor",
+    "kind": "hut",
+    "x": 54.5,
+    "y": 3.02,
+    "color": "#33240f",
+    "scale": 1.004172235680744,
+    "z": -0.27015933392103764
+   },
+   {
+    "type": "decor",
+    "kind": "lamppost",
+    "x": 17.5,
+    "y": 7.02,
+    "color": "#241a0e",
+    "scale": 1.048480205074884,
+    "z": -0.28267873874865473
+   },
+   {
+    "type": "light",
+    "x": 17.5,
+    "y": 7.8,
+    "color": "#ffcf86",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": false
+   },
+   {
+    "type": "decor",
+    "kind": "fern",
+    "x": 25.5,
+    "y": 9.02,
+    "color": "#264a1e",
+    "scale": 1.2157382153207437,
+    "z": -0.4989208938088268
+   },
+   {
+    "type": "decor",
+    "kind": "plant",
+    "x": 56.5,
+    "y": 7.02,
+    "color": "#2f5e2f",
+    "scale": 1.220599023345858,
+    "z": -0.31402030198369174
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "mine",
+    "spawn": "R"
+   },
+   {
+    "side": "R",
+    "to": "archive",
+    "spawn": "P"
+   }
+  ]
+ },
+ "archive": {
+  "id": "archive",
+  "title": "The Amber Archive",
+  "area": "L O R E V A U L T",
+  "biome": "archive",
+  "w": 64,
+  "h": 26,
+  "mapPos": {
+   "mx": 218,
+   "my": 60
+  },
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "                                    #   #                       ",
+   "                                    #   #                       ",
+   "                                    #   #                       ",
+   "                                    #   #                       ",
+   "                                    #   # #                     ",
+   "     #####               ####### #  #######                     ",
+   "              ####  ###  ####### #  ####### #######    ####     ",
+   "                         ####### #  ####### #######             ",
+   "                         ####### #  ####### #######             ",
+   "################################################################",
+   "################################################################",
+   "################################################################"
+  ],
+  "spawns": {
+   "P": {
+    "x": 3.5,
+    "y": 4.5
+   },
+   "R": {
+    "x": 60.5,
+    "y": 4.5
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "decor",
+    "kind": "column",
+    "x": 7.5,
+    "y": 3.02,
+    "color": "#2a200f",
+    "scale": 1.1181643552379683,
+    "z": -0.34865600548218934
+   },
+   {
+    "type": "decor",
+    "kind": "candle",
+    "x": 13.5,
+    "y": 3.02,
+    "color": "#2a2012",
+    "scale": 1.1794131192844362,
+    "z": -0.2828707012347877
+   },
+   {
+    "type": "light",
+    "x": 13.5,
+    "y": 3.8,
+    "color": "#ffd98a",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "candle",
+    "x": 28.5,
+    "y": 3.02,
+    "color": "#2a2012",
+    "scale": 1.0582315591862426,
+    "z": -0.35451830017846075
+   },
+   {
+    "type": "light",
+    "x": 28.5,
+    "y": 3.8,
+    "color": "#ffd98a",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "column",
+    "x": 33.5,
+    "y": 3.02,
+    "color": "#2a200f",
+    "scale": 0.8421380741754547,
+    "z": -0.30502035925164817
+   },
+   {
+    "type": "decor",
+    "kind": "column",
+    "x": 40.5,
+    "y": 3.02,
+    "color": "#2a200f",
+    "scale": 1.0179018099559471,
+    "z": -0.380107858707197
+   },
+   {
+    "type": "decor",
+    "kind": "scroll",
+    "x": 45.5,
+    "y": 3.02,
+    "color": "#b89a52",
+    "scale": 0.9639867046615109,
+    "z": -0.3071850407868624
+   },
+   {
+    "type": "decor",
+    "kind": "scroll",
+    "x": 54.5,
+    "y": 3.02,
+    "color": "#b89a52",
+    "scale": 0.8200628219172359,
+    "z": -0.38630474822130056
+   },
+   {
+    "type": "decor",
+    "kind": "candle",
+    "x": 7.5,
+    "y": 7.02,
+    "color": "#2a2012",
+    "scale": 0.9277972289826721,
+    "z": -0.39618102528620514
+   },
+   {
+    "type": "light",
+    "x": 7.5,
+    "y": 7.8,
+    "color": "#ffd98a",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "bookshelf",
+    "x": 16.5,
+    "y": 6.02,
+    "color": "#33240f",
+    "scale": 0.8943356179632247,
+    "z": -0.45599818690679966
+   },
+   {
+    "type": "decor",
+    "kind": "candle",
+    "x": 28.5,
+    "y": 7.02,
+    "color": "#2a2012",
+    "scale": 1.2381940874736757,
+    "z": -0.24129810268059373
+   },
+   {
+    "type": "light",
+    "x": 28.5,
+    "y": 7.8,
+    "color": "#ffd98a",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "candle",
+    "x": 39.5,
+    "y": 7.02,
+    "color": "#2a2012",
+    "scale": 1.080222706263885,
+    "z": -0.22272604014724495
+   },
+   {
+    "type": "light",
+    "x": 39.5,
+    "y": 7.8,
+    "color": "#ffd98a",
+    "scale": 5,
+    "opacity": 0.28,
+    "flicker": true
+   },
+   {
+    "type": "decor",
+    "kind": "column",
+    "x": 47.5,
+    "y": 6.02,
+    "color": "#2a200f",
+    "scale": 1.1918173995334655,
+    "z": -0.26077496190555394
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "village",
+    "spawn": "R"
+   },
+   {
+    "side": "R",
+    "to": "garden",
+    "spawn": "P"
+   }
+  ]
+ },
+ "garden": {
+  "id": "garden",
+  "title": "The Royal Gardens",
+  "area": "B L O O M C O U R T",
+  "biome": "garden",
+  "w": 70,
+  "h": 26,
+  "mapPos": {
+   "mx": 290,
+   "my": 60
+  },
+  "weather": "pollen",
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "                                                      ######          ",
+   "                                            ######    ######          ",
+   "                                            ######    ######          ",
+   "                                 #######    ######    ######          ",
+   "                                 #######    ######    ######          ",
+   "           #     #######         #######    ######    ######          ",
+   "     ####  ####    #        ###  #######    ######    ######          ",
+   "     ####  #       #        ###  #######    ######    ######          ",
+   "     ####  #       #        ###  #######    ######    ######          ",
+   "######################################################################",
+   "######################################################################",
+   "######################################################################"
+  ],
+  "spawns": {
+   "P": {
+    "x": 3.5,
+    "y": 4.5
+   },
+   "R": {
+    "x": 66.5,
+    "y": 4.5
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "decor",
+    "kind": "tree",
+    "x": 3.5,
+    "y": 3.02,
+    "color": "#1a3a1f",
+    "scale": 1.1536612612660975,
+    "z": -0.4247158344835043
+   },
+   {
+    "type": "decor",
+    "kind": "flower",
+    "x": 7.5,
+    "y": 3.02,
+    "color": "#d86aa0",
+    "scale": 0.9665949017042295,
+    "z": -0.3528787193121389
+   },
+   {
+    "type": "decor",
+    "kind": "hedge",
+    "x": 11.5,
+    "y": 3.02,
+    "color": "#2f6e3e",
+    "scale": 0.9707432264229283,
+    "z": -0.2138395156012848
+   },
+   {
+    "type": "decor",
+    "kind": "hedge",
+    "x": 17.5,
+    "y": 3.02,
+    "color": "#2f6e3e",
+    "scale": 0.8394922570558265,
+    "z": -0.24929302455857397
+   },
+   {
+    "type": "decor",
+    "kind": "tree",
+    "x": 21.5,
+    "y": 3.02,
+    "color": "#1a3a1f",
+    "scale": 0.8427430920535699,
+    "z": -0.45122307988349347
+   },
+   {
+    "type": "decor",
+    "kind": "trellis",
+    "x": 26.5,
+    "y": 3.02,
+    "color": "#244018",
+    "scale": 0.8556214123498649,
+    "z": -0.2566753282910213
+   },
+   {
+    "type": "decor",
+    "kind": "trellis",
+    "x": 36.5,
+    "y": 3.02,
+    "color": "#244018",
+    "scale": 0.9683199686231092,
+    "z": -0.48150278597604484
+   },
+   {
+    "type": "decor",
+    "kind": "flower",
+    "x": 42.5,
+    "y": 3.02,
+    "color": "#d86aa0",
+    "scale": 1.0945661458652467,
+    "z": -0.31506227934733033
+   },
+   {
+    "type": "decor",
+    "kind": "flower",
+    "x": 49.5,
+    "y": 3.02,
+    "color": "#d86aa0",
+    "scale": 1.24519602204673,
+    "z": -0.3439808041788638
+   },
+   {
+    "type": "decor",
+    "kind": "hedge",
+    "x": 64.5,
+    "y": 3.02,
+    "color": "#2f6e3e",
+    "scale": 1.0049888676265255,
+    "z": -0.31918264196719975
+   },
+   {
+    "type": "decor",
+    "kind": "flower",
+    "x": 7.5,
+    "y": 6.02,
+    "color": "#d86aa0",
+    "scale": 1.0281997282989324,
+    "z": -0.3120026992401108
+   },
+   {
+    "type": "decor",
+    "kind": "hedge",
+    "x": 20.5,
+    "y": 7.02,
+    "color": "#2f6e3e",
+    "scale": 1.136654311278835,
+    "z": -0.4266758946934715
+   },
+   {
+    "type": "decor",
+    "kind": "hedge",
+    "x": 29.5,
+    "y": 6.02,
+    "color": "#2f6e3e",
+    "scale": 1.2096478612627835,
+    "z": -0.4762914819875732
+   },
+   {
+    "type": "decor",
+    "kind": "trellis",
+    "x": 36.5,
+    "y": 9.02,
+    "color": "#244018",
+    "scale": 0.9699220113223419,
+    "z": -0.4249756945762784
+   },
+   {
+    "type": "decor",
+    "kind": "flower",
+    "x": 47.5,
+    "y": 11.02,
+    "color": "#d86aa0",
+    "scale": 1.1743618620792404,
+    "z": -0.37678998152259735
+   },
+   {
+    "type": "decor",
+    "kind": "flower",
+    "x": 57.5,
+    "y": 12.02,
+    "color": "#d86aa0",
+    "scale": 0.9743064902257175,
+    "z": -0.4390718281501904
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "archive",
+    "spawn": "R"
+   },
+   {
+    "side": "R",
+    "to": "tombs",
+    "spawn": "P"
+   }
+  ]
+ },
+ "tombs": {
+  "id": "tombs",
+  "title": "The Cold Catacombs",
+  "area": "R E S T I N G G R O U N D S",
+  "biome": "tombs",
+  "w": 66,
+  "h": 26,
+  "mapPos": {
+   "mx": 362,
+   "my": 60
+  },
+  "tiles": [
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "                                     #                            ",
+   "                                   # #                            ",
+   "     ####                          # #                            ",
+   "     ####    #####    ###          # #                            ",
+   "     ####       #     ###          # #                            ",
+   "     ####       #     ###  ####   #####  #####  ####    ###       ",
+   "     ####       #     ###  ####    # #   #####  ####              ",
+   "     ####       #     ###  ####    # #   #####  ####              ",
+   "##################################################################",
+   "##################################################################",
+   "##################################################################"
+  ],
+  "spawns": {
+   "P": {
+    "x": 3.5,
+    "y": 4.5
+   },
+   "R": {
+    "x": 62.5,
+    "y": 4.5
+   }
+  },
+  "enemies": [],
+  "props": [
+   {
+    "type": "decor",
+    "kind": "tombstone",
+    "x": 3.5,
+    "y": 3.02,
+    "color": "#3e4a44",
+    "scale": 0.9119928086409346,
+    "z": -0.42005883518140763
+   },
+   {
+    "type": "decor",
+    "kind": "urn",
+    "x": 13.5,
+    "y": 3.02,
+    "color": "#414b45",
+    "scale": 0.9346436202293262,
+    "z": -0.2007622501347214
+   },
+   {
+    "type": "decor",
+    "kind": "statue",
+    "x": 23.5,
+    "y": 3.02,
+    "color": "#4a544e",
+    "scale": 1.2894997416995466,
+    "z": -0.3123279779916629
+   },
+   {
+    "type": "decor",
+    "kind": "urn",
+    "x": 33.5,
+    "y": 3.02,
+    "color": "#414b45",
+    "scale": 1.1886285190237686,
+    "z": -0.2550657413667068
+   },
+   {
+    "type": "decor",
+    "kind": "sarcophagus",
+    "x": 37.5,
+    "y": 3.02,
+    "color": "#36403a",
+    "scale": 0.9380399443442002,
+    "z": -0.3315161811653525
+   },
+   {
+    "type": "decor",
+    "kind": "sarcophagus",
+    "x": 43.5,
+    "y": 3.02,
+    "color": "#36403a",
+    "scale": 0.9082692042691634,
+    "z": -0.23369661560282112
+   },
+   {
+    "type": "decor",
+    "kind": "statue",
+    "x": 48.5,
+    "y": 3.02,
+    "color": "#4a544e",
+    "scale": 1.1358291301410646,
+    "z": -0.49401338344905527
+   },
+   {
+    "type": "decor",
+    "kind": "urn",
+    "x": 55.5,
+    "y": 3.02,
+    "color": "#414b45",
+    "scale": 1.1639614129206166,
+    "z": -0.3686705202795565
+   },
+   {
+    "type": "decor",
+    "kind": "statue",
+    "x": 60.5,
+    "y": 3.02,
+    "color": "#4a544e",
+    "scale": 1.0357453441945836,
+    "z": -0.3147902460768819
+   },
+   {
+    "type": "decor",
+    "kind": "tombstone",
+    "x": 7.5,
+    "y": 9.02,
+    "color": "#3e4a44",
+    "scale": 1.2215582318138332,
+    "z": -0.47940981371793895
+   },
+   {
+    "type": "decor",
+    "kind": "sarcophagus",
+    "x": 15.5,
+    "y": 8.02,
+    "color": "#36403a",
+    "scale": 1.0146001836517826,
+    "z": -0.33964289526920766
+   },
+   {
+    "type": "decor",
+    "kind": "tombstone",
+    "x": 23.5,
+    "y": 8.02,
+    "color": "#3e4a44",
+    "scale": 0.8141124731162563,
+    "z": -0.41233074616175147
+   },
+   {
+    "type": "decor",
+    "kind": "urn",
+    "x": 29.5,
+    "y": 6.02,
+    "color": "#414b45",
+    "scale": 1.2402728175045923,
+    "z": -0.47371029034256934
+   },
+   {
+    "type": "decor",
+    "kind": "statue",
+    "x": 43.5,
+    "y": 6.02,
+    "color": "#4a544e",
+    "scale": 0.8216688573127613,
+    "z": -0.31667256958317014
+   },
+   {
+    "type": "decor",
+    "kind": "urn",
+    "x": 50.5,
+    "y": 6.02,
+    "color": "#414b45",
+    "scale": 0.9448233823757619,
+    "z": -0.2027149508940056
+   },
+   {
+    "type": "decor",
+    "kind": "sarcophagus",
+    "x": 57.5,
+    "y": 6.02,
+    "color": "#36403a",
+    "scale": 1.008808217663318,
+    "z": -0.29995741564780476
+   }
+  ],
+  "transitions": [
+   {
+    "side": "L",
+    "to": "garden",
+    "spawn": "R"
+   },
+   {
+    "side": "R",
+    "to": "watercity",
+    "spawn": "P"
+   }
+  ]
  }
 };
-
-// ---- City of Tears (water city) — tiles built here; the Victorian building is stamped on load ----
-(function () {
-  const W = 100, H = 100, g = [];
-  for (let r = 0; r < H; r++) { const wy = H - 1 - r; g.push(wy <= 4 ? 'b'.repeat(W) : ''); }
-  const run = (wy, c0, c1, ch) => { const r = H - 1 - wy; let row = (g[r] || '').padEnd(W, ' '); for (let c = c0; c <= c1; c++) row = row.slice(0, c) + ch + row.slice(c + 1); g[r] = row; };
-  // right-half street platforms / ledges to traverse the flooded city
-  run(12, 60, 99, 'b'); run(13, 60, 99, 'b');
-  run(22, 52, 82, 'b'); run(23, 52, 82, 'b');
-  run(32, 66, 99, 'b'); run(33, 66, 99, 'b');
-  run(20, 88, 99, 'b'); run(21, 88, 99, 'b');
-  G.LEVELS.watercity = {
-    id: 'watercity', title: 'City of Tears', area: 'C I T Y   O F   T E A R S', biome: 'city', w: W, h: H,
-    mapPos: { mx: 150, my: 0 }, weather: 'rain',
-    water: { y: 4, strength: 0.55, caustics: 0.5, color: '#74b0e0' },
-    tiles: g,
-    spawns: { 'P': { x: 52, y: 6 }, '1': { x: 96, y: 6 } },
-    enemies: [],
-    props: [
-      { type: 'bench', x: 52, y: 5 },
-      { type: 'sign', x: 49, y: 6, text: 'City of Tears\nA Victorian house stands to the west' }
-    ],
-    transitions: [{ side: 'R', to: 'steps', spawn: 'P' }],
-    buildings: [{ x: 4, y: 5, w: 40, h: 70, seed: 7 }]
-  };
-})();
-
-// ---- new biome region: forge / mine / village / archive / garden / tombs ----
-// Each level is procedurally laid out (ground + a meandering path of reachable ledges) and
-// dressed with that biome's signature foreground props. Chained L/R into a traversable loop.
-(function () {
-  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  function biomeLevel(o) {
-    const W = o.w, H = o.h, gh = o.groundH || 3, M = o.mat || '#', rng = mulberry32(o.seed || 1);
-    const g = []; for (let r = 0; r < H; r++) g.push('');
-    const set = (c, wy, ch) => { if (c < 0 || c >= W || wy < 0 || wy >= H) return; const r = H - 1 - wy; const row = (g[r] || '').padEnd(W, ' '); g[r] = row.slice(0, c) + ch + row.slice(c + 1); };
-    const rect = (c0, wy0, c1, wy1, ch) => { for (let c = c0; c <= c1; c++) for (let wy = wy0; wy <= wy1; wy++) set(c, wy, ch); };
-    rect(0, 0, W - 1, gh - 1, M);                                  // ground
-    const props = (o.props || []).slice(), decor = o.decor || [];
-    const place = (x, y) => { if (!decor.length) return; const d = decor[(rng() * decor.length) | 0]; props.push({ type: 'decor', kind: d.kind, x: x + 0.5, y: y + 0.02, color: d.color, scale: d.scale || (0.8 + rng() * 0.5), z: -0.2 - rng() * 0.3 }); if (d.light) props.push({ type: 'light', x: x + 0.5, y: y + 0.8, color: d.light, scale: 5, opacity: 0.28, flicker: !!d.flicker }); };
-    // scatter decor along the ground
-    for (let x = 3; x < W - 3; x += 4 + (rng() * 4 | 0)) if (rng() < 0.7) place(x, gh);
-    // meandering ledges left -> right
-    let px = 5, py = gh + 2 + (rng() * 2 | 0);
-    while (px < W - 8) {
-      const pw = 3 + (rng() * 5 | 0);
-      py = Math.max(gh + 2, Math.min(H - 6, py + ((rng() * 7 | 0) - 3)));
-      rect(px, py, px + pw - 1, py, M);
-      if (rng() < 0.35) rect(px, gh, px + pw - 1, py - 1, M);       // occasional pillar down to ground
-      if (rng() < 0.8) place(px + (pw / 2 | 0), py + 1);
-      px += pw + 2 + (rng() * 3 | 0);
-    }
-    // a few standalone pillars / broken columns for verticality
-    for (let i = 0; i < (o.pillars || 3); i++) { const c = 5 + (rng() * (W - 10) | 0), h = 3 + (rng() * 7 | 0); rect(c, gh, c, gh + h, M); }
-    return {
-      id: o.id, title: o.title, area: o.area || null, biome: o.biome, w: W, h: H, mapPos: o.mapPos,
-      weather: o.weather, water: o.water, tiles: g,
-      spawns: { 'P': { x: 3.5, y: gh + 1.5 }, 'R': { x: W - 3.5, y: gh + 1.5 } },
-      enemies: o.enemies || [], props: props, transitions: o.transitions || []
-    };
-  }
-  const T = (side, to, spawn) => ({ side, to, spawn });
-  G.LEVELS.forge = biomeLevel({
-    id: 'forge', title: 'The Iron Forge', area: 'A S H F O R G E', biome: 'forge', w: 64, h: 26, seed: 11, mapPos: { mx: 0, my: 60 }, weather: 'embers', pillars: 4,
-    decor: [{ kind: 'anvil', color: '#2e2018' }, { kind: 'gear', color: '#3a2c22' }, { kind: 'pipe', color: '#2c2018', light: '#ff7a30', flicker: true }, { kind: 'brokenPillar', color: '#241008' }],
-    transitions: [T('L', 'steps', '2'), T('R', 'mine', 'P')]
-  });
-  G.LEVELS.mine = biomeLevel({
-    id: 'mine', title: 'Slate Mineworks', area: 'D E E P D E L V E', biome: 'mine', w: 70, h: 28, seed: 22, mapPos: { mx: 70, my: 60 }, pillars: 5,
-    decor: [{ kind: 'cartRail', color: '#2a2e36' }, { kind: 'pipe', color: '#262a32' }, { kind: 'gear', color: '#30353e' }, { kind: 'stalactite', color: '#1c2026' }],
-    transitions: [T('L', 'forge', 'R'), T('R', 'village', 'P')]
-  });
-  G.LEVELS.village = biomeLevel({
-    id: 'village', title: 'Lantern Village', area: 'E M B E R H O L L O W', biome: 'village', w: 66, h: 24, seed: 33, mapPos: { mx: 146, my: 60 }, pillars: 2,
-    decor: [{ kind: 'hut', color: '#33240f' }, { kind: 'plant', color: '#2f5e2f' }, { kind: 'lamppost', color: '#241a0e', light: '#ffcf86' }, { kind: 'fern', color: '#264a1e' }],
-    transitions: [T('L', 'mine', 'R'), T('R', 'archive', 'P')]
-  });
-  G.LEVELS.archive = biomeLevel({
-    id: 'archive', title: 'The Amber Archive', area: 'L O R E V A U L T', biome: 'archive', w: 64, h: 26, seed: 44, mapPos: { mx: 218, my: 60 }, pillars: 4,
-    decor: [{ kind: 'bookshelf', color: '#33240f' }, { kind: 'scroll', color: '#b89a52' }, { kind: 'candle', color: '#2a2012', light: '#ffd98a', flicker: true }, { kind: 'column', color: '#2a200f' }],
-    transitions: [T('L', 'village', 'R'), T('R', 'garden', 'P')]
-  });
-  G.LEVELS.garden = biomeLevel({
-    id: 'garden', title: 'The Royal Gardens', area: 'B L O O M C O U R T', biome: 'garden', w: 70, h: 26, seed: 55, mapPos: { mx: 290, my: 60 }, weather: 'pollen', pillars: 3,
-    decor: [{ kind: 'trellis', color: '#244018' }, { kind: 'hedge', color: '#2f6e3e' }, { kind: 'flower', color: '#d86aa0' }, { kind: 'tree', color: '#1a3a1f' }],
-    transitions: [T('L', 'archive', 'R'), T('R', 'tombs', 'P')]
-  });
-  G.LEVELS.tombs = biomeLevel({
-    id: 'tombs', title: 'The Cold Catacombs', area: 'R E S T I N G G R O U N D S', biome: 'tombs', w: 66, h: 26, seed: 66, pillars: 4, mapPos: { mx: 362, my: 60 },
-    decor: [{ kind: 'tombstone', color: '#3e4a44' }, { kind: 'sarcophagus', color: '#36403a' }, { kind: 'urn', color: '#414b45' }, { kind: 'statue', color: '#4a544e' }],
-    transitions: [T('L', 'garden', 'R'), T('R', 'watercity', 'P')]
-  });
-  // make watercity loop back, and open the region from the start area (left side of The Sunken Steps)
-  if (G.LEVELS.watercity) G.LEVELS.watercity.transitions = [{ side: 'L', to: 'tombs', spawn: 'R' }];
-  if (G.LEVELS.steps) G.LEVELS.steps.transitions.push({ side: 'L', to: 'forge', spawn: 'R' });
-})();

@@ -625,6 +625,14 @@
     const a = placing;
     // prefab: stamp a saved cluster of objects
     if (a.cat === 'prefab') { stampPrefab(a.prefab, x, y); if (!keepPlacing) setPlacing(null); queueRebuild(); refreshHierarchy(); refreshInspector(); return; }
+    // building generator: stamp a procedural Victorian building (walls/floors as tiles + furniture as props)
+    if (a.cat === 'build' && G.World.genBuilding) {
+      const w = (a.defaults && a.defaults.w) || 30, h = (a.defaults && a.defaults.h) || 46, seed = (a.defaults && a.defaults.seed) || (Math.random() * 9999 | 0);
+      G.World.genBuilding(L, { x: Math.max(0, Math.floor(x - w / 2)), y: Math.max(0, Math.floor(y)), w, h, seed });
+      if (!keepPlacing) setPlacing(null);
+      queueRebuild(); refreshHierarchy(); refreshInspector(); markDirty();
+      return;
+    }
     // scatter brush: stamp a randomized cluster of this decor
     if (scatter && a.id === 'decor') {
       L.props = L.props || [];
@@ -663,6 +671,7 @@
       const p = Object.assign({ type: a.id, x, y }, JSON.parse(JSON.stringify(a.defaults || {})));
       if (a.id === 'bossTrigger') p.boss = a.boss || 'mossSovereign';
       if (a.id === 'decor') p.kind = a.kind || 'tree';
+      if (a.id === 'furniture') p.kind = a.kind || 'sofa';
       L.props.push(p);
       sel = { kind: 'prop', i: L.props.length - 1 };
     }
@@ -1069,6 +1078,17 @@
           }
           break;
         }
+        case 'furniture': {
+          selectField(body, 'Kind', Object.keys(G.World.FURN || {}).map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
+          selectField(body, 'Depth', [
+            { v: '-0.2', t: 'gameplay layer' }, { v: '-0.32', t: 'just behind' }, { v: '-9', t: 'background near' }, { v: '5', t: 'foreground' }
+          ], () => String(p.z !== undefined ? p.z : -0.2), v => { p.z = parseFloat(v); });
+          numField(body, 'Scale', () => p.scale || 1, v => { p.scale = Math.max(0.2, v); }, 0.1);
+          checkField(body, 'Flip', () => p.flip, v => { p.flip = v; });
+          numField(body, 'Seed', () => p.seed || 1, v => { p.seed = Math.round(v); }, 1);
+          el('div', { class: 'insNote' }, body, 'Full-colour Victorian furniture (detailed, not silhouette).');
+          break;
+        }
         case 'light':
           colorField(body, 'Colour', () => p.color || '#ffeecc', v => { p.color = v || '#ffeecc'; });
           numField(body, 'Size', () => p.scale || 8, v => { p.scale = Math.max(1, v); }, 1);
@@ -1263,6 +1283,8 @@
   const ASSET_CATS = [
     { id: 'props', label: 'Props' },
     { id: 'decor', label: 'Decor' },
+    { id: 'furniture', label: 'Furniture' },
+    { id: 'build', label: 'Build' },
     { id: 'lights', label: 'Lights' },
     { id: 'enemies', label: 'Enemies' },
     { id: 'bosses', label: 'Bosses' },
@@ -1291,6 +1313,12 @@
         for (const k of G.World.DECOR_KINDS.hanging) out.push({ cat: 'prop', id: 'decor', kind: k, label: k + ' (hanging)', ico: '🪢' });
         return out;
       }
+      case 'furniture': return Object.keys(G.World.FURN || {}).map(k => ({ cat: 'prop', id: 'furniture', kind: k, label: k, ico: '🛋️' }));
+      case 'build': return [
+        { cat: 'build', id: 'building', label: 'House (small)', ico: '🏠', defaults: { w: 22, h: 28, seed: 3 } },
+        { cat: 'build', id: 'building', label: 'House', ico: '🏠', defaults: { w: 30, h: 46, seed: 5 } },
+        { cat: 'build', id: 'building', label: 'Manor / Tower', ico: '🏰', defaults: { w: 40, h: 70, seed: 7 } }
+      ];
       case 'lights': return [
         { cat: 'prop', id: 'light', label: 'Glow light', ico: '✨', defaults: { color: '#ffeecc', scale: 8, opacity: 0.3, flicker: false } },
         { cat: 'prop', id: 'light', label: 'Flickering light', ico: '🔥', defaults: { color: '#ffc878', scale: 7, opacity: 0.35, flicker: true } },
