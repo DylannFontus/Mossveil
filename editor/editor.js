@@ -419,7 +419,7 @@
     // The cutscene tab (timeline DOM + preview bar) and the playtest overlay (with its
     // Stop button) handle their own input. Bail out BEFORE capturing the pointer —
     // otherwise vpEl steals pointerup and clicks on those buttons never fire.
-    if (tab === 'cutscene' || $('playFrame').classList.contains('on')) return;
+    if (tab === 'cutscene' || tab === 'logic' || $('playFrame').classList.contains('on')) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { vpEl.setPointerCapture(e.pointerId); } catch (_) { }
 
@@ -470,7 +470,7 @@
   addEventListener('pointermove', e => {
     if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (gesturing && pointers.size >= 2) { updateGesture(); return; }
-    if (tab === 'cutscene') return;
+    if (tab === 'cutscene' || tab === 'logic') return;
     if (tab === 'map') { if (mapDrag) mapMouseMove(e); return; }
     if (panning) {
       const r = vpEl.getBoundingClientRect();
@@ -548,6 +548,7 @@
     pinch = now;
   }
   $('viewportWrap').addEventListener('wheel', e => {
+    if (tab === 'logic') return;            // the logic canvas handles its own zoom
     e.preventDefault();
     if (tab === 'map') {
       mapView.zoom = U.clamp(mapView.zoom * (e.deltaY > 0 ? 0.88 : 1.14), 0.4, 12);
@@ -2271,7 +2272,7 @@
       if (sum) { ctx.fillStyle = 'rgba(170,205,195,.75)'; ctx.font = (9 * z | 0) + 'px ui-monospace'; ctx.fillText(sum.slice(0, 26), s.x + 6 * z, s.y + 30 * z); }
     }
     ctx.fillStyle = 'rgba(160,200,180,.45)'; ctx.font = '12px ui-monospace,Consolas,monospace'; ctx.textAlign = 'left';
-    ctx.fillText('drag node = move · drag output→input = wire · click input = disconnect · Del = delete · wheel = zoom', 12, cv.height - 12);
+    ctx.fillText('left-drag node = move · drag output→input pin = wire · click input pin = disconnect · right-drag = pan · wheel = zoom · Del = delete', 12, cv.height - 12);
   }
 
   function pointAt(e) { const r = logicCanvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
@@ -2318,13 +2319,18 @@
     el('div', { class: 'insNote', style: 'opacity:.6' }, body, 'Del to delete · drag pins to (re)wire.');
   }
 
+  logicCanvas.addEventListener('contextmenu', e => { if (tab === 'logic') e.preventDefault(); });
   logicCanvas.addEventListener('pointerdown', e => {
     if (tab !== 'logic') return;
     const m = pointAt(e), g = graphOf(); if (!g) return;
-    for (const n of g.nodes) for (let i = 0; i < nodeOuts(n); i++) { const p = outPin(n, i); if (Math.hypot(p.x - m.x, p.y - m.y) < 10) { logicWire = { from: n.id, fp: i, mx: m.x, my: m.y }; logicCanvas.setPointerCapture(e.pointerId); return; } }
-    for (const n of g.nodes) { const t = ETYPES[n.type] || {}; if ((t.ins || 0) > 0) { const p = inPin(n); if (Math.hypot(p.x - m.x, p.y - m.y) < 10) { g.links = g.links.filter(l => l.to !== n.id); markDirty(); return; } } }
-    for (let k = g.nodes.length - 1; k >= 0; k--) { const n = g.nodes[k], s = L2S(n.x, n.y), w = NODE_W * logicCam.zoom, h = nodeH(n) * logicCam.zoom; if (m.x >= s.x && m.x <= s.x + w && m.y >= s.y && m.y <= s.y + h) { logicSel = n.id; const lp = S2L(m.x, m.y); logicDrag = { id: n.id, ox: lp.x - n.x, oy: lp.y - n.y }; logicCanvas.setPointerCapture(e.pointerId); refreshInspector(); return; } }
-    logicSel = null; logicPan = { mx: m.x, my: m.y, cx: logicCam.x, cy: logicCam.y }; logicCanvas.setPointerCapture(e.pointerId); refreshInspector();
+    const cap = () => { try { logicCanvas.setPointerCapture(e.pointerId); } catch (_) { } };
+    // right / middle button (or space-less middle) drags to pan
+    if (e.button === 1 || e.button === 2) { logicPan = { mx: m.x, my: m.y, cx: logicCam.x, cy: logicCam.y }; cap(); return; }
+    if (e.button !== 0) return;
+    for (const n of g.nodes) for (let i = 0; i < nodeOuts(n); i++) { const p = outPin(n, i); if (Math.hypot(p.x - m.x, p.y - m.y) < 11) { logicWire = { from: n.id, fp: i, mx: m.x, my: m.y }; cap(); return; } }
+    for (const n of g.nodes) { const t = ETYPES[n.type] || {}; if ((t.ins || 0) > 0 && g.links.some(l => l.to === n.id)) { const p = inPin(n); if (Math.hypot(p.x - m.x, p.y - m.y) < 9) { g.links = g.links.filter(l => l.to !== n.id); markDirty(); return; } } }
+    for (let k = g.nodes.length - 1; k >= 0; k--) { const n = g.nodes[k], s = L2S(n.x, n.y), w = NODE_W * logicCam.zoom, h = nodeH(n) * logicCam.zoom; if (m.x >= s.x && m.x <= s.x + w && m.y >= s.y && m.y <= s.y + h) { logicSel = n.id; const lp = S2L(m.x, m.y); logicDrag = { id: n.id, ox: lp.x - n.x, oy: lp.y - n.y }; cap(); refreshInspector(); return; } }
+    logicSel = null; refreshInspector();    // empty left-click just deselects (pan = right/middle drag)
   });
   logicCanvas.addEventListener('pointermove', e => {
     if (tab !== 'logic') return; const m = pointAt(e);
