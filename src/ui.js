@@ -10,6 +10,7 @@
   let prompts = [];
   let toasts = [];           // {text, t}
   let areaQ = [];            // queued area titles {text, t}
+  let banners = [];          // placed text banners (from the Logic graph) {text, place, t, secs}
   let bossT = -1, bossText = '';
   let maskFlash = 0, healFlash = 0, lowHpPulse = 0;
   const fade = { val: 1, target: 1, speed: 2, cb: null };
@@ -46,6 +47,23 @@
   UI.prompt = (wx, wy, text, sign) => { prompts.push({ wx, wy, text, sign }); };
   UI.toast = text => { toasts.push({ text, t: 0 }); G.Audio.sfx('uiBell'); };
   UI.areaTitle = text => { areaQ.push({ text, t: 0 }); };
+  // a placed text banner (Logic graph "Show Text" with a placement: top / center / bottom)
+  UI.banner = (text, place, secs) => { banners.push({ text: text || '', place: place || 'center', t: 0, secs: secs || 2.5 }); };
+  function drawBanners(dt) {
+    for (let i = banners.length - 1; i >= 0; i--) {
+      const b = banners[i]; b.t += dt;
+      const total = b.secs + 0.8;
+      if (b.t > total) { banners.splice(i, 1); continue; }
+      const a = b.t < 0.4 ? b.t / 0.4 : b.t > b.secs ? Math.max(0, 1 - (b.t - b.secs) / 0.8) : 1;
+      const y = b.place === 'top' ? h * 0.16 : b.place === 'bottom' ? h * 0.84 : h * 0.5;
+      cx.save();
+      cx.globalAlpha = a; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.font = `italic ${Math.round(h * 0.04)}px ${serif}`;
+      cx.fillStyle = '#eef4ef'; cx.shadowColor = 'rgba(0,0,0,0.92)'; cx.shadowBlur = 14;
+      b.text.split('\n').forEach((ln, k, arr) => cx.fillText(ln, w / 2, y + (k - (arr.length - 1) / 2) * h * 0.05));
+      cx.restore();
+    }
+  }
   UI.bossTitle = text => { bossText = text; bossT = 0; };
   // persistent boss health bar (Hollow Knight style)
   const bossBar = { boss: null, name: '', maxHp: 1, dispHp: 0, lagHp: 0, shown: 0 };
@@ -952,6 +970,7 @@
       drawBossBar(dt);
       drawBossTitle(dt);
       drawToasts(dt);
+      drawBanners(dt);
     }
     cx.drawImage(vignette, 0, 0, w, h);
 

@@ -216,6 +216,7 @@
 
   G.Audio = {
     init,
+    sfxNames: Object.keys(SFX),
     get started() { return started; },
     sfx(name) { if (started && SFX[name]) SFX[name](); },
     setArea(root) { areaRoot = root; if (started) retune(); },

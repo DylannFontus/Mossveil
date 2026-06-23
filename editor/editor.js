@@ -1629,47 +1629,106 @@
     return { warns, bad };
   }
 
-  // live count badge on the Lint button
+  // live count badge on the Lint left-panel tab (+ refresh the panel if it's open)
   function refreshLint() {
-    const b = $('btnLint'); if (!b) return;
+    const tab = $('ltabLint'); if (!tab) return;
     const { warns } = validateWorld();
     const errs = warns.filter(w => w.sev === 'error').length;
-    b.textContent = warns.length ? `⚠ Lint (${warns.length})` : '⚠ Lint';
-    b.classList.toggle('warn', errs > 0);
+    tab.textContent = warns.length ? `Lint (${warns.length})` : 'Lint';
+    tab.classList.toggle('warn', errs > 0);
+    if ($('lint') && $('lint').style.display !== 'none') refreshLintPanel();
   }
-  // a clickable panel of every world issue, grouped by level
-  function lintModal() {
-    const box = $('modalBox'); box.innerHTML = '';
-    el('h3', {}, box, '⚠ World validation');
+  // clickable list of every world issue, grouped by level — rendered into the left Lint panel
+  function refreshLintPanel() {
+    const box = $('lint'); if (!box) return; box.innerHTML = '';
     const { warns } = validateWorld();
-    if (!warns.length) {
-      el('div', { class: 'insNote', style: 'color:#7fd89a;padding:10px 0' }, box, '✓ No issues found — every link, reference and exit checks out.');
-    } else {
-      const errs = warns.filter(w => w.sev === 'error').length;
-      el('div', { class: 'insNote' }, box, `${warns.length} issue${warns.length > 1 ? 's' : ''} · ${errs} error${errs !== 1 ? 's' : ''}, ${warns.length - errs} warning${(warns.length - errs) !== 1 ? 's' : ''} — click one to jump to it.`);
-      const list = el('div', { style: 'max-height:50vh;overflow:auto;margin:8px 0' }, box);
-      const byId = {};
-      for (const w of warns) (byId[w.id] = byId[w.id] || []).push(w);
-      for (const id in byId) {
-        el('div', { style: 'color:#9fd8b8;font-size:12px;margin:9px 0 2px;font-weight:600' }, list, id);
-        for (const w of byId[id]) {
-          const row = el('div', { style: 'display:flex;gap:7px;align-items:flex-start;padding:4px 6px;border-radius:4px;cursor:pointer;font-size:12px' }, list);
-          row.addEventListener('mouseenter', () => row.style.background = 'rgba(255,255,255,0.06)');
-          row.addEventListener('mouseleave', () => row.style.background = '');
-          el('span', { style: 'color:' + (w.sev === 'error' ? '#ff7a6a' : '#ffcf4a'), title: w.sev }, row, w.sev === 'error' ? '✕' : '⚠');
-          el('span', { style: 'color:#d8d2c8' }, row, w.msg);
-          row.addEventListener('click', () => {
-            $('modal').style.display = 'none';
-            if (!G.LEVELS[w.id]) return;
-            if (w.id !== currentId) openLevel(w.id);
-            if (w.sel) setTimeout(() => { sel = w.sel; multi = []; if (w.sel.kind === 'prop' || w.sel.kind === 'zone') { const it = selectedItem(); if (it && it.ref) { camX = it.ref.x != null ? it.ref.x : (it.ref.rect ? it.ref.rect.x : camX); camY = it.ref.y != null ? it.ref.y : (it.ref.rect ? it.ref.rect.y : camY); } } refreshInspector(); refreshHierarchy(); }, 220);
-          });
-        }
+    if (!warns.length) { el('div', { class: 'insNote', style: 'color:#7fd89a;padding:12px 10px' }, box, '✓ No issues found — every link, reference and exit checks out.'); return; }
+    const errs = warns.filter(w => w.sev === 'error').length;
+    el('div', { class: 'insNote', style: 'padding:8px 10px 4px' }, box, `${warns.length} issue${warns.length > 1 ? 's' : ''} · ${errs} error${errs !== 1 ? 's' : ''}, ${warns.length - errs} warning${(warns.length - errs) !== 1 ? 's' : ''} — click to jump to it.`);
+    const byId = {};
+    for (const w of warns) (byId[w.id] = byId[w.id] || []).push(w);
+    for (const id in byId) {
+      el('div', { style: 'color:#9fd8b8;font-size:12px;margin:9px 10px 2px;font-weight:600' }, box, (G.LEVELS[id] ? (G.LEVELS[id].title || id) : id));
+      for (const w of byId[id]) {
+        const row = el('div', { class: 'lintRow' }, box);
+        el('span', { style: 'color:' + (w.sev === 'error' ? '#ff7a6a' : '#ffcf4a'), title: w.sev }, row, w.sev === 'error' ? '✕' : '⚠');
+        el('span', { style: 'color:#d8d2c8' }, row, w.msg);
+        row.addEventListener('click', () => {
+          if (!G.LEVELS[w.id]) return;
+          if (w.id !== currentId) openLevel(w.id);
+          if (w.sel) setTimeout(() => { sel = w.sel; multi = []; const it = selectedItem(); if (it && it.ref) { camX = it.ref.x != null ? it.ref.x : (it.ref.rect ? it.ref.rect.x : camX); camY = it.ref.y != null ? it.ref.y : (it.ref.rect ? it.ref.rect.y : camY); } refreshInspector(); refreshHierarchy(); }, 200);
+        });
       }
     }
-    const btns = el('div', { id: 'modalBtns' }, box);
-    el('button', { class: 'tbtn', onclick: () => { $('modal').style.display = 'none'; } }, btns, 'Close');
-    $('modal').style.display = 'flex';
+  }
+
+  // ---- Guide / dictionary: documents every Logic node + engine concept ----
+  const NODE_DESC = {
+    onRoomEnter: 'Fires once when the player enters this room.',
+    onTimer: 'Fires once, N seconds after the room loads.',
+    onZone: 'Fires when the player walks into the rectangle (x,y,w,h). “once” = only the first time.',
+    onSignal: 'Fires when an Emit Signal action broadcasts a matching name.',
+    onBossDeath: 'Fires when a boss dies (blank id = any boss).',
+    onInterval: 'Fires repeatedly every N seconds while in the room.',
+    onHpBelow: 'Fires when the player’s health drops below the threshold (re-arms when it rises again).',
+    ifFlag: 'Branch: “true” if the flag is set, else “false”.',
+    ifNotFlag: 'Branch: “unset” if the flag is NOT set, else “set”.',
+    chance: 'Random branch — “hit” with the given % chance, else “miss”.',
+    gate: 'Passes through only the FIRST time it’s reached this room session, then blocks.',
+    setActive: 'Show or hide an object by its id + level. Use the ⌖ picker to choose the object.',
+    setFlag: 'Set a saved flag on or off.',
+    signal: 'Broadcast a signal name — every On Signal node with that name fires.',
+    wait: 'Pause this chain for N seconds, then continue.',
+    sound: 'Play a sound effect (pick from the list).',
+    shake: 'Shake the camera.',
+    hitstop: 'Briefly freeze the game for impact (seconds).',
+    flash: 'Flash the whole screen a colour.',
+    fx: 'Spawn a particle burst at the player (+ dx/dy offset).',
+    heal: 'Restore player health.',
+    hurt: 'Damage the player.',
+    weather: 'Change the room’s weather.',
+    toast: 'Show a small italic notice near the bottom (custom text).',
+    areaTitle: 'Show a big centred area title (custom text).',
+    cutscene: 'Play a cutscene.',
+    text: 'Show custom text — choose placement: default area-title, top / centre / bottom, or toast.',
+    log: 'Print a message to the browser console (debugging).'
+  };
+  const CONCEPTS = [
+    ['Object id', 'Every placed prop, enemy and portal gets an automatic numeric id (shown in its inspector). Reference it from the Logic graph or triggers; the ⌖ scope button searches and inserts ids.'],
+    ['Flag', 'A saved on/off switch the game remembers (e.g. “door1_opened”). Set it with Set Flag; branch on it with If Flag / If Not Flag.'],
+    ['Signal', 'A one-off message inside the running graph. Emit Signal broadcasts a name; On Signal nodes with the same name fire. Good for fanning one event out to many actions.'],
+    ['Active system', 'Objects can be toggled active/inactive (Set Active). Inactive objects are hidden and inert until a trigger flips them on.'],
+    ['Building generator', 'Build tab → House / Manor: stamps a procedural multi-storey building (stone shell + wood floors as terrain, randomised Victorian furniture as props).'],
+    ['Wall backdrop', 'Build tab → Wall (wood / brick / wallpaper): a tileable interior wall placed behind a building to hide the biome. Not affected by dynamic lighting.'],
+    ['Furniture', 'Furniture tab: full-colour Victorian furniture — sofa, fireplace (live fire), bookshelf, table, chandelier, painting, plant, chair, rug.'],
+    ['Biomes', '20 biome looks (verdant, gloom, City of Tears, forge, mine, village, archive, garden, tombs…). Set per level in Level settings; backgrounds + decor follow.'],
+    ['Dynamic lighting', 'Real-time 2D lights (lamps, fires, player lantern) with soft shadows + edge glow. Per-room Intensity / Edge glow / Soft shadows in Level settings; on/off in the in-game Settings.']
+  ];
+  const TOOLS = [
+    ['Auto-tile (⊞ Auto)', 'While painting terrain, exposed edges become the smooth/curvy variant and buried interior stays hard. Shift+click the button retiles the whole level.'],
+    ['Profiler (F3)', 'Toggle the performance overlay: FPS + frame-time graph, draw calls, triangles, light count, active post passes.'],
+    ['Record & replay (F6 / F7 / F8)', 'F6 records a run, F7 replays it deterministically, F8 stops. Great for demos and debugging a death.'],
+    ['Tone mapping', 'In-game Settings → Tone mapping: Off / ACES / AgX filmic curves. Also Motion blur, Dynamic lighting toggles.'],
+    ['Tabs', 'Top: Scene (paint & place), Map, Cutscene, Logic (visual scripting). Left panel: Hierarchy, Levels, Scenes, Lint, Guide.'],
+    ['Lint', 'Validates the world — broken links, missing references, dead-end rooms. Click an issue to jump straight to it.'],
+    ['Asset tabs', 'Props, Decor, Furniture, Build, Lights, Enemies, Bosses, Markers, Prefabs. Shift+click to keep placing.']
+  ];
+  function buildGuide() {
+    const box = $('guide'); if (!box) return; box.innerHTML = '';
+    const sb = el('input', { id: 'guideSearch', placeholder: 'Search the guide…', spellcheck: 'false' }, box);
+    const content = el('div', {}, box);
+    const T = (G.EventGraph && G.EventGraph.TYPES) || {};
+    const mkSec = title => { const s = el('div', { class: 'gSec' }, content); el('div', { class: 'gHead' }, s, title); return s; };
+    const mkEntry = (s, name, desc) => { const e = el('div', { class: 'gEntry' }, s); el('div', { class: 'gName' }, e, name); el('div', { class: 'gDesc' }, e, desc); };
+    const ev = mkSec('Logic — Events'), cn = mkSec('Logic — Conditions'), ac = mkSec('Logic — Actions');
+    for (const k in T) { const def = T[k]; const s = def.kind === 'event' ? ev : def.kind === 'cond' ? cn : ac; mkEntry(s, def.title, NODE_DESC[k] || ''); }
+    const cc = mkSec('Concepts'); for (const [a, b2] of CONCEPTS) mkEntry(cc, a, b2);
+    const tt = mkSec('Tools & shortcuts'); for (const [a, b2] of TOOLS) mkEntry(tt, a, b2);
+    sb.addEventListener('input', () => {
+      const f = sb.value.toLowerCase();
+      content.querySelectorAll('.gEntry').forEach(e => { e.style.display = e.textContent.toLowerCase().includes(f) ? '' : 'none'; });
+      content.querySelectorAll('.gSec').forEach(s => { s.style.display = [...s.querySelectorAll('.gEntry')].some(e => e.style.display !== 'none') ? '' : 'none'; });
+    });
   }
 
   function drawMapTab() {
@@ -1996,7 +2055,6 @@
   $('btnSnap').addEventListener('click', () => { snap = !snap; refreshToolbar(); });
   $('btnGizmos').addEventListener('click', () => { gizmos = !gizmos; refreshToolbar(); });
   $('btnScatter').addEventListener('click', () => { scatter = !scatter; refreshToolbar(); });
-  $('btnLint').addEventListener('click', lintModal);
   $('brushShape').addEventListener('change', e => { brushShape = e.target.value; });
   $('brushSize').addEventListener('change', e => { brushSize = parseInt(e.target.value) || 1; });
   (function () {                                   // populate the terrain-material picker (hard chars)
@@ -2021,16 +2079,24 @@
     $('ltabH').classList.toggle('on', which === 'H');
     $('ltabL').classList.toggle('on', which === 'L');
     $('ltabS').classList.toggle('on', which === 'S');
+    $('ltabLint').classList.toggle('on', which === 'Lint');
+    $('ltabG').classList.toggle('on', which === 'G');
     $('hierarchy').style.display = which === 'H' ? 'block' : 'none';
     $('levels').style.display = which === 'L' ? 'block' : 'none';
     $('scenes').style.display = which === 'S' ? 'block' : 'none';
+    $('lint').style.display = which === 'Lint' ? 'block' : 'none';
+    $('guide').style.display = which === 'G' ? 'block' : 'none';
     if (which === 'L') refreshLevels();
     if (which === 'S') { refreshScenes(); }
+    if (which === 'Lint') refreshLintPanel();
+    if (which === 'G') buildGuide();
     refreshInspector();
   }
   $('ltabH').addEventListener('click', () => setLeftTab('H'));
   $('ltabL').addEventListener('click', () => setLeftTab('L'));
   $('ltabS').addEventListener('click', () => setLeftTab('S'));
+  $('ltabLint').addEventListener('click', () => setLeftTab('Lint'));
+  $('ltabG').addEventListener('click', () => setLeftTab('G'));
 
   // ================= save destination: local server vs GitHub =================
   // Local mode posts to the Node server (writes files on this PC). GitHub mode commits
@@ -2414,6 +2480,30 @@
       for (const tk in ETYPES) { if (ETYPES[tk].kind !== gk) continue; const btn = el('button', {}, pal, ETYPES[tk].title); btn.addEventListener('click', () => addLogicNode(tk)); }
     }
   }
+  // dynamic option lists for graph 'select' fields
+  function graphOpts(src) {
+    if (src === 'sounds') return ((G.Audio && G.Audio.sfxNames) || []).map(s => ({ v: s, t: s }));
+    if (src === 'cutscenes') return [{ v: '', t: '(none)' }].concat(Object.keys(G.CUTSCENES || {}).map(id => ({ v: id, t: (G.CUTSCENES[id].name || id) })));
+    if (src === 'weather') return ((G.Weather && G.Weather.KINDS) || ['none']).map(k => ({ v: k, t: (G.Weather.LABELS && G.Weather.LABELS[k]) || k }));
+    if (src === 'fx') return ((G.FX && G.FX.BURSTS) || []).map(f => ({ v: f, t: f }));
+    if (src === 'placement') return [{ v: '', t: 'default (area title)' }, { v: 'top', t: 'top' }, { v: 'center', t: 'centre' }, { v: 'bottom', t: 'bottom' }, { v: 'toast', t: 'toast (corner)' }];
+    return [];
+  }
+  function collectFlags() {
+    const set = new Set();
+    for (const lid in G.LEVELS) { const g = G.LEVELS[lid].graph; if (!g) continue; for (const nn of (g.nodes || [])) { if (/Flag$/i.test(nn.type) && nn.p && nn.p.flag) set.add(nn.p.flag); } }
+    return [...set];
+  }
+  // flag = a saved on/off switch the game remembers. combobox: existing flags + free text for a new one
+  function flagField(body, label, getV, setV) {
+    const r = el('div', { class: 'frow' }, body); el('label', {}, r, label);
+    const inp = el('input', { type: 'text', list: 'flagList', spellcheck: 'false', style: 'flex:1;min-width:0' }, r);
+    inp.value = getV() || '';
+    inp.addEventListener('change', () => setV(inp.value.trim()));
+    let dl = document.getElementById('flagList'); if (!dl) dl = el('datalist', { id: 'flagList' }, document.body);
+    dl.innerHTML = ''; for (const f of collectFlags()) el('option', { value: f }, dl);
+    el('div', { class: 'insNote', style: 'opacity:.5' }, body, 'A flag is a saved on/off switch (e.g. “door1_opened”). Pick one or type a new name to create it.');
+  }
   function refreshLogicInspector(body) {
     const n = logicSel != null ? nodeById(logicSel) : null;
     if (!n) {
@@ -2429,6 +2519,8 @@
       const label = pp.label || pp.k, def = pp.def;
       if (pp.type === 'objref') idField(body, label, () => n.p[pp.k], v => { n.p[pp.k] = v; markDirty(); }, it => { n.p[pp.k] = it.oid; if ((t.params || []).some(q => q.k === 'level')) n.p.level = it.level; markDirty(); refreshInspector(); });
       else if (pp.type === 'levelref') selectField(body, label, [{ v: '', t: '(this room)' }].concat(Object.keys(G.LEVELS).map(id => ({ v: id, t: G.LEVELS[id].title || id }))), () => n.p[pp.k] || '', v => { n.p[pp.k] = v || ''; markDirty(); });
+      else if (pp.type === 'select') selectField(body, label, graphOpts(pp.src), () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
+      else if (pp.type === 'flag') flagField(body, label, () => n.p[pp.k] || '', v => { n.p[pp.k] = v; markDirty(); });
       else if (pp.type === 'bool') checkField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); });
       else if (pp.type === 'color') colorField(body, label, () => n.p[pp.k] || def, v => { n.p[pp.k] = v || def; markDirty(); });
       else if (typeof def === 'number') numField(body, label, () => n.p[pp.k] !== undefined ? n.p[pp.k] : def, v => { n.p[pp.k] = v; markDirty(); }, (pp.k === 'oid' || pp.k === 'pct') ? 1 : 0.1);

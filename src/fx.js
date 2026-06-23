@@ -124,6 +124,7 @@
   FX.p = (additive, o) => { (additive ? addPool : mixPool).spawn(o); };
 
   // ---------------- burst presets ----------------
+  FX.BURSTS = ['dust', 'land', 'spark', 'soul', 'spore', 'heal', 'healPop', 'death', 'gib', 'ember', 'leaf', 'mote'];
   FX.burst = (name, x, y, o = {}) => {
     const n = o.n, dir = o.dir || 0, col = o.color;
     switch (name) {

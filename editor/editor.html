@@ -111,6 +111,17 @@
   .scopeBtn { width:30px; flex:0 0 auto; margin-left:4px; border:1px solid rgba(120,200,180,.3); background:#0b1117; color:#9fe6c8; border-radius:6px; cursor:pointer; font-size:14px; line-height:1; }
   .scopeBtn:hover { background:#1d3a30; border-color:#5fd6a8; }
   .frow.idrow input { flex:1; min-width:0; }
+  .ptab.warn { color:#ffb14a; }
+  #lint .lintRow { display:flex; gap:7px; align-items:flex-start; padding:5px 10px; cursor:pointer; font-size:12px; }
+  #lint .lintRow:hover { background:rgba(255,255,255,.06); }
+  /* guide / dictionary */
+  #guide #guideSearch { width:calc(100% - 20px); margin:8px 10px; background:#0b1117; border:1px solid rgba(120,200,180,.3); border-radius:7px; color:#dfeee8; font:12px ui-monospace,Consolas,monospace; padding:7px 9px; outline:none; }
+  #guide #guideSearch:focus { border-color:#5fd6a8; }
+  #guide .gSec { margin:4px 0 8px; }
+  #guide .gHead { color:#9fd8b8; font:600 12px ui-monospace,Consolas,monospace; letter-spacing:.04em; padding:6px 10px 3px; border-bottom:1px solid rgba(120,200,180,.14); margin:6px 0 3px; }
+  #guide .gEntry { padding:5px 10px; }
+  #guide .gName { color:#eafffb; font:600 12px ui-monospace,Consolas,monospace; }
+  #guide .gDesc { color:#9bbcb0; font:11px/1.45 ui-monospace,Consolas,monospace; margin-top:1px; }
   #csView { position:absolute; inset:0; display:none; background:#0e0e13; overflow:auto; padding:16px 18px; }
   #csView.on { display:block; }
   #csView .cshead { color:#9fd8b8; font-size:15px; margin:2px 0 12px; }
@@ -231,8 +242,6 @@
     <button class="tbtn" id="btnSnap" title="Snap objects to half-tiles">Snap</button>
     <button class="tbtn" id="btnGizmos" title="Show object gizmos (G)">Gizmos</button>
     <button class="tbtn" id="btnScatter" title="Scatter: stamp a randomized cluster when placing decor">⁂ Scatter</button>
-    <button class="tbtn" id="btnLint" title="Validate the world — broken links, missing refs, dead ends">⚠ Lint</button>
-    <span class="tsep"></span>
     <button class="tbtn" id="btnUndo" title="Undo (Ctrl+Z)">↩</button>
     <button class="tbtn" id="btnRedo" title="Redo (Ctrl+Y)">↪</button>
     <span class="tsep"></span>
@@ -249,10 +258,14 @@
       <div class="ptab on" id="ltabH">Hierarchy</div>
       <div class="ptab" id="ltabL">Levels</div>
       <div class="ptab" id="ltabS">Scenes</div>
+      <div class="ptab" id="ltabLint">Lint</div>
+      <div class="ptab" id="ltabG">Guide</div>
     </div>
     <div class="pbody" id="hierarchy"></div>
     <div class="pbody" id="levels" style="display:none"></div>
     <div class="pbody" id="scenes" style="display:none"></div>
+    <div class="pbody" id="lint" style="display:none"></div>
+    <div class="pbody" id="guide" style="display:none"></div>
   </div>
 
   <div id="viewportWrap">

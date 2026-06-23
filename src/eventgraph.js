@@ -21,27 +21,27 @@
     onInterval:  { kind: 'event', title: 'On Interval', outs: 1, params: [{ k: 'secs', def: 3 }] },
     onHpBelow:   { kind: 'event', title: 'On HP Below', outs: 1, params: [{ k: 'hp', def: 2 }, { k: 'once', type: 'bool', def: false }] },
 
-    ifFlag:      { kind: 'cond', title: 'If Flag', ins: 1, outs: 2, outLabels: ['true', 'false'], params: [{ k: 'flag', def: '' }] },
-    ifNotFlag:   { kind: 'cond', title: 'If Not Flag', ins: 1, outs: 2, outLabels: ['unset', 'set'], params: [{ k: 'flag', def: '' }] },
+    ifFlag:      { kind: 'cond', title: 'If Flag', ins: 1, outs: 2, outLabels: ['true', 'false'], params: [{ k: 'flag', type: 'flag', def: '' }] },
+    ifNotFlag:   { kind: 'cond', title: 'If Not Flag', ins: 1, outs: 2, outLabels: ['unset', 'set'], params: [{ k: 'flag', type: 'flag', def: '' }] },
     chance:      { kind: 'cond', title: 'Chance %', ins: 1, outs: 2, outLabels: ['hit', 'miss'], params: [{ k: 'pct', def: 50 }] },
     gate:        { kind: 'cond', title: 'Gate (once)', ins: 1, outs: 1, params: [] },
 
     setActive:   { kind: 'action', title: 'Set Active', ins: 1, outs: 1, params: [{ k: 'oid', type: 'objref', def: 0 }, { k: 'level', type: 'levelref', def: '' }, { k: 'on', type: 'bool', def: true }] },
-    setFlag:     { kind: 'action', title: 'Set Flag', ins: 1, outs: 1, params: [{ k: 'flag', def: '' }, { k: 'on', type: 'bool', def: true }] },
+    setFlag:     { kind: 'action', title: 'Set Flag', ins: 1, outs: 1, params: [{ k: 'flag', type: 'flag', def: '' }, { k: 'on', type: 'bool', def: true }] },
     signal:      { kind: 'action', title: 'Emit Signal', ins: 1, outs: 1, params: [{ k: 'name', def: 'sig' }] },
     wait:        { kind: 'action', title: 'Wait', ins: 1, outs: 1, params: [{ k: 'secs', def: 1 }] },
-    sound:       { kind: 'action', title: 'Play Sound', ins: 1, outs: 1, params: [{ k: 'name', def: 'clink' }] },
+    sound:       { kind: 'action', title: 'Play Sound', ins: 1, outs: 1, params: [{ k: 'name', type: 'select', src: 'sounds', def: 'clink' }] },
     shake:       { kind: 'action', title: 'Camera Shake', ins: 1, outs: 1, params: [{ k: 'amount', def: 0.6 }] },
     hitstop:     { kind: 'action', title: 'Hit-Stop', ins: 1, outs: 1, params: [{ k: 'secs', def: 0.2 }] },
     flash:       { kind: 'action', title: 'Screen Flash', ins: 1, outs: 1, params: [{ k: 'amount', def: 0.4 }, { k: 'color', type: 'color', def: '#ffffff' }] },
-    fx:          { kind: 'action', title: 'Spawn FX', ins: 1, outs: 1, params: [{ k: 'name', def: 'spark' }, { k: 'dx', def: 0 }, { k: 'dy', def: 0.3 }] },
+    fx:          { kind: 'action', title: 'Spawn FX', ins: 1, outs: 1, params: [{ k: 'name', type: 'select', src: 'fx', def: 'spark' }, { k: 'dx', def: 0 }, { k: 'dy', def: 0.3 }] },
     heal:        { kind: 'action', title: 'Heal Player', ins: 1, outs: 1, params: [{ k: 'amount', def: 1 }] },
     hurt:        { kind: 'action', title: 'Hurt Player', ins: 1, outs: 1, params: [{ k: 'amount', def: 1 }] },
-    weather:     { kind: 'action', title: 'Set Weather', ins: 1, outs: 1, params: [{ k: 'kind', def: 'none' }] },
+    weather:     { kind: 'action', title: 'Set Weather', ins: 1, outs: 1, params: [{ k: 'kind', type: 'select', src: 'weather', def: 'none' }] },
     toast:       { kind: 'action', title: 'Toast', ins: 1, outs: 1, params: [{ k: 'text', def: '' }] },
     areaTitle:   { kind: 'action', title: 'Area Title', ins: 1, outs: 1, params: [{ k: 'text', def: '' }] },
-    cutscene:    { kind: 'action', title: 'Play Cutscene', ins: 1, outs: 1, params: [{ k: 'id', def: '' }] },
-    text:        { kind: 'action', title: 'Show Text', ins: 1, outs: 1, params: [{ k: 'text', def: '' }, { k: 'secs', def: 2.5 }] },
+    cutscene:    { kind: 'action', title: 'Play Cutscene', ins: 1, outs: 1, params: [{ k: 'id', type: 'select', src: 'cutscenes', def: '' }] },
+    text:        { kind: 'action', title: 'Show Text', ins: 1, outs: 1, params: [{ k: 'text', def: '' }, { k: 'place', type: 'select', src: 'placement', def: '' }, { k: 'secs', def: 2.5 }] },
     log:         { kind: 'action', title: 'Debug Log', ins: 1, outs: 1, params: [{ k: 'msg', def: '' }] }
   };
 
@@ -109,7 +109,13 @@
           if (id && G.Cutscene && G.CUTSCENES && G.CUTSCENES[id] && G.Cutscene.play) G.Cutscene.play(G.CUTSCENES[id]);
           break;
         }
-        case 'text': if (G.UI && G.UI.areaTitle) G.UI.areaTitle(param(n, 'text', '')); else if (G.UI && G.UI.toast) G.UI.toast(param(n, 'text', '')); break;
+        case 'text': {
+          const txt = param(n, 'text', ''), place = param(n, 'place', '');
+          if (place === 'toast' && G.UI && G.UI.toast) G.UI.toast(txt);
+          else if (place && G.UI && G.UI.banner) G.UI.banner(txt, place, +param(n, 'secs', 2.5));
+          else if (G.UI && G.UI.areaTitle) G.UI.areaTitle(txt);   // default placement
+          break;
+        }
         case 'log': console.log('[graph]', param(n, 'msg', '')); break;
       }
     } catch (e) { /* never let a graph action crash the frame */ }
