@@ -177,6 +177,30 @@
       sil: 0x0c2836, terrain: 0x0a1418, moss: 0x4ec8c0, mossDark: 0x2e8480, glow: 0x90ffe8,
       dust: 0xa0ffe8, light: 0xc8fff4, rays: true, root: 246.9,
       deco: ['crystalSpire', 'icicle', 'column', 'hump'], amb: 'sparkle'
+    },
+    city: {
+      label: 'City of Tears (rain blue)', bgTop: 0x305f92, bgBottom: 0x07101f, fog: 0x1d456f, fogNear: 36, fogFar: 92,
+      sil: 0x0a1c30, terrain: 0x0d1c30, moss: 0x3c6a98, mossDark: 0x244568, glow: 0xa6d4ff,
+      dust: 0xc4e2ff, light: 0xd2e8ff, rays: false, root: 205.0,
+      deco: ['spire', 'cityArch', 'gothWindow', 'lamppost', 'column'], amb: 'mote'
+    },
+    forge: {
+      label: 'Forge (molten iron)', bgTop: 0x5a2410, bgBottom: 0x160603, fog: 0x4a1d0c, fogNear: 28, fogFar: 60,
+      sil: 0x24100a, terrain: 0x190b07, moss: 0xb85a26, mossDark: 0x70341a, glow: 0xff8a3c,
+      dust: 0xffb070, light: 0xffcaa0, rays: false, root: 168.0,
+      deco: ['anvil', 'gear', 'pipe', 'brokenPillar', 'column'], amb: 'ember'
+    },
+    mine: {
+      label: 'Mine (deep slate)', bgTop: 0x39414e, bgBottom: 0x0c0f14, fog: 0x2c333e, fogNear: 28, fogFar: 62,
+      sil: 0x16191f, terrain: 0x111419, moss: 0x6a7280, mossDark: 0x434a56, glow: 0x9fd0ff,
+      dust: 0xc8d0dc, light: 0xdfe6ef, rays: false, root: 152.0,
+      deco: ['cartRail', 'pipe', 'gear', 'stalactite', 'column'], amb: 'spore'
+    },
+    village: {
+      label: 'Village (warm hearth)', bgTop: 0x6a5230, bgBottom: 0x1a1109, fog: 0x55421f, fogNear: 31, fogFar: 74,
+      sil: 0x2a1d0f, terrain: 0x191107, moss: 0x9a7c44, mossDark: 0x60492a, glow: 0xffd28a,
+      dust: 0xffe2b0, light: 0xffeccb, rays: true, root: 188.0,
+      deco: ['hut', 'lamppost', 'gothWindow', 'plant', 'column'], amb: 'mote'
     }
   };
   W.BIOMES = Object.keys(PAL);
@@ -304,12 +328,98 @@
     },
     hump(grp, mat, x, y, s, rng) {
       grp.add(shapeMesh(U.splineShape([[-3 * s, 0], [-1.5 * s, 1.6 * s], [0, 2.1 * s], [1.5 * s, 1.6 * s], [3 * s, 0], [0, -1]]), mat, x, y, 10));
+    },
+    // ---- Victorian / interior furniture (single-colour silhouettes) ----
+    rug(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-2.4 * s, 0], [2.4 * s, 0], [2.15 * s, 0.22 * s], [-2.15 * s, 0.22 * s]]), mat, x, y, 2));
+    },
+    sofa(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-1.5 * s, 0], [1.5 * s, 0], [1.5 * s, 0.6 * s], [-1.5 * s, 0.6 * s]]), mat, x, y, 2));        // seat base
+      grp.add(shapeMesh(U.splineShape([[-1.5 * s, 0.5 * s], [1.5 * s, 0.5 * s], [1.35 * s, 1.35 * s], [-1.35 * s, 1.35 * s]]), mat, x, y, 6)); // back
+      grp.add(shapeMesh(U.poly([[-1.65 * s, 0], [-1.2 * s, 0], [-1.2 * s, 0.95 * s], [-1.65 * s, 0.95 * s]]), mat, x, y, 2));  // arms
+      grp.add(shapeMesh(U.poly([[1.2 * s, 0], [1.65 * s, 0], [1.65 * s, 0.95 * s], [1.2 * s, 0.95 * s]]), mat, x, y, 2));
+    },
+    fireplace(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-1.5 * s, 0], [-0.95 * s, 0], [-0.95 * s, 2.1 * s], [-1.5 * s, 2.1 * s]]), mat, x, y, 2));    // posts
+      grp.add(shapeMesh(U.poly([[0.95 * s, 0], [1.5 * s, 0], [1.5 * s, 2.1 * s], [0.95 * s, 2.1 * s]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[-1.7 * s, 2.0 * s], [1.7 * s, 2.0 * s], [1.7 * s, 2.5 * s], [-1.7 * s, 2.5 * s]]), mat, x, y, 2)); // mantel
+      grp.add(shapeMesh(U.poly([[-0.95 * s, 1.4 * s], [0.95 * s, 1.4 * s], [0.95 * s, 2.0 * s], [-0.95 * s, 2.0 * s]]), mat, x, y, 2)); // lintel above hearth
+    },
+    bookshelf(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-1 * s, 0], [1 * s, 0], [1 * s, 2.8 * s], [-1 * s, 2.8 * s]]), mat, x, y, 2));
+      for (let i = 1; i <= 3; i++) grp.add(shapeMesh(U.poly([[-1 * s, i * 0.7 * s], [1 * s, i * 0.7 * s], [1 * s, i * 0.7 * s + 0.08 * s], [-1 * s, i * 0.7 * s + 0.08 * s]]), mat, x, y - 0.001, 2));
+    },
+    painting(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-0.75 * s, 0], [0.75 * s, 0], [0.75 * s, 1.05 * s], [-0.75 * s, 1.05 * s]]), mat, x, y, 2));
+    },
+    table(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-1.1 * s, 0.72 * s], [1.1 * s, 0.72 * s], [1.1 * s, 0.92 * s], [-1.1 * s, 0.92 * s]]), mat, x, y, 2)); // top
+      grp.add(shapeMesh(U.poly([[-0.95 * s, 0], [-0.72 * s, 0], [-0.72 * s, 0.72 * s], [-0.95 * s, 0.72 * s]]), mat, x, y, 2));   // legs
+      grp.add(shapeMesh(U.poly([[0.72 * s, 0], [0.95 * s, 0], [0.95 * s, 0.72 * s], [0.72 * s, 0.72 * s]]), mat, x, y, 2));
+    },
+    plant(grp, mat, x, y, s, rng) {
+      grp.add(shapeMesh(U.poly([[-0.42 * s, 0], [0.42 * s, 0], [0.3 * s, 0.62 * s], [-0.3 * s, 0.62 * s]]), mat, x, y, 2)); // pot
+      const r = rng || U.mulberry32(7);
+      for (let i = 0; i < 5; i++) { const a = U.lerp(0.7, 2.45, r()), len = U.lerp(0.8, 1.7, r()) * s; grp.add(shapeMesh(U.poly([[-0.09 * s, 0.55 * s], [0.09 * s, 0.55 * s], [Math.cos(a) * len, 0.55 * s + Math.sin(a) * len]]), mat, x, y, 2)); }
+    },
+    chandelier(grp, mat, x, topY, s) {
+      grp.add(shapeMesh(U.poly([[-0.05 * s, 0], [0.05 * s, 0], [0.05 * s, -1.2 * s], [-0.05 * s, -1.2 * s]]), mat, x, topY, 2)); // chain
+      grp.add(shapeMesh(U.splineShape([[-1.3 * s, -1.2 * s], [0, -0.75 * s], [1.3 * s, -1.2 * s], [0.7 * s, -1.85 * s], [0, -1.5 * s], [-0.7 * s, -1.85 * s]]), mat, x, topY, 8));
+    },
+    // ---- city of tears / gothic ----
+    spire(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(3), h = U.lerp(12, 22, r()) * s, w2 = U.lerp(1.2, 2.2, r()) * s;
+      grp.add(shapeMesh(U.poly([[-w2, 0], [w2, 0], [w2 * 0.78, h], [-w2 * 0.78, h]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[-w2 * 1.1, h], [w2 * 1.1, h], [0, h + 3.2 * s]]), mat, x, y, 2)); // conical roof
+      grp.add(shapeMesh(U.poly([[-0.06 * s, h + 3.2 * s], [0.06 * s, h + 3.2 * s], [0.06 * s, h + 4.4 * s], [-0.06 * s, h + 4.4 * s]]), mat, x, y, 2)); // finial
+    },
+    cityArch(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(5), h = U.lerp(7, 12, r()) * s, w2 = U.lerp(2, 3.5, r()) * s;
+      grp.add(shapeMesh(U.poly([[-w2 - 0.6 * s, 0], [-w2 + 0.6 * s, 0], [-w2 + 0.5 * s, h], [-w2 - 0.5 * s, h]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[w2 - 0.6 * s, 0], [w2 + 0.6 * s, 0], [w2 + 0.5 * s, h], [w2 - 0.5 * s, h]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[-w2 - 0.6 * s, h * 0.9], [0, h + 2.2 * s], [w2 + 0.6 * s, h * 0.9], [w2 - 0.4 * s, h * 0.86], [0, h + 1.1 * s], [-w2 + 0.4 * s, h * 0.86]]), mat, x, y, 2)); // pointed top
+    },
+    gothWindow(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(9), h = U.lerp(3, 5, r()) * s, w2 = 0.95 * s;
+      grp.add(shapeMesh(U.poly([[-w2, 0], [w2, 0], [w2, h], [0, h + 1.1 * s], [-w2, h]]), mat, x, y, 2));
+    },
+    lamppost(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-0.13 * s, 0], [0.13 * s, 0], [0.08 * s, 4 * s], [-0.08 * s, 4 * s]]), mat, x, y, 2));     // pole
+      grp.add(shapeMesh(U.splineShape([[-0.4 * s, 4 * s], [0.4 * s, 4 * s], [0.28 * s, 4.75 * s], [-0.28 * s, 4.75 * s]]), mat, x, y, 6)); // lamp head
+      grp.add(shapeMesh(U.poly([[-0.55 * s, 0], [0.55 * s, 0], [0.4 * s, 0.4 * s], [-0.4 * s, 0.4 * s]]), mat, x, y, 2));   // base
+    },
+    // ---- forge / mine / village ----
+    anvil(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-0.5 * s, 0], [0.5 * s, 0], [0.35 * s, 0.5 * s], [-0.35 * s, 0.5 * s]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[-1.1 * s, 0.5 * s], [0.9 * s, 0.5 * s], [1.4 * s, 0.95 * s], [0.7 * s, 1.1 * s], [-0.9 * s, 1.1 * s], [-0.9 * s, 0.5 * s]]), mat, x, y, 2));
+    },
+    gear(grp, mat, x, y, s, rng) {
+      const R = 1.1 * s, teeth = 9;
+      const pts = [];
+      for (let i = 0; i < teeth; i++) { const a = i / teeth * Math.PI * 2, a2 = (i + 0.5) / teeth * Math.PI * 2; pts.push([Math.cos(a) * R * 1.25, Math.sin(a) * R * 1.25]); pts.push([Math.cos(a2) * R, Math.sin(a2) * R]); }
+      grp.add(shapeMesh(U.poly(pts), mat, x, y + R, 2));
+    },
+    pipe(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(4), h = U.lerp(3, 7, r()) * s;
+      grp.add(shapeMesh(U.poly([[-0.35 * s, 0], [0.35 * s, 0], [0.35 * s, h], [-0.35 * s, h]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[-0.5 * s, h * 0.4], [0.5 * s, h * 0.4], [0.5 * s, h * 0.55], [-0.5 * s, h * 0.55]]), mat, x, y, 2)); // flange
+    },
+    cartRail(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-3 * s, 0.2 * s], [3 * s, 0.2 * s], [3 * s, 0.34 * s], [-3 * s, 0.34 * s]]), mat, x, y, 2));
+      for (let i = -2; i <= 2; i++) grp.add(shapeMesh(U.poly([[i * 1.1 * s - 0.08 * s, 0], [i * 1.1 * s + 0.08 * s, 0], [i * 1.1 * s + 0.08 * s, 0.3 * s], [i * 1.1 * s - 0.08 * s, 0.3 * s]]), mat, x, y, 2)); // ties
+    },
+    hut(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(6), w2 = U.lerp(2.2, 3.4, r()) * s, h = U.lerp(2.4, 3.6, r()) * s;
+      grp.add(shapeMesh(U.poly([[-w2, 0], [w2, 0], [w2, h], [-w2, h]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[-w2 - 0.6 * s, h], [w2 + 0.6 * s, h], [0, h + 2.2 * s]]), mat, x, y, 2)); // roof
     }
   };
   // decor kinds the editor can place (standing vs hanging anchors)
   W.DECOR_KINDS = {
-    standing: ['mushroom', 'tree', 'deadtree', 'thintree', 'fern', 'column', 'brokenPillar', 'arch', 'crystalSpire', 'coral', 'kelp', 'reed', 'ribs', 'thorn', 'hump'],
-    hanging: ['stalactite', 'icicle', 'roots', 'lanterns']
+    standing: ['mushroom', 'tree', 'deadtree', 'thintree', 'fern', 'column', 'brokenPillar', 'arch', 'crystalSpire', 'coral', 'kelp', 'reed', 'ribs', 'thorn', 'hump',
+      'spire', 'cityArch', 'gothWindow', 'lamppost', 'hut', 'anvil', 'gear', 'pipe', 'cartRail',
+      'sofa', 'fireplace', 'bookshelf', 'painting', 'table', 'plant', 'rug'],
+    hanging: ['stalactite', 'icicle', 'roots', 'lanterns', 'chandelier']
   };
 
   function silHumps(grp, mat, x0, x1, baseY, maxH, rng) {
@@ -948,6 +1058,8 @@
     'k': { id: 'rock', label: 'Rocky', foliage: false, smooth: false, col: () => 0x242832 },
     's': { id: 'sand', label: 'Sandy', foliage: false, smooth: false, col: () => 0x352b19 },
     'p': { id: 'pale', label: 'Pale stone', foliage: false, smooth: false, col: () => 0x30323a },
+    'w': { id: 'wood', label: 'Wood floor', foliage: false, smooth: false, col: () => 0x4a3320 },
+    'b': { id: 'brick', label: 'City stone', foliage: false, smooth: false, col: () => 0x1b2c44 },
     // curvy (smooth-rendered) variants of each material — combined freely in one level
     'G': { id: 'grass', label: 'Grassy', foliage: true, smooth: true, col: p => p.terrain },
     'D': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: true, col: () => 0x2a1d12 },
@@ -958,6 +1070,68 @@
   const SOLID_SET = new Set(Object.keys(TERRAIN_MATS));
   W.SMOOTH_CHAR = { '#': 'G', 'd': 'D', 'k': 'K', 's': 'S', 'p': 'P' };   // hard → smooth
   W.HARD_CHAR = { 'G': '#', 'D': 'd', 'K': 'k', 'S': 's', 'P': 'p' };     // smooth → hard
+
+  // ---- procedural building generator ----------------------------------------------------
+  // Stamps a multi-storey building into a level def: a stone shell + wood-floor slabs (as
+  // terrain tiles) and a randomised Victorian interior (rug, sofa, fireplace, bookshelf,
+  // table, plants, paintings, hanging chandeliers + warm lights) as props. Reusable from
+  // any level via def.buildings:[{x,y,w,h,seed}] or from the editor. Mutates def once.
+  W.genBuilding = function (def, o) {
+    o = o || {};
+    const Wd = def.w, Hd = def.h;
+    const bx = o.x | 0, by = o.y | 0, bw = Math.max(4, o.w | 0), bh = Math.max(6, o.h | 0);
+    const wall = o.wallMat || 'b', floor = o.floorMat || 'w';
+    const rng = U.mulberry32(((o.seed || 1) * 2654435761) >>> 0);
+    for (let r = 0; r < Hd; r++) if (def.tiles[r] === undefined) def.tiles[r] = '';
+    const set = (cx, cy, ch) => {
+      if (cx < 0 || cx >= Wd || cy < 0 || cy >= Hd) return;
+      const r = Hd - 1 - cy; const row = (def.tiles[r] || '').padEnd(Wd, ' ');
+      def.tiles[r] = row.slice(0, cx) + ch + row.slice(cx + 1);
+    };
+    def.props = def.props || [];
+    const prop = p => def.props.push(p);
+    // shell: side walls + base + roof
+    for (let cy = by; cy < by + bh; cy++) { set(bx, cy, wall); set(bx + bw - 1, cy, wall); }
+    for (let cx = bx; cx < bx + bw; cx++) { set(cx, by, wall); set(cx, by + bh - 1, wall); }
+    // storeys: wood floor slabs, each with an offset 2-wide stairwell gap to climb through
+    const storeyH = o.storeyH || 9;
+    const floors = [by + 1];
+    for (let fy = by + storeyH; fy < by + bh - 3; fy += storeyH) {
+      for (let cx = bx + 1; cx < bx + bw - 1; cx++) set(cx, fy, floor);
+      const gap = bx + 2 + ((rng() * (bw - 6)) | 0);
+      set(gap, fy, ' '); set(gap + 1, fy, ' ');
+      floors.push(fy + 1);
+    }
+    // interior per storey
+    const FURN = ['sofa', 'fireplace', 'bookshelf', 'table', 'plant', 'painting'];
+    for (const fy of floors) {
+      const ix0 = bx + 2, ix1 = bx + bw - 3, cxm = (ix0 + ix1) / 2 + 0.5;
+      prop({ type: 'decor', kind: 'rug', x: cxm, y: fy + 0.04, scale: Math.max(1, (ix1 - ix0) / 7.5), color: '#360c0c', z: -0.24 });
+      let cx = ix0 + 1.5;
+      while (cx < ix1 - 1.5) {
+        const k = FURN[(rng() * FURN.length) | 0];
+        if (k === 'painting') prop({ type: 'decor', kind: 'painting', x: cx, y: fy + 1.7 + rng(), color: '#7a5a32', z: -0.2 });
+        else if (k === 'fireplace') {
+          prop({ type: 'decor', kind: 'fireplace', x: cx, y: fy + 0.05, color: '#2b2622', z: -0.22 });
+          prop({ type: 'light', x: cx, y: fy + 0.7, color: '#ff8a3c', scale: 5, opacity: 0.32, flicker: true });
+        } else {
+          const col = k === 'sofa' ? '#7a1f1f' : k === 'bookshelf' ? '#3a2718' : k === 'table' ? '#4a3320' : '#2f5e3a';
+          prop({ type: 'decor', kind: k, x: cx, y: fy + 0.05, color: col, z: -0.2 });
+        }
+        cx += 3 + rng() * 3;
+      }
+      if (storeyH >= 6) {
+        const cy = fy + storeyH - 1.6;
+        prop({ type: 'decor', kind: 'chandelier', x: cxm, y: cy, color: '#caa24a', z: -0.32 });
+        prop({ type: 'light', x: cxm, y: cy - 0.8, color: '#ffcf86', scale: 7, opacity: 0.28, flicker: true });
+      }
+    }
+    // exterior wall lamps for the City-of-Tears glow
+    for (let cy = by + 4; cy < by + bh - 2; cy += storeyH) {
+      prop({ type: 'light', x: bx - 0.3, y: cy, color: '#a6d4ff', scale: 6, opacity: 0.22 });
+      prop({ type: 'light', x: bx + bw - 0.7, y: cy, color: '#a6d4ff', scale: 6, opacity: 0.22 });
+    }
+  };
 
   // ============================ TILE PARSING ============================
   function parseLevel(lvl) {
@@ -1107,6 +1281,8 @@
     }
     const def = G.LEVELS[id];
     if (!def) throw new Error('No level: ' + id);
+    // stamp any procedural buildings into the def once (walls/floors as tiles + interior props)
+    if (def.buildings && !def._built) { for (const b of def.buildings) W.genBuilding(def, b); def._built = true; }
     // a lookTrigger may have re-themed this room (biome/grade/weather/water); clear it when
     // we move to a different room
     if (G.lookOverride && G.lookOverride.id !== id) G.lookOverride = null;

@@ -1017,3 +1017,29 @@ G.LEVELS = {
   ]
  }
 };
+
+// ---- City of Tears (water city) — tiles built here; the Victorian building is stamped on load ----
+(function () {
+  const W = 100, H = 100, g = [];
+  for (let r = 0; r < H; r++) { const wy = H - 1 - r; g.push(wy <= 4 ? 'b'.repeat(W) : ''); }
+  const run = (wy, c0, c1, ch) => { const r = H - 1 - wy; let row = (g[r] || '').padEnd(W, ' '); for (let c = c0; c <= c1; c++) row = row.slice(0, c) + ch + row.slice(c + 1); g[r] = row; };
+  // right-half street platforms / ledges to traverse the flooded city
+  run(12, 60, 99, 'b'); run(13, 60, 99, 'b');
+  run(22, 52, 82, 'b'); run(23, 52, 82, 'b');
+  run(32, 66, 99, 'b'); run(33, 66, 99, 'b');
+  run(20, 88, 99, 'b'); run(21, 88, 99, 'b');
+  G.LEVELS.watercity = {
+    id: 'watercity', title: 'City of Tears', area: 'C I T Y   O F   T E A R S', biome: 'city', w: W, h: H,
+    mapPos: { mx: 150, my: 0 }, weather: 'rain',
+    water: { y: 4, strength: 0.55, caustics: 0.5, color: '#74b0e0' },
+    tiles: g,
+    spawns: { 'P': { x: 52, y: 6 }, '1': { x: 96, y: 6 } },
+    enemies: [],
+    props: [
+      { type: 'bench', x: 52, y: 5 },
+      { type: 'sign', x: 49, y: 6, text: 'City of Tears\nA Victorian house stands to the west' }
+    ],
+    transitions: [{ side: 'R', to: 'steps', spawn: 'P' }],
+    buildings: [{ x: 4, y: 5, w: 40, h: 70, seed: 7 }]
+  };
+})();
