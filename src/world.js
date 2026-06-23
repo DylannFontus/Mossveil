@@ -1184,6 +1184,67 @@
     };
   };
 
+  // ---- interior wall backdrops (tileable Victorian textures) to hide the biome behind a building ----
+  function brickCanvas() {
+    const [c, x] = U.makeCanvas(256, 256);
+    x.fillStyle = '#2c1810'; x.fillRect(0, 0, 256, 256);
+    const pitchX = 64, pitchY = 32, bw = 60, bh = 26, cols = ['#6e3a28', '#794132', '#653425', '#824a36', '#5c3120', '#714030'];
+    for (let row = 0, y = 0; y < 256; row++, y += pitchY) {
+      const off = (row % 2) ? pitchX / 2 : 0;
+      for (let bx = -pitchX; bx < 256 + pitchX; bx += pitchX) {
+        x.fillStyle = cols[Math.abs((bx / pitchX + row * 3) % cols.length)];
+        x.fillRect(bx + off + 2, y + 2, bw, bh);
+        x.fillStyle = 'rgba(255,210,170,0.06)'; x.fillRect(bx + off + 2, y + 2, bw, 3);
+        x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(bx + off + 2, y + bh - 1, bw, 3);
+      }
+    }
+    return c;
+  }
+  function woodCanvas() {
+    const [c, x] = U.makeCanvas(256, 256);
+    x.fillStyle = '#4a3320'; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 42; i++) { x.strokeStyle = 'rgba(0,0,0,' + (0.04 + (i % 3) * 0.02) + ')'; x.beginPath(); const gx = (i * 6.1) % 256; x.moveTo(gx, 0); x.lineTo(gx + 3, 256); x.stroke(); }
+    const m = 18, pw = 256 - 2 * m;
+    x.fillStyle = '#392717'; x.fillRect(m, m, pw, pw);
+    x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(m, m, pw, 5); x.fillRect(m, m, 5, pw);
+    x.fillStyle = 'rgba(255,215,165,0.12)'; x.fillRect(m, m + pw - 5, pw, 5); x.fillRect(m + pw - 5, m, 5, pw);
+    x.fillStyle = '#473320'; x.fillRect(m + 12, m + 12, pw - 24, pw - 24);
+    x.fillStyle = 'rgba(255,215,165,0.08)'; x.fillRect(m + 12, m + 12, pw - 24, 4);
+    return c;
+  }
+  function paperCanvas() {
+    const [c, x] = U.makeCanvas(256, 256);
+    x.fillStyle = '#4a2226'; x.fillRect(0, 0, 256, 256);
+    x.fillStyle = 'rgba(255,255,255,0.025)'; for (let sx = 0; sx < 256; sx += 32) x.fillRect(sx, 0, 16, 256);
+    const motif = (cx, cy) => {
+      x.save(); x.translate(cx, cy); x.fillStyle = '#7a4438';
+      x.beginPath(); for (let a = 0; a < 8; a++) { const ang = a / 8 * 6.2832, r = (a % 2) ? 9 : 21; x[a ? 'lineTo' : 'moveTo'](Math.cos(ang) * r, Math.sin(ang) * r); } x.closePath(); x.fill();
+      x.fillStyle = '#9a5a48'; x.beginPath(); x.arc(0, 0, 6, 0, 7); x.fill(); x.restore();
+    };
+    for (let gy = 0; gy <= 256; gy += 64) for (let gx = 0; gx <= 256; gx += 64) { motif(gx, gy); motif(gx + 32, gy + 32); }
+    return c;
+  }
+  const _wallTex = {};
+  function wallTex(style) {
+    if (_wallTex[style]) return _wallTex[style];
+    const c = style === 'brick' ? brickCanvas() : style === 'wallpaper' ? paperCanvas() : woodCanvas();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return _wallTex[style] = t;
+  }
+  W.WALL_STYLES = ['wood', 'brick', 'wallpaper'];
+  mkProp.wall = (p) => {
+    const w = Math.max(1, p.w || 16), h = Math.max(1, p.h || 18), z = p.z !== undefined ? p.z : -2;
+    const geo = new THREE.PlaneGeometry(w, h);
+    const rx = w / 4, ry = h / 4, uv = geo.attributes.uv;       // tile every ~4 world units, via UVs (shared texture)
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rx, uv.getY(i) * ry);
+    uv.needsUpdate = true;
+    const mat = new THREE.MeshBasicMaterial({ map: wallTex(p.style || 'wood'), fog: z < -3, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(p.x, p.y, z);                              // (x,y) = centre
+    const grp = new THREE.Group(); grp.add(mesh);
+    return { type: 'wall', x: p.x, y: p.y, group: grp, update() { } };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);

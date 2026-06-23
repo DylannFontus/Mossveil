@@ -1078,6 +1078,14 @@
           }
           break;
         }
+        case 'wall': {
+          selectField(body, 'Style', (G.World.WALL_STYLES || ['wood', 'brick', 'wallpaper']).map(k => ({ v: k, t: k })), () => p.style || 'wood', v => { p.style = v; });
+          numField(body, 'Width', () => p.w || 16, v => { p.w = Math.max(1, v); }, 1);
+          numField(body, 'Height', () => p.h || 18, v => { p.h = Math.max(1, v); }, 1);
+          numField(body, 'Depth (z)', () => p.z !== undefined ? p.z : -2, v => { p.z = v; }, 0.5);
+          el('div', { class: 'insNote' }, body, 'Interior wall backdrop (centred on its position). Put it behind a building to hide the biome. More negative depth = further back.');
+          break;
+        }
         case 'furniture': {
           selectField(body, 'Kind', Object.keys(G.World.FURN || {}).map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
           selectField(body, 'Depth', [
@@ -1317,7 +1325,10 @@
       case 'build': return [
         { cat: 'build', id: 'building', label: 'House (small)', ico: '🏠', defaults: { w: 22, h: 28, seed: 3 } },
         { cat: 'build', id: 'building', label: 'House', ico: '🏠', defaults: { w: 30, h: 46, seed: 5 } },
-        { cat: 'build', id: 'building', label: 'Manor / Tower', ico: '🏰', defaults: { w: 40, h: 70, seed: 7 } }
+        { cat: 'build', id: 'building', label: 'Manor / Tower', ico: '🏰', defaults: { w: 40, h: 70, seed: 7 } },
+        { cat: 'prop', id: 'wall', label: 'Wall — wood panel', ico: '🟫', defaults: { style: 'wood', w: 20, h: 22, z: -2 } },
+        { cat: 'prop', id: 'wall', label: 'Wall — brick', ico: '🧱', defaults: { style: 'brick', w: 20, h: 22, z: -2 } },
+        { cat: 'prop', id: 'wall', label: 'Wall — wallpaper', ico: '🟥', defaults: { style: 'wallpaper', w: 20, h: 22, z: -2 } }
       ];
       case 'lights': return [
         { cat: 'prop', id: 'light', label: 'Glow light', ico: '✨', defaults: { color: '#ffeecc', scale: 8, opacity: 0.3, flicker: false } },
