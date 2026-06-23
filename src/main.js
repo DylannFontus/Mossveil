@@ -322,6 +322,7 @@
     initSaves();
     G.time = 0;
     G.hitStop = 0;
+    G.slowMo = 0; G.slowScale = 0.3;
 
     G.FX.init(scene);
     G.UI.init();
@@ -777,6 +778,7 @@
 
     let dt = rdt;
     if (G.hitStop > 0) { G.hitStop -= rdt; dt = 0; }
+    else if (G.slowMo > 0) { G.slowMo -= rdt; dt = rdt * (G.slowScale || 0.3); }   // cinematic slow-motion
 
     // mid menu-transition: hold input, wait for the swarm to cover, then swap behind it
     if (Main.transLock > 0) {

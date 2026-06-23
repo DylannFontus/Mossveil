@@ -446,6 +446,18 @@
   };
   B.LIST = Object.keys(CFG).map(id => ({ id, label: CFG[id].name }));
 
+  // boss epithets shown under the name on the cinematic name card
+  const EPITHETS = B.EPITHETS = {
+    mossSovereign: 'Warden of the Green Tomb', thornbackAlpha: 'First of the Bramble',
+    sporefather: 'He Who Seeds the Dark', cindershell: 'Ember of the Deep Forge',
+    marshfiend: 'Drowned King of the Mire', gloomTyrant: 'Sovereign of the Blue Hollow',
+    paleMagistrate: 'Keeper of Pale Law', crownlessKing: 'Throne Without a Head',
+    ashwingMatriarch: 'Mother of Cinders', duskweaver: 'Spinner of the Failing Light',
+    frostboundWarden: 'Sentinel of the Rime', bonelordErevax: 'Lord of the Ossuary',
+    auricSentinel: 'The Gilded Eye', tidemaw: 'Hunger of the Tides',
+    veilserpentYssa: 'She Who Coils the Veil'
+  };
+
   // ============================ PREVIEW (for the editor) ============================
   B.preview = typeId => {
     const cfg = CFG[typeId] || CFG.mossSovereign;
@@ -501,7 +513,7 @@
     G.Audio.sfx('roar');
     G.Audio.setBoss(true);
     G.FX.shake(0.3, 0.8);
-    G.UI.bossTitle(cfg.name);
+    G.UI.bossTitle(cfg.name, EPITHETS[typeId]);
     G.UI.setBoss(bs);
     if (G.Post) G.Post.flash(0.28, cfg.colors.glow);
     if (G.Main.camPunch) G.Main.camPunch(1.6);
@@ -515,13 +527,16 @@
     bs.noGravity = false;
     G.Audio.sfx('roar');
     G.Audio.sfx('die');
-    G.FX.hitStop(0.35);
-    G.FX.shake(0.5, 0.8);
+    G.FX.hitStop(0.4);
+    if (G.FX.slowMo) G.FX.slowMo(0.25, 1.6);          // dramatic slow-motion finish
+    G.FX.shake(0.6, 1.1);
     G.FX.burst('death', bs.body.x, bs.body.y + 1);
+    G.FX.ring(bs.body.x, bs.body.y + 1, { r1: 7, life: 0.6, color: bs.cfg.colors.glow, alpha: 0.8 });
+    G.FX.ring(bs.body.x, bs.body.y + 1, { r1: 11, life: 0.9, color: 0xffffff, alpha: 0.5 });
     G.Audio.setBoss(false);
     G.UI.setBoss(null);
-    if (G.Post) { G.Post.flash(0.5, 0xffffff); G.Post.punch(2); }
-    if (G.Main.camPunch) G.Main.camPunch(2.5);
+    if (G.Post) { G.Post.flash(0.6, 0xffffff); G.Post.punch(2.4); }
+    if (G.Main.camPunch) G.Main.camPunch(2.8);
     if (G.Main.dropGlimmer) G.Main.dropGlimmer(bs.body.x, bs.body.y + 1, 40 + (Math.random() * 20 | 0));
   }
 

@@ -307,6 +307,8 @@
     return { x: U.rand(-k, k), y: U.rand(-k, k) };
   };
   FX.hitStop = t => { G.hitStop = Math.max(G.hitStop || 0, t); };
+  // cinematic slow-motion: scale gameplay dt to `scale` for `dur` seconds (camera/UI stay real-time)
+  FX.slowMo = (scale, dur) => { G.slowScale = scale; G.slowMo = Math.max(G.slowMo || 0, dur); };
 
   FX.update = dt => {
     if (shakeT > 0) shakeT -= dt;

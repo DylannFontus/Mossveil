@@ -11,7 +11,7 @@
   let toasts = [];           // {text, t}
   let areaQ = [];            // queued area titles {text, t}
   let banners = [];          // placed text banners (from the Logic graph) {text, place, t, secs}
-  let bossT = -1, bossText = '';
+  let bossT = -1, bossText = '', bossSub = '';
   let maskFlash = 0, healFlash = 0, lowHpPulse = 0;
   const fade = { val: 1, target: 1, speed: 2, cb: null };
   let deathTextT = 0;
@@ -64,7 +64,7 @@
       cx.restore();
     }
   }
-  UI.bossTitle = text => { bossText = text; bossT = 0; };
+  UI.bossTitle = (text, sub) => { bossText = text; bossSub = sub || ''; bossT = 0; };
   // persistent boss health bar (Hollow Knight style)
   const bossBar = { boss: null, name: '', maxHp: 1, dispHp: 0, lagHp: 0, shown: 0 };
   UI.setBoss = boss => {
@@ -235,20 +235,32 @@
   function drawBossTitle(dt) {
     if (bossT < 0) return;
     bossT += dt;
-    const IN = 0.4, HOLD = 2.0, OUT = 0.7;
+    const IN = 0.5, HOLD = 2.1, OUT = 0.8;
     if (bossT > IN + HOLD + OUT) { bossT = -1; return; }
-    let alpha = bossT < IN ? bossT / IN : bossT < IN + HOLD ? 1 : 1 - (bossT - IN - HOLD) / OUT;
+    const alpha = bossT < IN ? bossT / IN : bossT < IN + HOLD ? 1 : 1 - (bossT - IN - HOLD) / OUT;
+    const rev = U.clamp(bossT / IN, 0, 1);        // wipe-in reveal of the name + flanking slashes
     cx.save();
     cx.globalAlpha = Math.max(0, alpha);
-    cx.textAlign = 'center';
-    cx.font = `52px ${serif}`;
-    cx.fillStyle = '#dff2e4';
-    cx.shadowColor = 'rgba(120,255,170,0.5)';
-    cx.shadowBlur = 22;
-    const sc = 1 + (bossT < IN ? (1 - bossT / IN) * 0.15 : 0);
-    cx.translate(w / 2, h * 0.68);
+    cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
+    cx.translate(w / 2, h * 0.66);
+    const sc = 1 + (1 - rev) * 0.12;
     cx.scale(sc, sc);
+    // name
+    cx.font = `900 54px ${menuFont}`;
+    cx.fillStyle = '#eef7ee'; cx.shadowColor = 'rgba(120,255,170,0.55)'; cx.shadowBlur = 26;
     cx.fillText(bossText, 0, 0);
+    cx.shadowBlur = 0;
+    // flanking accent slashes that grow with the reveal
+    const nameW = cx.measureText(bossText).width, sl = (nameW / 2 + 28) * rev;
+    cx.strokeStyle = 'rgba(150,240,190,0.7)'; cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(-nameW / 2 - 18, 14); cx.lineTo(-nameW / 2 - 18 - sl * 0.5, 14); cx.stroke();
+    cx.beginPath(); cx.moveTo(nameW / 2 + 18, 14); cx.lineTo(nameW / 2 + 18 + sl * 0.5, 14); cx.stroke();
+    // epithet
+    if (bossSub) {
+      cx.font = `italic 21px ${serif}`; cx.fillStyle = 'rgba(200,224,210,0.85)';
+      cx.globalAlpha = Math.max(0, alpha) * U.clamp((bossT - IN * 0.5) / IN, 0, 1);
+      cx.fillText(bossSub, 0, 34);
+    }
     cx.restore();
   }
 
@@ -285,9 +297,18 @@
     grad.addColorStop(0, '#d9e8df'); grad.addColorStop(1, '#f4fff8');
     cx.fillStyle = grad;
     cx.fillRect(bx, by, bw * frac, bh);
+    // phase divider notch at the 50% threshold (where the boss enters phase 2)
+    cx.fillStyle = 'rgba(20,24,26,0.85)';
+    cx.fillRect(bx + bw * 0.5 - 1, by - 1, 2, bh + 2);
     // border
     cx.strokeStyle = 'rgba(220,235,225,0.5)'; cx.lineWidth = 1;
     cx.strokeRect(bx - 2.5, by - 2.5, bw + 5, bh + 5);
+    // phase pips (filled = current phase) at the right end of the name line
+    const phase = (b.boss && b.boss.phase) || 1;
+    for (let i = 0; i < 2; i++) {
+      cx.beginPath(); cx.arc(bx + bw - 6 - i * 13, by - 13, 4, 0, 6.28);
+      cx.fillStyle = (2 - i) <= phase ? '#bff0d0' : 'rgba(160,180,170,0.3)'; cx.fill();
+    }
     cx.restore();
   }
 
