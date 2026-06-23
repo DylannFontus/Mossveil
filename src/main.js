@@ -945,16 +945,20 @@
       else if (Main.state !== 'title' && Main.state !== 'prologue' && G.player) G.player.update(dt);
       G.FX.update(dt);
     }
-    // adaptive music: swell tension when alive enemies crowd the player
+    // adaptive music: only count enemies that can actually SEE the player (line of sight within
+    // the vicinity), so aggro stops once nothing is engaging — not merely when something is near.
     if (G.Audio.setIntensity) {
       if (Main.state === 'play' && G.player && !G.player.dead && G.room) {
+        const px = G.player.body.x, py = G.player.body.y, VIS = 14;
         let danger = 0;
         for (const e of G.room.entities) {
           if (!e.isEnemy || !e.alive || e.type === 'boss') continue;
-          const d = Math.abs(e.body.x - G.player.body.x) + Math.abs(e.body.y - G.player.body.y) * 0.6;
-          if (d < 18) danger += (e.aggro ? 1 : 0.6) * (1 - d / 18);
+          const d = Math.abs(e.body.x - px) + Math.abs(e.body.y - py) * 0.6;
+          if (d > VIS) continue;
+          const sees = e.aggro === true || (G.Physics.los ? G.Physics.los(e.body.x, e.body.y, px, py + 0.4) : true);
+          if (sees) danger += (1 - d / VIS);
         }
-        G.Audio.setIntensity(Math.min(1, danger * 0.5));
+        G.Audio.setIntensity(Math.min(1, danger * 0.6));
       } else G.Audio.setIntensity(0);
     }
     G.Audio.update(rdt);

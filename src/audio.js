@@ -8,7 +8,7 @@
   let areaRoot = 220, bossOn = false;
   let bossPulseGain = null;
   // adaptive music: a combat-tension layer that swells with on-screen danger
-  let combatGain = null, combatPad = null, intensity = 0, targetIntensity = 0;
+  let combatGain = null, combatPad = null, intensity = 0, targetIntensity = 0, combatStep = 0;
   // reverb that changes per zone (big hall vs tight tunnel); applied once audio starts
   let pendingReverb = null, reverbWet = 0.4;
   // tone()/noiseHit() connect here; sfxAt() temporarily redirects it through a panner for positional one-shots
@@ -78,13 +78,14 @@
     // boss pulse bus (silent until boss)
     bossPulseGain = ctx.createGain(); bossPulseGain.gain.value = 0;
     bossPulseGain.connect(master);
-    // combat-tension layer: two saws a tritone apart, lowpassed — silent until danger swells it
+    // combat layer: a warm consonant root+fifth bed under a driving arpeggio (built in update) —
+    // silent until danger swells it. Upbeat rather than tense.
     combatGain = ctx.createGain(); combatGain.gain.value = 0;
     combatGain.connect(master); combatGain.connect(verb);
-    const padA = ctx.createOscillator(); padA.type = 'sawtooth';
-    const padB = ctx.createOscillator(); padB.type = 'sawtooth';
-    const padLp = ctx.createBiquadFilter(); padLp.type = 'lowpass'; padLp.frequency.value = 440; padLp.Q.value = 0.7;
-    const padG = ctx.createGain(); padG.gain.value = 0.5;
+    const padA = ctx.createOscillator(); padA.type = 'triangle';
+    const padB = ctx.createOscillator(); padB.type = 'triangle';
+    const padLp = ctx.createBiquadFilter(); padLp.type = 'lowpass'; padLp.frequency.value = 900; padLp.Q.value = 0.6;
+    const padG = ctx.createGain(); padG.gain.value = 0.28;            // quieter bed; the arpeggio carries it
     padA.connect(padLp); padB.connect(padLp); padLp.connect(padG); padG.connect(combatGain);
     padA.start(); padB.start();
     combatPad = { a: padA, b: padB };
@@ -94,9 +95,9 @@
   function retune() {
     if (!droneNodes.length) return;
     droneNodes.forEach(n => n.o.frequency.setTargetAtTime(areaRoot * n.mult, ctx.currentTime, 2.5));
-    if (combatPad) {                                   // root + a tense tritone above
+    if (combatPad) {                                   // root + a (consonant) fifth above it
       combatPad.a.frequency.setTargetAtTime(areaRoot * 0.5, ctx.currentTime, 2);
-      combatPad.b.frequency.setTargetAtTime(areaRoot * 0.5 * Math.pow(2, 6 / 12), ctx.currentTime, 2);
+      combatPad.b.frequency.setTargetAtTime(areaRoot * 0.75, ctx.currentTime, 2);
     }
   }
 
@@ -362,15 +363,23 @@
           setTimeout(() => { if (started) bell(areaRoot * 2 * Math.pow(2, s2 / 12), 0.04, 2.5); }, 700 + Math.random() * 600);
         }
       }
-      // combat pulse: a low heartbeat that quickens with intensity
+      // combat groove: an upbeat driving arpeggio (root–fifth–octave) + a kick on the downbeat,
+      // quickening with intensity. Routed through the combat bus so it only sounds while engaged.
       if (intensity > 0.12 && !bossOn) {
         combatPulseT -= dt;
         if (combatPulseT <= 0) {
-          combatPulseT = 0.85 - intensity * 0.35;
+          combatPulseT = 0.2 - intensity * 0.07;       // ~8th→16th notes as it heats up
           const prev = sfxTarget; sfxTarget = combatGain;
-          try { tone({ type: 'sine', f0: 70, f1: 46, t: 0.18, vol: 0.10 + intensity * 0.16 }); } finally { sfxTarget = prev; }
+          try {
+            const ARP = [1, 1.5, 2, 3, 2, 1.5];          // root, fifth, octave, fifth-above… (major, energetic)
+            const note = ARP[combatStep % ARP.length];
+            tone({ type: 'triangle', f0: areaRoot * note, t: 0.13, vol: 0.05 + intensity * 0.11, a: 0.004 });
+            if (combatStep % 4 === 0) tone({ type: 'sine', f0: 92, f1: 46, t: 0.13, vol: 0.10 + intensity * 0.12 });   // kick
+            else if (combatStep % 2 === 1) noiseHit({ f0: 4200, f1: 6500, t: 0.04, vol: 0.02 + intensity * 0.04, ftype: 'highpass', q: 0.7 });  // hat
+            combatStep++;
+          } finally { sfxTarget = prev; }
         }
-      }
+      } else combatStep = 0;
       if (bossOn) {
         bossPulseT -= dt;
         if (bossPulseT <= 0) {

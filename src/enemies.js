@@ -152,14 +152,14 @@
         b.vx = U.clamp(b.vx + U.clamp(tx - b.x, -1, 1) * (this.aggro ? 14 : 5) * dt, -5.5, 5.5);
         b.vy = U.clamp(b.vy + U.clamp(ty - b.y, -1, 1) * (this.aggro ? 14 : 5) * dt, -4.5, 4.5);
         b.vx *= 1 - dt * 0.7; b.vy *= 1 - dt * 0.7;
-        G.Physics.move(b, dt);
+        b.x += b.vx * dt; b.y += b.vy * dt;        // phases through terrain (no collision)
         contactPlayer(this);
         if (Math.abs(b.vx) > 0.4) vis.scale.x = b.vx > 0 ? 1 : -1;
         const flap = Math.sin(G.time * 38 + this.ph);
         wingL.rotation.z = 0.5 + flap * 0.5;
         wingR.rotation.z = 0.65 + flap * 0.45;
         vis.position.y = Math.sin(this.ph * 2.4) * 0.08;
-        grp.position.set(b.x, b.y, -0.05);
+        grp.position.set(b.x, b.y, 0.5);           // in front of the terrain so it stays visible while passing through
       }
     };
   }
