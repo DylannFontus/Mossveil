@@ -106,14 +106,30 @@ only in that device's browser. Revoke/rotate it anytime from GitHub's token sett
 | Move | `A` `D` or `←` `→` |
 | Jump (hold = higher) | `Z` or `SPACE` |
 | Strike (combine with `↑`/`↓`) | `X` or `J` |
+| **Great Slash** (charged nail art) | hold Strike, release |
 | Dash | `C` / `K` / `SHIFT` |
 | Focus (hold, mends a mask) / Soul-wisp (tap) | `F` or `L` |
 | Interact / rest at bench | `↑` or `E` |
-| **World map** | `M` (arrows pan, `+`/`−` zoom) |
+| **World map** (drop / clear a pin) | `M` (arrows pan, `+`/`−` zoom, `Z`/`X` pin) |
 | Drop through platforms | `↓` + jump |
 | Pause / Mute | `ESC` / `U` |
 
-The map fills in as you discover rooms. Rest at benches to record your journey.
+The map fills in as you discover rooms (with an exploration-% readout); drop pins to
+mark spots, and an on-screen compass points to the nearest bench when it's off-screen.
+Rest at benches to record your journey.
+
+**Combat feel** — strikes land a real crescent slash that sweeps and follows through.
+**Hold Strike** to charge a **Great Slash** nail art (a lunging heavy blow that staggers
+and knocks back). Enemies build **poise** and stagger when it breaks; time a swing into an
+incoming hit to **clash/parry** it (no damage). Defeat a boss and the final blow drops into
+**slow-motion**.
+
+**The shade** — when you fall you drop your **Glimmer** and a shade appears where you died;
+return to that room and destroy it to reclaim what you lost.
+
+**Hunter's Journal** (pause → **Journal**) — a bestiary that fills in as you defeat each
+creature, with kill counts, lore and a live 3D portrait. The first kill of a type pops a
+"Journal entry added" notice.
 
 **On a touch device (iPad), on-screen controls appear automatically:** a directional pad
 on the bottom-left, an action cluster (Jump / Strike / Dash / Focus) on the bottom-right,
@@ -127,8 +143,12 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   vignette, film grain and chromatic aberration**, plus a living camera (look-ahead +
   zoom-punch on impacts), squash-&-stretch juice, a lantern glow, and per-biome atmosphere
   (drifting haze, fireflies, wind). Visual quality is adjustable in **Settings** (Low/Med/High).
-- **Bosses** get a named **health bar**, a cinematic intro/phase-transition, and attack
-  telegraphs.
+- **Adaptive audio** — the procedural score grows a **combat-tension layer** that swells when
+  enemies crowd you and relaxes when the room clears; reverb **changes per biome** (ringing
+  stone halls vs dry forges) and per **reverb zone**; footsteps and impacts are
+  **surface-aware** (wood / grass / stone / metal), positioned and panned by distance.
+- **Bosses** get a named **health bar** with **phase pips**, a cinematic **name-card + epithet**
+  intro, a phase-transition, attack telegraphs, and a **slow-motion final blow**.
 - **Charms** — equip up to your **notch** budget (which grows as you fell bosses) for effects
   like extra masks, harder strikes, faster focus, quicker dashes. Find them in the world
   (charm pickups) or **buy them from a Vendor** with Glimmer.
@@ -172,15 +192,33 @@ the world map (the same map shown in-game on `M`).
   - *Lights*: glow lights (colour / size / intensity / flicker) and god rays.
   - *Enemies*: all 14 creature types.
   - *Bosses*: all 15 — place a boss trigger, pick the boss, and pair it with gates.
-  - *Markers*: spawn points and **portals/transitions** (edge-based like the original
-    rooms, or free rectangles) — pick the destination level and arrival spawn in the
-    Inspector.
+  - *Markers*: spawn points, **portals/transitions** (edge-based like the original rooms, or
+    free rectangles), cutscene / set-active / biome-change triggers, and **Audio zones** — an
+    ambient emitter (positional looping sound), a reverb zone (swaps the room reverb while
+    you're inside), or a music trigger (sets the adaptive-music mood).
+  - *Furniture / Build*: full-colour Victorian furniture and a procedural **building generator**
+    (multi-storey shell + wood floors + furnishings), plus tileable interior **wall backdrops**.
+  - *My Models*: custom models you built in the **Models tab** (see below).
+
+  The asset browser renders a **live 3D thumbnail** for every item; **search** by name and
+  **★ favourite** the ones you use most (favourites sort first / filter-only).
 - **Levels tab** — open, create, duplicate, delete levels. New levels pick a size and one
-  of **13 biomes** (verdant, gloom, hearth, pale, dusk, crown, ember, frost, marsh,
-  sunken, ossuary, fungal, aurora) — each with its own palette, backdrop assets,
-  ambient particles and music key.
+  of **20 biomes** (verdant, gloom, hearth, pale, dusk, crown, ember, frost, marsh, sunken,
+  ossuary, fungal, aurora, **City of Tears**, forge, mine, village, archive, garden, tombs) —
+  each with its own palette, backdrop assets, ambient particles, **reverb character** and
+  music key.
 - **Map tab** — the whole world drawn in dark-cartography style; drag rooms to arrange,
-  double-click to open one.
+  double-click to open one. It doubles as a **world-graph diagnostic**: room thumbnails +
+  door links, a ▶START badge, dimmed **unreachable** rooms, and red/amber outlines on rooms
+  the **lint** flags (broken links, missing spawns/refs, dead-ends, unreachable-from-start).
+- **Logic tab** — a node-graph **visual-scripting** canvas per room: events (room-enter,
+  timer, zone, signal, boss-death…) wired to conditions and actions (set flag, set-active,
+  play sound/cutscene/FX, weather, text…), all driven by the universal **object-id** system.
+- **Models tab** — build characters or props from primitives (box, sphere, capsule, cone…),
+  **parent** parts into a rig, set pivots, recolour, and author **animation clips** (pose +
+  keyframe). **🦴 Auto-rig (humanoid)** guesses a torso/head/arms/legs skeleton from the layout
+  and generates **idle + walk** clips. Models are flat-shaded to match the art; place a saved
+  model from *Props → Model* (with an Animation dropdown), and it animates in-game.
 - **Scenes tab** — author **cutscenes** on a timeline. Each cutscene is a list of timed
   events you add, reorder by start time, and edit in the Inspector. Event types:
   - *Screen/camera*: `fade`, `letterbox` (cinematic bars), `blur`, `flash`, `text`
@@ -201,12 +239,17 @@ the world map (the same map shown in-game on `M`).
 
   `▶ Test` previews the selected cutscene in the game. An **"Expressions (demo)"** sample
   cutscene is included as a reference for all the emotive animations (delete it freely).
-- **Test** — `▶ Test Level` saves and launches the game directly in the room you're
-  editing (or, on the Scenes tab, previews the selected cutscene); `▶ From Start` plays
+- **Test / Play here** — `▶ Play here` saves and launches the game directly in the room
+  you're editing, inside the editor; the playtest overlay has a **↻ Reload** (hot-reload)
+  that saves your latest edits and reloads the running room in place. `▶ From Start` plays
   from the title screen.
+- **Prefabs** — marquee-drag or `Shift`-click objects and save them as a reusable prefab
+  (`Ctrl+G`). Prefabs can be **nested** (⊕ on a prefab card embeds another prefab; stamping
+  expands them recursively), and stamped copies are edited freely for per-instance variants.
 - Undo/redo (`Ctrl+Z`/`Ctrl+Y`), snap, duplicate (`Ctrl+D`), delete, focus (`F`),
   save (`Ctrl+S`). Saves write `data/levels.json` (+ a `.js` mirror so the game runs from
-  `file://`) with rolling backups in `data/backups/`.
+  `file://`) with rolling backups in `data/backups/`. The left panel's **Guide** tab is a
+  searchable dictionary of every node, concept and tool.
 
 ## The bestiary
 
@@ -214,7 +257,8 @@ the world map (the same map shown in-game on `M`).
 (ceiling dropper), driftwisp (phases through walls), shellback (armored front — hit it
 from behind or above), skimmer (dive-bomber), sporeling (swarmer), mortarbug
 (artillery with cluster shells), blastcap (mine fungus), hookworm (burrower),
-sentine (turret eye).
+sentine (turret eye). Each is recorded in the in-game **Hunter's Journal** as you defeat it,
+with lore and a 3D portrait.
 
 15 bosses built on five rig archetypes (beetle, mantis, moth, serpent, golem) with a
 shared move library (leap-slam + shockwaves, scythe rushes, projectile rains, volleys,
@@ -236,11 +280,16 @@ geometry naturally. Depth fog tints each layer toward the biome palette.
 - `index.html` — the game · `editor/` — the editor app · `MOSSVEIL Editor.cmd` — launcher
 - `data/levels.json` / `data/cutscenes.json` — levels and cutscenes (the editor's save
   targets); the matching `.js` files are generated mirrors so the game runs from `file://`
-- `src/` — engine: util, input, audio (procedural WebAudio), physics, fx, world (13 biomes,
-  props, builders), map (world-map renderer), player, enemies, bosses, cutscene
-  (cinematic timeline runtime), ui, main
+- `src/` — engine: util, input, audio (procedural WebAudio + adaptive layers/reverb),
+  physics, fx, post, lights, world (20 biome looks, props, builders), map (world-map
+  renderer), models (custom-model rig + clips), thumb (3D→portrait snapshotter), eventgraph
+  (visual-scripting runtime), player, enemies, bosses, cutscene (cinematic timeline runtime),
+  ui, main
 - `tools/` — editor server + headless test harnesses (`smoke.js`, `systems.js`,
-  `editor-smoke.js`, `boss-test.js`; they use puppeteer-core + your installed Edge)
+  `editor-smoke.js`, `boss-test.js`, plus per-feature tests: `combat-texture-test.js`,
+  `audio-smoke.js`, `shade-test.js`, `journal-test.js`, `boss-cinematic-test.js`,
+  `map-depth-test.js`, `world-graph-test.js`, `autorig-test.js`, …; they use puppeteer-core
+  + your installed Edge)
 
 Headless tests run in software-rendered slow motion; on real hardware the game runs at
 full speed.

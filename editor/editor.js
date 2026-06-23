@@ -1796,7 +1796,12 @@
     ['Wall backdrop', 'Build tab → Wall (wood / brick / wallpaper): a tileable interior wall placed behind a building to hide the biome. Not affected by dynamic lighting.'],
     ['Furniture', 'Furniture tab: full-colour Victorian furniture — sofa, fireplace (live fire), bookshelf, table, chandelier, painting, plant, chair, rug.'],
     ['Biomes', '20 biome looks (verdant, gloom, City of Tears, forge, mine, village, archive, garden, tombs…). Set per level in Level settings; backgrounds + decor follow.'],
-    ['Dynamic lighting', 'Real-time 2D lights (lamps, fires, player lantern) with soft shadows + edge glow. Per-room Intensity / Edge glow / Soft shadows in Level settings; on/off in the in-game Settings.']
+    ['Dynamic lighting', 'Real-time 2D lights (lamps, fires, player lantern) with soft shadows + edge glow. Per-room Intensity / Edge glow / Soft shadows in Level settings; on/off in the in-game Settings.'],
+    ['Audio markers', 'Markers → Audio zone, in three modes: Ambient emitter (a positional looping sound, panned + attenuated by distance), Reverb zone (swaps the room reverb while the player is inside, reverts on exit), and Music trigger (sets the adaptive-music mood: calm / tense / boss).'],
+    ['Model editor', 'Models tab: build characters or props from primitives, parent parts into a rig, set pivots, and author animation clips. “🦴 Auto-rig (humanoid)” guesses a torso/head/arms/legs skeleton from the layout and generates idle + walk clips. Place a saved model in a level from Props → Model (with an Animation dropdown).'],
+    ['Hunter’s Journal', 'In-game bestiary (pause → Journal) that fills as you defeat each creature: kill counts, lore and a live 3D portrait. The first kill of a type pops a “Journal entry added” notice.'],
+    ['Shade', 'On death you drop your Glimmer and a shade spawns where you fell (saved to the file). Return to that room and destroy the shade to reclaim the Glimmer.'],
+    ['Map pins & compass', 'On the in-game map: Z drops a pin, X clears the nearest one; the header shows exploration %. In play, an edge arrow points to the nearest bench when it’s off-screen.']
   ];
   const TOOLS = [
     ['Auto-tile (⊞ Auto)', 'While painting terrain, exposed edges become the smooth/curvy variant and buried interior stays hard. Shift+click the button retiles the whole level.'],
@@ -1804,8 +1809,13 @@
     ['Record & replay (F6 / F7 / F8)', 'F6 records a run, F7 replays it deterministically, F8 stops. Great for demos and debugging a death.'],
     ['Tone mapping', 'In-game Settings → Tone mapping: Off / ACES / AgX filmic curves. Also Motion blur, Dynamic lighting toggles.'],
     ['Tabs', 'Top: Scene (paint & place), Map, Cutscene, Logic (visual scripting). Left panel: Hierarchy, Levels, Scenes, Lint, Guide.'],
-    ['Lint', 'Validates the world — broken links, missing references, dead-end rooms. Click an issue to jump straight to it.'],
-    ['Asset tabs', 'Props, Decor, Furniture, Build, Lights, Enemies, Bosses, Markers, Prefabs. Shift+click to keep placing.']
+    ['Lint', 'Validates the world — broken links, missing references, dead-end rooms, and now BFS reachability (rooms you can’t walk to from the start) + targets with no spawn points. Click an issue to jump straight to it.'],
+    ['Asset tabs', 'Props, Decor, Furniture, Build, Lights, Enemies, Bosses, Markers, Prefabs. Shift+click to keep placing.'],
+    ['Asset browser', 'Every prop / model / enemy renders a live 3D thumbnail. Search assets by name, and ★ favourite the ones you use most (favourites sort to the front; the ★ toggle shows favourites only).'],
+    ['World graph (Map tab)', 'The Map tab doubles as a connection graph: room thumbnails + door links, a ▶START badge on the entry room, dimmed unreachable rooms, and red/amber outlines on rooms with lint errors/warnings.'],
+    ['Nested prefabs', 'A saved prefab can embed other prefabs — click ⊕ on a prefab card to nest one inside. Stamping expands them recursively (cycle-guarded); edit the stamped copies freely for per-instance variants.'],
+    ['Hot-reload (↻)', 'In the ▶ Play-here overlay, the ↻ Reload button saves your latest edits and reloads the running room in place — no need to stop and relaunch.'],
+    ['Model editor (Models tab)', 'Build & animate custom models from primitives; “🦴 Auto-rig (humanoid)” auto-builds a skeleton + idle/walk clips. Flat-shaded by default to match the art; place results from Props → Model.']
   ];
   function buildGuide() {
     const box = $('guide'); if (!box) return; box.innerHTML = '';
