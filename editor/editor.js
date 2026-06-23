@@ -269,6 +269,7 @@
   function propRect(p) {
     if (p.type === 'textTrigger' || p.type === 'cutsceneTrigger') return { x: p.x, y: p.y, w: p.w || 3, h: p.h || 3 };
     if (p.type === 'setActiveTrigger' || p.type === 'lookTrigger') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
+    if (p.type === 'audio') return { x: p.x, y: p.y, w: p.w || 8, h: p.h || 6 };
     const s = PROP_SIZE[p.type] || [1.5, 1.5];
     const k = p.type === 'decor' ? (p.scale || 1) : 1;
     return { x: p.x, y: p.y + (p.type === 'textTrigger' ? 0 : s[1] * k / 2 - 0.2), w: s[0] * k, h: s[1] * k };
@@ -744,11 +745,12 @@
       if (it.ref.type === 'cutsceneTrigger') col = '#5fd0e8';
       if (it.ref.type === 'setActiveTrigger') col = '#c89bff';
       if (it.ref.type === 'lookTrigger') col = '#5fe0a8';
+      if (it.ref.type === 'audio') col = '#8fd0ff';
       const inactive = it.ref.active === false;
       octx.globalAlpha = inactive ? 0.4 : 1;        // dim objects that are switched off
       octx.strokeStyle = isSel ? '#ffd887' : (inMulti ? '#7fe8ff' : col + 'aa');
       octx.lineWidth = (isSel || inMulti) ? 2.5 : 1.2;
-      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger' || it.ref.type === 'lookTrigger') octx.setLineDash([4, 4]);
+      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger' || it.ref.type === 'lookTrigger' || it.ref.type === 'audio') octx.setLineDash([4, 4]);
       octx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
       octx.setLineDash([]);
       // label
@@ -1138,6 +1140,30 @@
           }
           break;
         }
+        case 'audio': {
+          selectField(body, 'Mode', [
+            { v: 'emitter', t: 'Ambient emitter (positional)' },
+            { v: 'reverbZone', t: 'Reverb zone' },
+            { v: 'musicTrigger', t: 'Music trigger' }
+          ], () => p.mode || 'emitter', v => { p.mode = v; refreshInspector(); });
+          if (p.mode !== 'emitter') {
+            numField(body, 'Zone W', () => p.w || 8, v => { p.w = Math.max(1, v); });
+            numField(body, 'Zone H', () => p.h || 6, v => { p.h = Math.max(1, v); });
+          }
+          if (p.mode === 'emitter') {
+            selectField(body, 'Sound', (G.Audio.sfxNames || ['drop']).map(s => ({ v: s, t: s })), () => p.sound || 'drop', v => { p.sound = v; });
+            numField(body, 'Every (s)', () => p.every !== undefined ? p.every : 4, v => { p.every = Math.max(0.2, v); }, 0.5);
+            el('div', { class: 'insNote' }, body, 'Plays the sound on a loose timer, panned + attenuated by distance to the player.');
+          } else if (p.mode === 'reverbZone') {
+            numField(body, 'Wet', () => p.wet !== undefined ? p.wet : 0.55, v => { p.wet = U.clamp(v, 0, 1); }, 0.05);
+            numField(body, 'Tail (s)', () => p.tail || 3.4, v => { p.tail = Math.max(0.3, v); }, 0.1);
+            el('div', { class: 'insNote' }, body, 'While the player is inside, the room reverb switches to these settings; it reverts on exit. Great for big halls vs tight tunnels.');
+          } else {
+            selectField(body, 'Music', [{ v: 'tense', t: 'Tense / combat' }, { v: 'calm', t: 'Calm' }, { v: 'boss', t: 'Boss' }], () => p.music || 'tense', v => { p.music = v; });
+            el('div', { class: 'insNote' }, body, 'Sets the adaptive-music state when the player enters the zone (reverts to calm on exit).');
+          }
+          break;
+        }
         case 'decor': {
           const kinds = [...G.World.DECOR_KINDS.standing, ...G.World.DECOR_KINDS.hanging];
           selectField(body, 'Kind', kinds.map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
@@ -1435,7 +1461,8 @@
         { cat: 'zone', id: 'portal', label: 'Portal / transition', ico: '🌀' },
         { cat: 'prop', id: 'cutsceneTrigger', label: 'Cutscene trigger', ico: '🎬', defaults: { w: 4, h: 4, once: true } },
         { cat: 'prop', id: 'setActiveTrigger', label: 'Set-active trigger', ico: '🎚️', defaults: { w: 5, h: 5, once: false, targets: [] } },
-        { cat: 'prop', id: 'lookTrigger', label: 'Biome / look changer', ico: '🌗', defaults: { w: 5, h: 5, fade: 2 } }
+        { cat: 'prop', id: 'lookTrigger', label: 'Biome / look changer', ico: '🌗', defaults: { w: 5, h: 5, fade: 2 } },
+        { cat: 'prop', id: 'audio', label: 'Audio zone', ico: '🔊', defaults: { mode: 'emitter', w: 8, h: 6, sound: 'drop', every: 4 } }
       ];
       case 'prefabs': return Object.keys(prefabs).map(name => ({ cat: 'prefab', prefab: name, label: name, ico: '🧩', n: (prefabs[name].items || []).length, del: true }));
     }

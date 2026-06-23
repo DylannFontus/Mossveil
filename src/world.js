@@ -231,6 +231,13 @@
     forge: [0.30, 1.6, 2.0], mine: [0.42, 2.2, 2.4], village: [0.28, 1.8, 2.2],
     garden: [0.24, 1.5, 2.2]
   };
+  // (re)apply the current room's default reverb — also used to revert when leaving a reverb zone
+  function applyRoomReverb() {
+    if (!G.Audio || !G.Audio.setReverb || !G.room) return;
+    const rv = REVERB[G.room.biome] || REVERB._default;
+    G.Audio.setReverb(rv[0], rv[1], rv[2]);
+  }
+  W.applyRoomReverb = applyRoomReverb;
 
   // ============================ SILHOUETTE GENERATORS ============================
   function shapeMesh(shape, mat, x, y, seg) {
@@ -1275,6 +1282,36 @@
     };
   };
 
+  // an inaudible/invisible audio marker: a positional emitter, a reverb zone, or a music trigger
+  mkProp.audio = (p) => {
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, 0); grp.visible = false;
+    const mode = p.mode || 'emitter', w = p.w || 8, h = p.h || 6;
+    let inside = false, emitT = U.rand(0, 1.5);
+    const inZone = pl => Math.abs(pl.body.x - p.x) <= w / 2 && Math.abs(pl.body.y - p.y) <= h / 2;
+    return {
+      type: 'audioZone', x: p.x, y: p.y, group: grp, mode,
+      update(dt) {
+        const pl = G.player; if (!pl || !G.Audio) return;
+        if (mode === 'emitter') {
+          emitT -= dt;
+          if (emitT <= 0) { emitT = (p.every || 4) * U.rand(0.55, 1.5); if (G.Audio.sfxAt) G.Audio.sfxAt(p.sound || 'drop', p.x, p.y); }
+          return;
+        }
+        const within = inZone(pl);
+        if (within && !inside) {
+          inside = true;
+          if (mode === 'reverbZone' && G.Audio.setReverb) G.Audio.setReverb(p.wet != null ? p.wet : 0.55, p.tail || 3.4, p.decay || 3.0);
+          else if (mode === 'musicTrigger' && G.Audio.setMusicState) G.Audio.setMusicState(p.music || 'tense');
+        } else if (!within && inside) {
+          inside = false;
+          if (mode === 'reverbZone') W.applyRoomReverb();
+          else if (mode === 'musicTrigger' && G.Audio.setMusicState) G.Audio.setMusicState('calm');
+        }
+      },
+      onRemove() { if (inside && mode === 'reverbZone') W.applyRoomReverb(); }
+    };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);
@@ -1816,7 +1853,7 @@
 
     G.scene.add(group);
     G.Audio.setArea(pal.root);
-    if (G.Audio.setReverb) { const rv = REVERB[biome] || REVERB._default; G.Audio.setReverb(rv[0], rv[1], rv[2]); }
+    applyRoomReverb();
 
     // visited tracking for the world map
     if (G.save) {
