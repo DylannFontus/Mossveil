@@ -365,17 +365,31 @@
     const ox = items.reduce((a, b) => a + b.x, 0) / items.length, oy = items.reduce((a, b) => a + b.y, 0) / items.length;
     return { items, ox, oy };
   }
-  function stampCapture(cap, wx, wy) {
+  function stampCapture(cap, wx, wy, _seen) {
     if (!cap || !cap.items || !cap.items.length) return;
-    const L = lvl(); multi = [];
+    const L = lvl(); if (!_seen) multi = [];
+    const seen = _seen || {};
     for (const it of cap.items) {
-      const d = JSON.parse(JSON.stringify(it.data));
       const nx = +(wx + (it.x - cap.ox)).toFixed(2), ny = +(wy + (it.y - cap.oy)).toFixed(2);
+      if (it.kind === 'prefab') {                       // nested prefab — expand it recursively (cycle-guarded)
+        const name = it.data && it.data.prefab;
+        if (name && prefabs[name] && !seen[name]) stampCapture(prefabs[name], nx, ny, Object.assign({}, seen, { [name]: 1 }));
+        continue;
+      }
+      const d = JSON.parse(JSON.stringify(it.data));
       if (it.kind === 'prop') { d.x = nx; d.y = ny; L.props = L.props || []; L.props.push(d); multi.push({ kind: 'prop', i: L.props.length - 1 }); }
       else if (it.kind === 'enemy') { d.x = nx; d.y = ny; L.enemies = L.enemies || []; L.enemies.push(d); multi.push({ kind: 'enemy', i: L.enemies.length - 1 }); }
       else if (it.kind === 'zone') { if (d.rect) { d.rect.x = nx; d.rect.y = ny; } else { d.x = nx; d.y = ny; } L.transitions = L.transitions || []; L.transitions.push(d); multi.push({ kind: 'zone', i: L.transitions.length - 1 }); }
     }
-    sel = multi[0] || null;
+    if (!_seen) sel = multi[0] || null;
+  }
+  // compose prefabs: embed `child` inside `parent` at an offset (creates a nested prefab)
+  function nestPrefab(parent, child, dx, dy) {
+    if (!prefabs[parent] || !prefabs[child] || parent === child) return false;
+    prefabs[parent].items.push({ kind: 'prefab', data: { prefab: child }, x: (prefabs[parent].ox || 0) + (dx || 0), y: (prefabs[parent].oy || 0) + (dy || 0) });
+    try { localStorage.setItem('mossveil-ed-prefabs', JSON.stringify(prefabs)); } catch (e) { }
+    refreshAssets();
+    return true;
   }
   function copySelection() { const c = captureSelection(); if (!c) return; clipboard = c; try { localStorage.setItem('mossveil-ed-clip', JSON.stringify(c)); } catch (e) { } }
   function pasteClipboard() { if (!clipboard) return; pushUndo(); stampCapture(clipboard, lastWorld.x, lastWorld.y); queueRebuild(); refreshHierarchy(); refreshInspector(); }
@@ -1565,6 +1579,16 @@
         const x = el('div', { class: 'nm', style: 'position:absolute;top:1px;right:4px;color:#c66;cursor:pointer', title: 'Delete prefab' }, d, '✕');
         x.addEventListener('click', ev => { ev.stopPropagation(); if (confirm('Delete prefab "' + a.prefab + '"?')) deletePrefab(a.prefab); });
       }
+      if (a.cat === 'prefab') {
+        const nb = el('div', { class: 'nm', style: 'position:absolute;bottom:1px;right:4px;color:#7fb3ff;cursor:pointer', title: 'Embed another prefab inside this one (nested prefab)' }, d, '⊕');
+        nb.addEventListener('click', ev => {
+          ev.stopPropagation();
+          const names = Object.keys(prefabs).filter(n => n !== a.prefab);
+          if (!names.length) { alert('Create another prefab first, then you can nest it inside this one.'); return; }
+          const child = prompt('Embed which prefab inside “' + a.prefab + '”?\n(' + names.join(', ') + ')', names[0]);
+          if (child && prefabs[child]) nestPrefab(a.prefab, child, 2, 0);
+        });
+      }
     }
   }
   // asset search + favourites state
@@ -2411,6 +2435,12 @@
   }
   $('btnPlayHere').addEventListener('click', async () => { if (await save()) openPlay(); });
   $('playClose').addEventListener('click', closePlay);
+  // hot-reload: save the latest edits and reload the running room in place
+  $('playReload').addEventListener('click', async () => {
+    const btn = $('playReload'), was = btn.textContent; btn.textContent = '↻ …';
+    if (await save()) $('playIframe').src = playUrl();
+    setTimeout(() => { btn.textContent = was; }, 600);
+  });
 
   // ---------------- in-editor cutscene preview ----------------
   // Plays the cutscene live in the 3D viewport with a real player rig, so you can
@@ -3024,6 +3054,8 @@
     copySelection, pasteClipboard, savePrefab, stampPrefab, alignSelected, captureSelection, selectInBox,
     setSel: v => { sel = v; }, setMulti: v => { multi = v; }, getMulti: () => multi, getSel: () => sel,
     getClip: () => clipboard, getPrefabs: () => prefabs, setLastWorld: (x, y) => { lastWorld = { x, y }; },
+    nestPrefab: (parent, child, dx, dy) => nestPrefab(parent, child, dx, dy), stampPrefab: (n, x, y) => stampPrefab(n, x, y),
+    savePrefabAs: (n) => savePrefab(n), playUrl: () => playUrl(),
     openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
     retileAll: () => retileWholeLevel(),
     logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
