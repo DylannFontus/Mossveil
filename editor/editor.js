@@ -270,6 +270,9 @@
     if (p.type === 'textTrigger' || p.type === 'cutsceneTrigger') return { x: p.x, y: p.y, w: p.w || 3, h: p.h || 3 };
     if (p.type === 'setActiveTrigger' || p.type === 'lookTrigger') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 4 };
     if (p.type === 'audio') return { x: p.x, y: p.y, w: p.w || 8, h: p.h || 6 };
+    if (p.type === 'windzone') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 9 };
+    if (p.type === 'spiketrap') return { x: p.x, y: p.y + 0.35, w: p.w || 2.4, h: 1 };
+    if (p.type === 'platform' || p.type === 'crusher' || p.type === 'conveyor' || p.type === 'fallfloor') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 1 };
     const s = PROP_SIZE[p.type] || [1.5, 1.5];
     const k = p.type === 'decor' ? (p.scale || 1) : 1;
     return { x: p.x, y: p.y + (p.type === 'textTrigger' ? 0 : s[1] * k / 2 - 0.2), w: s[0] * k, h: s[1] * k };
@@ -760,11 +763,22 @@
       if (it.ref.type === 'setActiveTrigger') col = '#c89bff';
       if (it.ref.type === 'lookTrigger') col = '#5fe0a8';
       if (it.ref.type === 'audio') col = '#8fd0ff';
+      if (it.ref.type === 'windzone') col = '#9fe0ff';
+      if (it.ref.type === 'platform' || it.ref.type === 'conveyor') col = '#8fb0ff';
+      if (it.ref.type === 'crusher' || it.ref.type === 'spiketrap') col = '#ff8f8f';
+      if (it.ref.type === 'fallfloor') col = '#d8b070';
+      // moving-platform travel path
+      if (it.ref.type === 'platform' && (it.ref.dx || it.ref.dy)) {
+        const a = U.toScreen(it.ref.x, it.ref.y), b = U.toScreen(it.ref.x + it.ref.dx, it.ref.y + it.ref.dy);
+        octx.save(); octx.strokeStyle = 'rgba(143,176,255,0.5)'; octx.setLineDash([5, 4]); octx.lineWidth = 1.5;
+        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke();
+        octx.beginPath(); octx.arc(b.x, b.y, 4, 0, 6.28); octx.stroke(); octx.restore();
+      }
       const inactive = it.ref.active === false;
       octx.globalAlpha = inactive ? 0.4 : 1;        // dim objects that are switched off
       octx.strokeStyle = isSel ? '#ffd887' : (inMulti ? '#7fe8ff' : col + 'aa');
       octx.lineWidth = (isSel || inMulti) ? 2.5 : 1.2;
-      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger' || it.ref.type === 'lookTrigger' || it.ref.type === 'audio') octx.setLineDash([4, 4]);
+      if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger' || it.ref.type === 'lookTrigger' || it.ref.type === 'audio' || it.ref.type === 'windzone') octx.setLineDash([4, 4]);
       octx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
       octx.setLineDash([]);
       // label
@@ -1178,6 +1192,55 @@
           }
           break;
         }
+        case 'platform': {
+          numField(body, 'Width', () => p.w || 4, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 0.8, v => { p.h = Math.max(0.3, v); }, 0.1);
+          numField(body, 'Travel X', () => p.dx || 0, v => { p.dx = v; }, 0.5);
+          numField(body, 'Travel Y', () => p.dy || 0, v => { p.dy = v; }, 0.5);
+          numField(body, 'Speed', () => p.speed || 2.5, v => { p.speed = Math.max(0.2, v); }, 0.5);
+          selectField(body, 'Mode', [{ v: 'pingpong', t: 'Ping-pong' }, { v: 'loop', t: 'Loop' }], () => p.mode || 'pingpong', v => { p.mode = v; });
+          el('div', { class: 'insNote' }, body, 'Carries the player while they ride it. The dashed line shows its travel.');
+          break;
+        }
+        case 'crusher': {
+          numField(body, 'Width', () => p.w || 2.6, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 2, v => { p.h = Math.max(0.5, v); }, 0.5);
+          numField(body, 'Slam distance', () => p.dist || 4, v => { p.dist = Math.max(0.5, v); }, 0.5);
+          numField(body, 'Period (s)', () => p.period || 2.6, v => { p.period = Math.max(0.5, v); }, 0.2);
+          el('div', { class: 'insNote' }, body, 'Slams straight down on a timer and crushes the player.');
+          break;
+        }
+        case 'conveyor': {
+          numField(body, 'Width', () => p.w || 5, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 0.7, v => { p.h = Math.max(0.3, v); }, 0.1);
+          numField(body, 'Speed (±)', () => p.speed !== undefined ? p.speed : 3, v => { p.speed = v; }, 0.5);
+          el('div', { class: 'insNote' }, body, 'Pushes whoever stands on it. Negative speed = left.');
+          break;
+        }
+        case 'windzone': {
+          numField(body, 'Width', () => p.w || 6, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 9, v => { p.h = Math.max(1, v); }, 0.5);
+          numField(body, 'Force X', () => p.fx || 0, v => { p.fx = v; }, 1);
+          numField(body, 'Force Y (+up)', () => p.fy !== undefined ? p.fy : 14, v => { p.fy = v; }, 1);
+          el('div', { class: 'insNote' }, body, 'Pushes the player while inside — e.g. an updraft to ride upward.');
+          break;
+        }
+        case 'fallfloor': {
+          numField(body, 'Width', () => p.w || 3, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 0.7, v => { p.h = Math.max(0.3, v); }, 0.1);
+          numField(body, 'Shake delay (s)', () => p.delay !== undefined ? p.delay : 0.55, v => { p.delay = Math.max(0, v); }, 0.1);
+          numField(body, 'Respawn (s)', () => p.respawn || 3, v => { p.respawn = Math.max(0.5, v); }, 0.5);
+          el('div', { class: 'insNote' }, body, 'Shakes then drops when stood on, and respawns.');
+          break;
+        }
+        case 'spiketrap': {
+          numField(body, 'Width', () => p.w || 2.4, v => { p.w = Math.max(0.5, v); }, 0.5);
+          numField(body, 'Period (s)', () => p.period || 2, v => { p.period = Math.max(0.3, v); }, 0.2);
+          numField(body, 'Out time (s)', () => p.onTime !== undefined ? p.onTime : 0.9, v => { p.onTime = Math.max(0.1, v); }, 0.1);
+          numField(body, 'Phase (s)', () => p.phase || 0, v => { p.phase = v; }, 0.2);
+          el('div', { class: 'insNote' }, body, 'Extends and retracts on a timer — only dangerous while out. Offset Phase to alternate several.');
+          break;
+        }
         case 'decor': {
           const kinds = [...G.World.DECOR_KINDS.standing, ...G.World.DECOR_KINDS.hanging];
           selectField(body, 'Kind', kinds.map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
@@ -1425,6 +1488,7 @@
     { id: 'furniture', label: 'Furniture' },
     { id: 'mymodels', label: 'My Models' },
     { id: 'build', label: 'Build' },
+    { id: 'dynamic', label: 'Dynamic' },
     { id: 'lights', label: 'Lights' },
     { id: 'enemies', label: 'Enemies' },
     { id: 'bosses', label: 'Bosses' },
@@ -1462,6 +1526,14 @@
         { cat: 'prop', id: 'wall', label: 'Wall — wood panel', ico: '🟫', defaults: { style: 'wood', w: 20, h: 22, z: -2 } },
         { cat: 'prop', id: 'wall', label: 'Wall — brick', ico: '🧱', defaults: { style: 'brick', w: 20, h: 22, z: -2 } },
         { cat: 'prop', id: 'wall', label: 'Wall — wallpaper', ico: '🟥', defaults: { style: 'wallpaper', w: 20, h: 22, z: -2 } }
+      ];
+      case 'dynamic': return [
+        { cat: 'prop', id: 'platform', label: 'Moving platform', ico: '⬛', defaults: { w: 4, h: 0.8, dx: 6, dy: 0, speed: 2.5, mode: 'pingpong' } },
+        { cat: 'prop', id: 'crusher', label: 'Crusher', ico: '🔻', defaults: { w: 2.6, h: 2, dist: 4, period: 2.6 } },
+        { cat: 'prop', id: 'conveyor', label: 'Conveyor belt', ico: '➡️', defaults: { w: 5, h: 0.7, speed: 3 } },
+        { cat: 'prop', id: 'windzone', label: 'Wind current', ico: '🌬️', defaults: { w: 6, h: 9, fx: 0, fy: 14 } },
+        { cat: 'prop', id: 'fallfloor', label: 'Collapsing floor', ico: '🧱', defaults: { w: 3, h: 0.7, delay: 0.55, respawn: 3 } },
+        { cat: 'prop', id: 'spiketrap', label: 'Timed spikes', ico: '🔺', defaults: { w: 2.4, period: 2, onTime: 0.9, phase: 0 } }
       ];
       case 'lights': return [
         { cat: 'prop', id: 'light', label: 'Glow light', ico: '✨', defaults: { color: '#ffeecc', scale: 8, opacity: 0.3, flicker: false } },

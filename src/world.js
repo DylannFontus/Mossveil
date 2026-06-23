@@ -1312,6 +1312,133 @@
     };
   };
 
+  // ===================== DYNAMIC / INTERACTIVE LEVEL ELEMENTS =====================
+  function rectMesh(w, h, col, topCol) {
+    const g = new THREE.Group();
+    g.add(U.flat(U.poly([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]]), col, {}));
+    if (topCol) g.add(U.flat(U.poly([[-w / 2, h / 2 - 0.14], [w / 2, h / 2 - 0.14], [w / 2, h / 2], [-w / 2, h / 2]]), topCol, { z: 0.01 }));
+    return g;
+  }
+  function playerOnTop(c, padX) {
+    const p = G.player; if (!p || p.dead) return false;
+    const b = p.body, top = c.y + c.h / 2;
+    return Math.abs(b.x - c.x) * 2 < c.w + b.w + (padX || 0.2)
+      && (b.y - b.h / 2) >= top - 0.34 && (b.y - b.h / 2) <= top + 0.42 && b.vy <= 0.8;
+  }
+  const addSolid = c => { if (!G.EDITOR && G.Physics.solids.indexOf(c) < 0) G.Physics.solids.push(c); };
+  const rmSolid = c => { const i = G.Physics.solids.indexOf(c); if (i >= 0) G.Physics.solids.splice(i, 1); };
+
+  // a platform that travels (x,y)->(x+dx,y+dy) and carries the player riding on it
+  mkProp.platform = (p) => {
+    const w = p.w || 4, h = p.h || 0.8, dx = p.dx || 0, dy = p.dy || 0, spd = p.speed || 2.5;
+    const grp = new THREE.Group(); grp.add(rectMesh(w, h, 0x2b3340, 0x4a596c)); grp.position.set(p.x, p.y, 0);
+    const collider = { x: p.x, y: p.y, w, h }; addSolid(collider);
+    const len = Math.hypot(dx, dy) || 1; let t = 0;
+    return {
+      type: 'platform', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        t += dt * spd / len;
+        let f; const tri = (t % 2 + 2) % 2; f = (p.mode === 'loop') ? (t % 1 + 1) % 1 : (tri > 1 ? 2 - tri : tri);
+        const nx = p.x + dx * f, ny = p.y + dy * f, ddx = nx - collider.x, ddy = ny - collider.y;
+        if (playerOnTop(collider)) { G.player.body.x += ddx; G.player.body.y += ddy; }
+        collider.x = nx; collider.y = ny; grp.position.set(nx, ny, 0);
+      }
+    };
+  };
+
+  // a spiked block that slams down on a timer and crushes
+  mkProp.crusher = (p) => {
+    const w = p.w || 2.6, h = p.h || 2, dist = p.dist || 4, period = p.period || 2.6;
+    const grp = new THREE.Group(); grp.add(rectMesh(w, h, 0x33222b, 0x5e3a48));
+    const n = Math.max(2, Math.round(w));
+    for (let i = 0; i < n; i++) { const sx = -w / 2 + 0.3 + i * (w - 0.6) / (n - 1 || 1); grp.add(U.flat(U.poly([[sx - 0.2, -h / 2], [sx + 0.2, -h / 2], [sx, -h / 2 - 0.42]]), 0x9a5e6e, { z: 0.02 })); }
+    grp.position.set(p.x, p.y, 0);
+    const collider = { x: p.x, y: p.y, w, h }; addSolid(collider);
+    let t = U.rand(0, period), hit = false;
+    return {
+      type: 'crusher', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        t = (t + dt) % period; const ph = t / period;
+        let f;
+        if (ph < 0.5) f = 0; else if (ph < 0.6) f = (ph - 0.5) / 0.1; else if (ph < 0.82) f = 1; else f = 1 - (ph - 0.82) / 0.18;
+        const ny = p.y - dist * f; collider.y = ny; grp.position.set(p.x, ny, 0);
+        if (ph >= 0.5 && ph < 0.62) {
+          if (!hit) { hit = true; (G.Audio.sfxAt ? G.Audio.sfxAt('stomp', p.x, ny) : G.Audio.sfx('stomp')); G.FX.shake(0.22, 0.25); G.FX.burst('dust', p.x, ny - h / 2, { n: 10 }); }
+          if (G.player && !G.player.dead && G.player.invulnT <= 0 && U.overlap({ x: p.x, y: ny, w: w - 0.2, h: h - 0.1 }, G.player.body)) G.player.damage(1, p.x + 0.01);
+        } else if (ph < 0.5) hit = false;
+      }
+    };
+  };
+
+  // a belt that pushes whoever stands on it
+  mkProp.conveyor = (p) => {
+    const w = p.w || 5, h = p.h || 0.7, spd = p.speed !== undefined ? p.speed : 3;
+    const grp = new THREE.Group(); grp.add(rectMesh(w, h, 0x26262e, 0x44444f));
+    const arrows = []; for (let i = 0; i < Math.max(2, Math.round(w / 1.2)); i++) { const a = U.flat(U.poly([[-0.18, -0.12], [0.22, 0], [-0.18, 0.12]]), 0x6a6a78, { z: 0.02 }); arrows.push(a); grp.add(a); }
+    grp.position.set(p.x, p.y, 0);
+    const collider = { x: p.x, y: p.y, w, h }; addSolid(collider);
+    let roll = 0;
+    return {
+      type: 'conveyor', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        roll = (roll + dt * spd * 0.6) % 1.2;
+        arrows.forEach((a, i) => { a.position.set(-w / 2 + 0.6 + ((i * 1.2 + roll * Math.sign(spd || 1)) % (w)), h / 2 - 0.18, 0); a.scale.x = spd < 0 ? -1 : 1; });
+        if (playerOnTop(collider)) G.player.body.x += spd * dt;
+      }
+    };
+  };
+
+  // a wind current that pushes the player while inside (updraft / gust)
+  mkProp.windzone = (p) => {
+    const w = p.w || 6, h = p.h || 9, fx = p.fx || 0, fy = p.fy !== undefined ? p.fy : 14;
+    const grp = new THREE.Group(); grp.visible = false; grp.position.set(p.x, p.y, 0);
+    return {
+      type: 'windzone', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        const pl = G.player;
+        if (pl && !pl.dead) { const b = pl.body; if (Math.abs(b.x - p.x) * 2 < w + b.w && Math.abs(b.y - p.y) * 2 < h + b.h) { b.vx += fx * dt; b.vy += fy * dt; } }
+        if (G.FX && U.chance(dt * 10)) G.FX.p(true, { x: p.x + U.rand(-w / 2, w / 2), y: p.y - h / 2 + U.rand(0, 1), vx: fx * 0.12, vy: fy * 0.12, life: Math.min(1.4, h / (Math.abs(fy) + 1)), size: 0.12, color: 0xc6e4ff, alpha: 0.28 });
+      }
+    };
+  };
+
+  // a floor that shakes then drops when you stand on it, and respawns
+  mkProp.fallfloor = (p) => {
+    const w = p.w || 3, h = p.h || 0.7, delay = p.delay !== undefined ? p.delay : 0.55, respawn = p.respawn || 3;
+    const grp = new THREE.Group(); grp.add(rectMesh(w, h, 0x453524, 0x68543a)); grp.position.set(p.x, p.y, 0);
+    const collider = { x: p.x, y: p.y, w, h }; addSolid(collider);
+    let state = 'solid', t = 0, vy = 0;
+    return {
+      type: 'fallfloor', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        if (state === 'solid') { if (playerOnTop(collider)) { state = 'shake'; t = delay; } }
+        else if (state === 'shake') { t -= dt; grp.position.x = p.x + Math.sin(G.time * 55) * 0.07; if (t <= 0) { state = 'fall'; vy = -2; rmSolid(collider); grp.position.x = p.x; G.Audio.sfx('clink'); G.FX.burst('dust', p.x, p.y - h / 2, { n: 6 }); } }
+        else if (state === 'fall') { vy -= 34 * dt; grp.position.y += vy * dt; t += dt; if (t > 1.4) { state = 'gone'; t = respawn; grp.visible = false; } }
+        else { t -= dt; if (t <= 0) { state = 'solid'; vy = 0; grp.position.set(p.x, p.y, 0); grp.visible = true; addSolid(collider); G.FX.burst('dust', p.x, p.y, { n: 6 }); } }
+      }
+    };
+  };
+
+  // spikes that extend and retract on a timer (only dangerous while extended)
+  mkProp.spiketrap = (p) => {
+    const w = p.w || 2.4, period = p.period || 2, onTime = p.onTime !== undefined ? p.onTime : 0.9, phase = p.phase || 0;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, 0);
+    grp.add(U.flat(U.poly([[-w / 2, -0.25], [w / 2, -0.25], [w / 2, 0], [-w / 2, 0]]), 0x2a2f33, {}));   // base
+    const teeth = new THREE.Group(); grp.add(teeth);
+    const n = Math.max(2, Math.round(w / 0.5));
+    for (let i = 0; i < n; i++) { const sx = -w / 2 + (i + 0.5) * w / n; teeth.add(U.flat(U.poly([[sx - 0.22, 0], [sx + 0.22, 0], [sx, 0.7]]), 0xc6d2d8, { z: 0.02 })); }
+    const rect = { x: p.x, y: p.y + 0.35, w, h: 0.8 }; let on = false;
+    const setOn = v => { if (v === on) return; on = v; const i = G.Physics.spikes.indexOf(rect); if (v && i < 0) G.Physics.spikes.push(rect); if (!v && i >= 0) G.Physics.spikes.splice(i, 1); };
+    return {
+      type: 'spiketrap', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        const t = ((G.time + phase) % period), active = t < onTime;
+        setOn(active && !G.EDITOR);
+        teeth.scale.y = U.damp(teeth.scale.y, active ? 1 : 0.04, 16, dt);
+      }
+    };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);
