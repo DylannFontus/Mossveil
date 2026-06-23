@@ -201,6 +201,24 @@
       sil: 0x2a1d0f, terrain: 0x191107, moss: 0x9a7c44, mossDark: 0x60492a, glow: 0xffd28a,
       dust: 0xffe2b0, light: 0xffeccb, rays: true, root: 188.0,
       deco: ['hut', 'lamppost', 'gothWindow', 'plant', 'column'], amb: 'mote'
+    },
+    archive: {
+      label: 'Archive (amber library)', bgTop: 0x6a4e2c, bgBottom: 0x191207, fog: 0x564018, fogNear: 30, fogFar: 70,
+      sil: 0x281c0d, terrain: 0x18110a, moss: 0xa6863e, mossDark: 0x6a5226, glow: 0xffd98a,
+      dust: 0xffe6b4, light: 0xffeec6, rays: true, root: 178.0,
+      deco: ['bookshelf', 'scroll', 'candle', 'column', 'arch'], amb: 'mote'
+    },
+    garden: {
+      label: 'Garden (royal bloom)', bgTop: 0x3f7e54, bgBottom: 0x10210f, fog: 0x336b46, fogNear: 32, fogFar: 78,
+      sil: 0x14361f, terrain: 0x0e1c10, moss: 0x6cc07e, mossDark: 0x47864f, glow: 0xc8ffd0,
+      dust: 0xffc8e6, light: 0xe6ffe0, rays: true, root: 132.0,
+      deco: ['trellis', 'hedge', 'flower', 'fern', 'tree'], amb: 'pollen'
+    },
+    tombs: {
+      label: 'Tombs (cold catacomb)', bgTop: 0x44544e, bgBottom: 0x0e1413, fog: 0x33403b, fogNear: 30, fogFar: 70,
+      sil: 0x18211e, terrain: 0x121817, moss: 0x728079, mossDark: 0x47534d, glow: 0xbfe0d4,
+      dust: 0xd0e4dc, light: 0xe2f0ea, rays: true, root: 158.0,
+      deco: ['tombstone', 'sarcophagus', 'urn', 'statue', 'brokenPillar'], amb: 'mote'
     }
   };
   W.BIOMES = Object.keys(PAL);
@@ -412,13 +430,59 @@
       const r = rng || U.mulberry32(6), w2 = U.lerp(2.2, 3.4, r()) * s, h = U.lerp(2.4, 3.6, r()) * s;
       grp.add(shapeMesh(U.poly([[-w2, 0], [w2, 0], [w2, h], [-w2, h]]), mat, x, y, 2));
       grp.add(shapeMesh(U.poly([[-w2 - 0.6 * s, h], [w2 + 0.6 * s, h], [0, h + 2.2 * s]]), mat, x, y, 2)); // roof
+    },
+    // ---- archive / library ----
+    scroll(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-0.3 * s, 0.2 * s], [0.3 * s, 0.2 * s], [0.3 * s, 1.8 * s], [-0.3 * s, 1.8 * s]]), mat, x, y, 2));    // sheet
+      grp.add(shapeMesh(U.splineShape([[-0.42 * s, 0], [0.42 * s, 0], [0.34 * s, 0.34 * s], [-0.34 * s, 0.34 * s]]), mat, x, y, 5));    // bottom roll
+      grp.add(shapeMesh(U.splineShape([[-0.42 * s, 1.7 * s], [0.42 * s, 1.7 * s], [0.34 * s, 2.04 * s], [-0.34 * s, 2.04 * s]]), mat, x, y, 5)); // top roll
+    },
+    candle(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-0.4 * s, 0], [0.4 * s, 0], [0.3 * s, 0.2 * s], [-0.3 * s, 0.2 * s]]), mat, x, y, 2));   // holder
+      grp.add(shapeMesh(U.poly([[-0.1 * s, 0.2 * s], [0.1 * s, 0.2 * s], [0.1 * s, 1 * s], [-0.1 * s, 1 * s]]), mat, x, y, 2)); // candle
+      grp.add(shapeMesh(U.poly([[-0.07 * s, 1 * s], [0.07 * s, 1 * s], [0, 1.35 * s]]), mat, x, y, 2)); // flame
+    },
+    // ---- garden ----
+    trellis(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(2), h = U.lerp(4, 7, r()) * s;
+      grp.add(shapeMesh(U.poly([[-1.2 * s, 0], [-1 * s, 0], [-1 * s, h], [-1.2 * s, h]]), mat, x, y, 2));
+      grp.add(shapeMesh(U.poly([[1 * s, 0], [1.2 * s, 0], [1.2 * s, h], [1 * s, h]]), mat, x, y, 2));
+      for (let i = 0; i < 4; i++) { const yy = (i + 0.5) / 4 * h; grp.add(shapeMesh(U.poly([[-1 * s, yy], [1 * s, yy], [1 * s, yy + 0.1 * s], [-1 * s, yy + 0.1 * s]]), mat, x, y, 2)); }
+    },
+    hedge(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(8);
+      grp.add(shapeMesh(U.splineShape([[-2.6 * s, 0], [-2.2 * s, 1.4 * s], [-1 * s, 2 * s], [0, 2.3 * s], [1 * s, 2 * s], [2.2 * s, 1.4 * s], [2.6 * s, 0], [0, -0.6 * s]]), mat, x, y, 12));
+    },
+    flower(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(1), h = U.lerp(1, 2.2, r()) * s;
+      grp.add(shapeMesh(U.poly([[-0.08 * s, 0], [0.08 * s, 0], [0.05 * s, h], [-0.05 * s, h]]), mat, x, y, 2)); // stem
+      for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; grp.add(shapeMesh(U.ellipse(0.32 * s, 0.16 * s), mat, x + Math.cos(a) * 0.3 * s, y + h + Math.sin(a) * 0.3 * s, 8)); }
+    },
+    // ---- tombs / catacombs ----
+    tombstone(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(3), h = U.lerp(1.4, 2.6, r()) * s, w2 = 0.7 * s, tilt = (r() - 0.5) * 0.25;
+      grp.add(shapeMesh(U.splineShape([[-w2, 0], [w2, 0], [w2 + tilt, h], [tilt, h + 0.7 * s], [-w2 + tilt, h]]), mat, x, y, 8));
+    },
+    sarcophagus(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.poly([[-1.6 * s, 0], [1.6 * s, 0], [1.4 * s, 1 * s], [-1.4 * s, 1 * s]]), mat, x, y, 2));         // base
+      grp.add(shapeMesh(U.poly([[-1.5 * s, 0.9 * s], [1.5 * s, 0.9 * s], [1.1 * s, 1.5 * s], [-1.1 * s, 1.5 * s]]), mat, x, y, 2)); // lid
+    },
+    urn(grp, mat, x, y, s) {
+      grp.add(shapeMesh(U.splineShape([[-0.4 * s, 0], [0.4 * s, 0], [0.7 * s, 0.9 * s], [0.4 * s, 1.5 * s], [0.55 * s, 1.7 * s], [-0.55 * s, 1.7 * s], [-0.4 * s, 1.5 * s], [-0.7 * s, 0.9 * s]]), mat, x, y, 12));
+    },
+    statue(grp, mat, x, y, s, rng) {
+      const r = rng || U.mulberry32(4);
+      grp.add(shapeMesh(U.poly([[-1 * s, 0], [1 * s, 0], [0.8 * s, 0.6 * s], [-0.8 * s, 0.6 * s]]), mat, x, y, 2));         // plinth
+      grp.add(shapeMesh(U.splineShape([[-0.7 * s, 0.6 * s], [0.7 * s, 0.6 * s], [0.45 * s, 3.2 * s], [-0.45 * s, 3.2 * s]]), mat, x, y, 8)); // robed body
+      grp.add(shapeMesh(U.ellipse(0.4 * s, 0.5 * s), mat, x, y + 3.5 * s, 10)); // head
     }
   };
   // decor kinds the editor can place (standing vs hanging anchors)
   W.DECOR_KINDS = {
     standing: ['mushroom', 'tree', 'deadtree', 'thintree', 'fern', 'column', 'brokenPillar', 'arch', 'crystalSpire', 'coral', 'kelp', 'reed', 'ribs', 'thorn', 'hump',
       'spire', 'cityArch', 'gothWindow', 'lamppost', 'hut', 'anvil', 'gear', 'pipe', 'cartRail',
-      'sofa', 'fireplace', 'bookshelf', 'painting', 'table', 'plant', 'rug'],
+      'sofa', 'fireplace', 'bookshelf', 'painting', 'table', 'plant', 'rug',
+      'scroll', 'candle', 'trellis', 'hedge', 'flower', 'tombstone', 'sarcophagus', 'urn', 'statue'],
     hanging: ['stalactite', 'icicle', 'roots', 'lanterns', 'chandelier']
   };
 

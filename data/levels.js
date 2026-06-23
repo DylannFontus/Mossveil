@@ -1043,3 +1043,73 @@ G.LEVELS = {
     buildings: [{ x: 4, y: 5, w: 40, h: 70, seed: 7 }]
   };
 })();
+
+// ---- new biome region: forge / mine / village / archive / garden / tombs ----
+// Each level is procedurally laid out (ground + a meandering path of reachable ledges) and
+// dressed with that biome's signature foreground props. Chained L/R into a traversable loop.
+(function () {
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function biomeLevel(o) {
+    const W = o.w, H = o.h, gh = o.groundH || 3, M = o.mat || '#', rng = mulberry32(o.seed || 1);
+    const g = []; for (let r = 0; r < H; r++) g.push('');
+    const set = (c, wy, ch) => { if (c < 0 || c >= W || wy < 0 || wy >= H) return; const r = H - 1 - wy; const row = (g[r] || '').padEnd(W, ' '); g[r] = row.slice(0, c) + ch + row.slice(c + 1); };
+    const rect = (c0, wy0, c1, wy1, ch) => { for (let c = c0; c <= c1; c++) for (let wy = wy0; wy <= wy1; wy++) set(c, wy, ch); };
+    rect(0, 0, W - 1, gh - 1, M);                                  // ground
+    const props = (o.props || []).slice(), decor = o.decor || [];
+    const place = (x, y) => { if (!decor.length) return; const d = decor[(rng() * decor.length) | 0]; props.push({ type: 'decor', kind: d.kind, x: x + 0.5, y: y + 0.02, color: d.color, scale: d.scale || (0.8 + rng() * 0.5), z: -0.2 - rng() * 0.3 }); if (d.light) props.push({ type: 'light', x: x + 0.5, y: y + 0.8, color: d.light, scale: 5, opacity: 0.28, flicker: !!d.flicker }); };
+    // scatter decor along the ground
+    for (let x = 3; x < W - 3; x += 4 + (rng() * 4 | 0)) if (rng() < 0.7) place(x, gh);
+    // meandering ledges left -> right
+    let px = 5, py = gh + 2 + (rng() * 2 | 0);
+    while (px < W - 8) {
+      const pw = 3 + (rng() * 5 | 0);
+      py = Math.max(gh + 2, Math.min(H - 6, py + ((rng() * 7 | 0) - 3)));
+      rect(px, py, px + pw - 1, py, M);
+      if (rng() < 0.35) rect(px, gh, px + pw - 1, py - 1, M);       // occasional pillar down to ground
+      if (rng() < 0.8) place(px + (pw / 2 | 0), py + 1);
+      px += pw + 2 + (rng() * 3 | 0);
+    }
+    // a few standalone pillars / broken columns for verticality
+    for (let i = 0; i < (o.pillars || 3); i++) { const c = 5 + (rng() * (W - 10) | 0), h = 3 + (rng() * 7 | 0); rect(c, gh, c, gh + h, M); }
+    return {
+      id: o.id, title: o.title, area: o.area || null, biome: o.biome, w: W, h: H, mapPos: o.mapPos,
+      weather: o.weather, water: o.water, tiles: g,
+      spawns: { 'P': { x: 3.5, y: gh + 1.5 }, 'R': { x: W - 3.5, y: gh + 1.5 } },
+      enemies: o.enemies || [], props: props, transitions: o.transitions || []
+    };
+  }
+  const T = (side, to, spawn) => ({ side, to, spawn });
+  G.LEVELS.forge = biomeLevel({
+    id: 'forge', title: 'The Iron Forge', area: 'A S H F O R G E', biome: 'forge', w: 64, h: 26, seed: 11, mapPos: { mx: 0, my: 60 }, weather: 'embers', pillars: 4,
+    decor: [{ kind: 'anvil', color: '#2e2018' }, { kind: 'gear', color: '#3a2c22' }, { kind: 'pipe', color: '#2c2018', light: '#ff7a30', flicker: true }, { kind: 'brokenPillar', color: '#241008' }],
+    transitions: [T('L', 'steps', '2'), T('R', 'mine', 'P')]
+  });
+  G.LEVELS.mine = biomeLevel({
+    id: 'mine', title: 'Slate Mineworks', area: 'D E E P D E L V E', biome: 'mine', w: 70, h: 28, seed: 22, mapPos: { mx: 70, my: 60 }, pillars: 5,
+    decor: [{ kind: 'cartRail', color: '#2a2e36' }, { kind: 'pipe', color: '#262a32' }, { kind: 'gear', color: '#30353e' }, { kind: 'stalactite', color: '#1c2026' }],
+    transitions: [T('L', 'forge', 'R'), T('R', 'village', 'P')]
+  });
+  G.LEVELS.village = biomeLevel({
+    id: 'village', title: 'Lantern Village', area: 'E M B E R H O L L O W', biome: 'village', w: 66, h: 24, seed: 33, mapPos: { mx: 146, my: 60 }, pillars: 2,
+    decor: [{ kind: 'hut', color: '#33240f' }, { kind: 'plant', color: '#2f5e2f' }, { kind: 'lamppost', color: '#241a0e', light: '#ffcf86' }, { kind: 'fern', color: '#264a1e' }],
+    transitions: [T('L', 'mine', 'R'), T('R', 'archive', 'P')]
+  });
+  G.LEVELS.archive = biomeLevel({
+    id: 'archive', title: 'The Amber Archive', area: 'L O R E V A U L T', biome: 'archive', w: 64, h: 26, seed: 44, mapPos: { mx: 218, my: 60 }, pillars: 4,
+    decor: [{ kind: 'bookshelf', color: '#33240f' }, { kind: 'scroll', color: '#b89a52' }, { kind: 'candle', color: '#2a2012', light: '#ffd98a', flicker: true }, { kind: 'column', color: '#2a200f' }],
+    transitions: [T('L', 'village', 'R'), T('R', 'garden', 'P')]
+  });
+  G.LEVELS.garden = biomeLevel({
+    id: 'garden', title: 'The Royal Gardens', area: 'B L O O M C O U R T', biome: 'garden', w: 70, h: 26, seed: 55, mapPos: { mx: 290, my: 60 }, weather: 'pollen', pillars: 3,
+    decor: [{ kind: 'trellis', color: '#244018' }, { kind: 'hedge', color: '#2f6e3e' }, { kind: 'flower', color: '#d86aa0' }, { kind: 'tree', color: '#1a3a1f' }],
+    transitions: [T('L', 'archive', 'R'), T('R', 'tombs', 'P')]
+  });
+  G.LEVELS.tombs = biomeLevel({
+    id: 'tombs', title: 'The Cold Catacombs', area: 'R E S T I N G G R O U N D S', biome: 'tombs', w: 66, h: 26, seed: 66, pillars: 4, mapPos: { mx: 362, my: 60 },
+    decor: [{ kind: 'tombstone', color: '#3e4a44' }, { kind: 'sarcophagus', color: '#36403a' }, { kind: 'urn', color: '#414b45' }, { kind: 'statue', color: '#4a544e' }],
+    transitions: [T('L', 'garden', 'R'), T('R', 'watercity', 'P')]
+  });
+  // make watercity loop back, and open the region from the start area (left side of The Sunken Steps)
+  if (G.LEVELS.watercity) G.LEVELS.watercity.transitions = [{ side: 'L', to: 'tombs', spawn: 'R' }];
+  if (G.LEVELS.steps) G.LEVELS.steps.transitions.push({ side: 'L', to: 'forge', spawn: 'R' });
+})();
