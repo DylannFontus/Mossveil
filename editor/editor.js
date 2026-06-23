@@ -2487,6 +2487,13 @@
     if (src === 'weather') return ((G.Weather && G.Weather.KINDS) || ['none']).map(k => ({ v: k, t: (G.Weather.LABELS && G.Weather.LABELS[k]) || k }));
     if (src === 'fx') return ((G.FX && G.FX.BURSTS) || []).map(f => ({ v: f, t: f }));
     if (src === 'placement') return [{ v: '', t: 'default (area title)' }, { v: 'top', t: 'top' }, { v: 'center', t: 'centre' }, { v: 'bottom', t: 'bottom' }, { v: 'toast', t: 'toast (corner)' }];
+    if (src === 'bosses') {                  // every boss actually placed (bossTrigger) across the game
+      const seen = new Map(), label = id => { const b2 = G.Bosses && G.Bosses.LIST.find(x => x.id === id); return b2 ? b2.label : id; };
+      for (const lid in G.LEVELS) for (const p of (G.LEVELS[lid].props || [])) if (p.type === 'bossTrigger' && p.boss && !seen.has(p.boss)) seen.set(p.boss, label(p.boss) + '  ·  ' + (G.LEVELS[lid].title || lid));
+      const out = [{ v: '', t: '(any boss)' }];
+      for (const [v, t] of seen) out.push({ v, t });
+      return out;
+    }
     return [];
   }
   function collectFlags() {

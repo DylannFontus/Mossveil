@@ -464,7 +464,7 @@
       gibColor: cfg.colors.accent,
       body: { x, y: y + (fly ? 2 : 0.5), w: 2.7 * cfg.scale, h: 2.5 * cfg.scale, vx: 0, vy: 0 },
       halfH: 1.25 * cfg.scale,
-      cfg, rig, gates, saveKey: saveKey || (G.room.id + ':' + typeId),
+      cfg, rig, gates, typeId, saveKey: saveKey || (G.room.id + ':' + typeId),
       group: rig.group,
       state: 'intro', t: 1.6, phase: 1, dir: -1,
       staggerAcc: 0, deathT: 0, mv: {}, move: null, lastMove: '',
@@ -617,6 +617,7 @@
           (bs.gates || []).forEach(g2 => g2.open());
           G.save.bosses = G.save.bosses || {};
           G.save.bosses[bs.saveKey] = true;
+          if (G.EventGraph && G.EventGraph.bossDeath) G.EventGraph.bossDeath(bs.typeId);   // fire On Boss Death
           if (G.Main && G.Main.persist) G.Main.persist();
           G.UI.toast(cfg.name.charAt(0) + cfg.name.slice(1).toLowerCase() + ' has fallen.');
           if (G.player) G.player.gainSoul(99);

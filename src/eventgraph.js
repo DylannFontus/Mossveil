@@ -17,7 +17,7 @@
     onTimer:     { kind: 'event', title: 'On Timer', outs: 1, params: [{ k: 'delay', label: 'Delay s', def: 1 }] },
     onZone:      { kind: 'event', title: 'On Enter Zone', outs: 1, params: [{ k: 'x', def: 0 }, { k: 'y', def: 0 }, { k: 'w', def: 4 }, { k: 'h', def: 4 }, { k: 'once', type: 'bool', def: true }] },
     onSignal:    { kind: 'event', title: 'On Signal', outs: 1, params: [{ k: 'name', def: 'sig' }] },
-    onBossDeath: { kind: 'event', title: 'On Boss Death', outs: 1, params: [{ k: 'id', def: '' }] },
+    onBossDeath: { kind: 'event', title: 'On Boss Death', outs: 1, params: [{ k: 'id', type: 'select', src: 'bosses', def: '' }] },
     onInterval:  { kind: 'event', title: 'On Interval', outs: 1, params: [{ k: 'secs', def: 3 }] },
     onHpBelow:   { kind: 'event', title: 'On HP Below', outs: 1, params: [{ k: 'hp', def: 2 }, { k: 'once', type: 'bool', def: false }] },
 
