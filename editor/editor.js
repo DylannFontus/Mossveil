@@ -1658,6 +1658,10 @@
     const flag = (id, msg, sev, sel) => { warns.push({ id, msg, sev: sev || 'warn', sel }); bad[id] = Math.max(bad[id] || 0, sev === 'error' ? 2 : 1); };
     const incoming = {};
     for (const id in G.LEVELS) for (const tz of (G.LEVELS[id].transitions || [])) if (tz.to) incoming[tz.to] = (incoming[tz.to] || 0) + 1;
+    // reachability: BFS over transitions from the start room (true reachability, not just incoming links)
+    const startId = Object.keys(G.LEVELS)[0];
+    const reachable = {}; if (startId) { reachable[startId] = true; const q = [startId];
+      while (q.length) { const cur = q.shift(); for (const tz of (G.LEVELS[cur].transitions || [])) { const to = tz.to; if (to && G.LEVELS[to] && !reachable[to]) { reachable[to] = true; q.push(to); } } } }
 
     for (const id in G.LEVELS) {
       const L = G.LEVELS[id];
@@ -1689,9 +1693,10 @@
       if (L.intro && !cs[L.intro]) flag(id, `${id}: intro cutscene "${L.intro}" doesn't exist`, 'error');
       if (L.water && (L.water.y < 0 || L.water.y > L.h)) flag(id, `${id}: water level Y (${L.water.y}) is outside the room`, 'warn');
       if (!(L.transitions || []).length) flag(id, `${id}: has no exits (dead-end room)`, 'warn');
-      if (!incoming[id] && Object.keys(G.LEVELS)[0] !== id) flag(id, `${id}: no other room links here (unreachable?)`, 'warn');
+      if (incoming[id] && !(L.spawns && Object.keys(L.spawns).length)) flag(id, `${id}: rooms link here but it has no spawn points`, 'warn');
+      if (id !== startId && !reachable[id]) flag(id, `${id}: unreachable from the start room "${startId}"`, 'warn', null);
     }
-    return { warns, bad };
+    return { warns, bad, reachable, startId };
   }
 
   // live count badge on the Lint left-panel tab (+ refresh the panel if it's open)
@@ -1815,13 +1820,23 @@
       try { mctx.drawImage(roomThumb(L), r.x, r.y, r.w, r.h); } catch (e) { }
     }
     mctx.restore();
-    // validation markers + summary
-    const { warns, bad } = validateWorld();
-    for (const id in bad) {
-      const L = G.LEVELS[id]; if (!L) continue;
-      const r = G.MapView.roomScreenRect(L, view);
-      mctx.font = '16px Segoe UI'; mctx.textAlign = 'center'; mctx.fillStyle = '#ffcf4a';
-      mctx.fillText('⚠', r.x + r.w - 10, r.y + 16);
+    // validation markers + summary (world-graph diagnostic overlay)
+    const { warns, bad, reachable, startId } = validateWorld();
+    for (const id in G.LEVELS) {
+      const L = G.LEVELS[id]; const r = G.MapView.roomScreenRect(L, view);
+      if (r.w < 6 || r.h < 6) continue;
+      if (startId && !reachable[id]) { mctx.fillStyle = 'rgba(6,5,10,0.5)'; mctx.fillRect(r.x, r.y, r.w, r.h); }   // dim unreachable
+      const sev = bad[id];
+      if (sev) {
+        mctx.strokeStyle = sev >= 2 ? 'rgba(255,90,80,0.95)' : 'rgba(255,200,80,0.9)';
+        mctx.lineWidth = 2; mctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+        mctx.font = '16px Segoe UI'; mctx.textAlign = 'center'; mctx.fillStyle = sev >= 2 ? '#ff6a5a' : '#ffcf4a';
+        mctx.fillText(sev >= 2 ? '✕' : '⚠', r.x + r.w - 10, r.y + 16);
+      }
+      if (id === startId) {
+        mctx.textAlign = 'left'; mctx.font = 'bold 10px Segoe UI'; mctx.fillStyle = 'rgba(130,230,160,0.95)';
+        mctx.fillText('▶ START', r.x + 5, r.y + 14);
+      }
     }
     mctx.textAlign = 'left';
     if (warns.length) {
