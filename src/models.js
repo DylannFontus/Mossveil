@@ -1,21 +1,30 @@
-// MOSSVEIL — models.js : a tiny model registry + builder shared by the editor's Model
-// tab and the game. A model is { parts:[ {shape,x,y,z,rx,ry,rz,sx,sy,sz,color,name} ] }.
-// Parts are flat-shaded primitives lit by one shared light so they read as 3D form while
-// the rest of the game (flat MeshBasic) is untouched. Saved models live in localStorage
-// (and can be placed in levels via the `model` prop).
+// MOSSVEIL — models.js : model registry + rig/animation, shared by the editor's Model tab
+// and the game. A model is { name, parts:[...], clips:{name:{dur,loop,tracks}} }.
+//   part  = { id, shape, parent, x,y,z (joint in parent space), rx,ry,rz (deg), sx,sy,sz,
+//            ox,oy,oz (mesh offset from the joint -> rotate limbs around a pivot), color, name }
+//   clip  = { dur, loop, tracks:{ partId:[ {t, rx,ry,rz} ] } }  (absolute bone rotations, deg)
+// Parts are flat-shaded primitives lit by one shared light (the flat MeshBasic world is
+// untouched). buildRig() returns { group, bones } so clips animate the bones live.
 (function () {
   const M = G.Models = { lib: {} };
   const KEY = 'mossveil_models';
   try { M.lib = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { M.lib = {}; }
+  const rad = d => (d || 0) * Math.PI / 180;
 
   M.list = () => Object.keys(M.lib).sort();
-  M.get = name => M.lib[name];
-  M.save = (name, model) => { M.lib[name] = JSON.parse(JSON.stringify(model)); persist(); };
+  M.get = name => { const m = M.lib[name]; if (m) M.ensureIds(m); return m; };
+  M.save = (name, model) => { M.ensureIds(model); M.lib[name] = JSON.parse(JSON.stringify(model)); persist(); };
   M.rename = (from, to) => { if (M.lib[from] && !M.lib[to]) { M.lib[to] = M.lib[from]; delete M.lib[from]; persist(); } };
   M.remove = name => { delete M.lib[name]; persist(); };
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(M.lib)); } catch (e) { } }
 
-  // primitive geometry factory (unit-sized; scaled per part)
+  M.ensureIds = function (model) {
+    if (!model || !model.parts) return;
+    let mx = 0; for (const p of model.parts) if (typeof p.id === 'number' && p.id > mx) mx = p.id;
+    for (const p of model.parts) if (typeof p.id !== 'number') p.id = ++mx;
+    model.clips = model.clips || {};
+  };
+
   M.SHAPES = ['box', 'sphere', 'cylinder', 'cone', 'capsule', 'prism', 'pyramid', 'wedge', 'torus', 'plane'];
   M.geom = function (shape) {
     switch (shape) {
@@ -31,28 +40,70 @@
       default: return new THREE.BoxGeometry(1, 1, 1);
     }
   };
-  M.mesh = function (p) {
-    const geo = M.geom(p.shape || 'box');
-    const mat = new THREE.MeshLambertMaterial({ color: p.color || '#c8c8c8', side: THREE.DoubleSide, emissive: 0x000000 });
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(p.x || 0, p.y || 0, p.z || 0);
-    m.rotation.set((p.rx || 0) * Math.PI / 180, (p.ry || 0) * Math.PI / 180, (p.rz || 0) * Math.PI / 180);
+  // flat (MeshBasic, matches the game's silhouette art) by default; shaded (Lambert) optional
+  M.partMesh = function (p, shaded) {              // mesh sits offset from its bone (the pivot)
+    const mat = shaded
+      ? new THREE.MeshLambertMaterial({ color: p.color || '#c8c8c8', side: THREE.DoubleSide })
+      : new THREE.MeshBasicMaterial({ color: p.color || '#c8c8c8', side: THREE.DoubleSide });
+    const m = new THREE.Mesh(M.geom(p.shape || 'box'), mat);
+    m.position.set(p.ox || 0, p.oy || 0, p.oz || 0);
     m.scale.set(p.sx || 1, p.sy || 1, p.sz || 1);
     return m;
   };
-  // build a THREE.Group for a whole model
-  M.buildGroup = function (model) {
-    const grp = new THREE.Group();
-    if (model && model.parts) for (const p of model.parts) grp.add(M.mesh(p));
-    return grp;
+  // build a rig: nested bones (one per part) + meshes; returns handles for live animation
+  M.buildRig = function (model) {
+    const root = new THREE.Group(), bones = {}, meshes = {}, shaded = !!(model && model.shaded);
+    if (!model || !model.parts) return { group: root, bones, meshes };
+    M.ensureIds(model);
+    for (const p of model.parts) {
+      const bone = new THREE.Object3D();
+      bone.position.set(p.x || 0, p.y || 0, p.z || 0);
+      bone.rotation.set(rad(p.rx), rad(p.ry), rad(p.rz));
+      bone.userData.base = { x: p.x || 0, y: p.y || 0, z: p.z || 0, rx: rad(p.rx), ry: rad(p.ry), rz: rad(p.rz) };
+      const mesh = M.partMesh(p, shaded); mesh.userData.partId = p.id;
+      bone.add(mesh); bones[p.id] = bone; meshes[p.id] = mesh;
+    }
+    for (const p of model.parts) { const par = (p.parent != null && bones[p.parent] && p.parent !== p.id) ? bones[p.parent] : root; par.add(bones[p.id]); }
+    return { group: root, bones, meshes };
   };
-  M.buildByName = name => M.buildGroup(M.lib[name]);
+  M.buildGroup = model => M.buildRig(model).group;
+  M.buildByName = name => M.buildGroup(M.get(name));
 
-  // a single shared light pair so Lambert models shade; harmless to the flat MeshBasic world
+  function sampleTrack(keys, t) {
+    if (t <= keys[0].t) return keys[0];
+    if (t >= keys[keys.length - 1].t) return keys[keys.length - 1];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const a = keys[i], b = keys[i + 1];
+      if (t >= a.t && t <= b.t) { const f = (t - a.t) / Math.max(1e-4, b.t - a.t), o = {}; for (const k of ['rx', 'ry', 'rz']) o[k] = (a[k] || 0) + ((b[k] || 0) - (a[k] || 0)) * f; return o; }
+    }
+    return keys[keys.length - 1];
+  }
+  // apply a clip to the bones at time t (seconds); resets unanimated bones to rest pose
+  M.applyClip = function (model, bones, clipName, t) {
+    for (const id in bones) { const b = bones[id], base = b.userData.base; if (base) b.rotation.set(base.rx, base.ry, base.rz); }
+    const clip = model && model.clips && model.clips[clipName];
+    if (!clip || !clip.tracks) return;
+    const dur = clip.dur || 1, tt = (clip.loop === false) ? Math.min(t, dur) : (t % dur + dur) % dur;
+    for (const pid in clip.tracks) {
+      const keys = clip.tracks[pid], b = bones[pid];
+      if (!b || !keys || !keys.length) continue;
+      const v = sampleTrack(keys, tt);
+      b.rotation.set(rad(v.rx), rad(v.ry), rad(v.rz));
+    }
+  };
+
+  // sampled absolute rotations (deg) per animated part at time t — for the editor's scrub/pose flow
+  M.clipPose = function (model, clipName, t) {
+    const out = {}, clip = model && model.clips && model.clips[clipName];
+    if (!clip || !clip.tracks) return out;
+    const dur = clip.dur || 1, tt = (clip.loop === false) ? Math.min(t, dur) : ((t % dur) + dur) % dur;
+    for (const pid in clip.tracks) { const keys = clip.tracks[pid]; if (keys && keys.length) { const v = sampleTrack(keys, tt); out[pid] = { rx: v.rx || 0, ry: v.ry || 0, rz: v.rz || 0 }; } }
+    return out;
+  };
+
   M.ensureLight = function (scene) {
     if (!scene || scene.userData._modelLight) return;
     const dir = new THREE.DirectionalLight(0xffffff, 1.05); dir.position.set(0.6, 1.1, 1.4);
-    const amb = new THREE.AmbientLight(0xffffff, 0.55);
-    scene.add(dir); scene.add(amb); scene.userData._modelLight = true;
+    scene.add(dir); scene.add(new THREE.AmbientLight(0xffffff, 0.55)); scene.userData._modelLight = true;
   };
 })();

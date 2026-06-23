@@ -1246,13 +1246,24 @@
     return { type: 'wall', x: p.x, y: p.y, group: grp, update() { } };
   };
 
-  // a custom model built in the editor's Model tab (G.Models)
+  // a custom model built in the editor's Model tab (G.Models) — rigged + optional clip playback
   mkProp.model = (p) => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : 0);
     const s = p.scale || 1; grp.scale.set(p.flip ? -s : s, s, s);
-    if (G.Models) { G.Models.ensureLight(G.scene); const g = G.Models.buildByName(p.model); if (g) grp.add(g); }
-    return { type: 'model', x: p.x, y: p.y, group: grp, update() { } };
+    let model = null, rig = null, t = 0;
+    if (G.Models) {
+      G.Models.ensureLight(G.scene);
+      model = G.Models.get(p.model);
+      if (model) { rig = G.Models.buildRig(model); grp.add(rig.group); }
+    }
+    const clip = p.clip || '';
+    return {
+      type: 'model', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        if (rig && clip && model.clips && model.clips[clip]) { t += dt || 0.016; G.Models.applyClip(model, rig.bones, clip, t); }
+      }
+    };
   };
 
   mkProp.light = p => {

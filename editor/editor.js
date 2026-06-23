@@ -1158,7 +1158,10 @@
           break;
         }
         case 'model': {
-          selectField(body, 'Model', (G.Models ? G.Models.list() : []).map(m => ({ v: m, t: m })), () => p.model || '', v => { p.model = v; });
+          selectField(body, 'Model', (G.Models ? G.Models.list() : []).map(m => ({ v: m, t: m })), () => p.model || '', v => { p.model = v; p.clip = ''; refreshInspector(); });
+          const md = G.Models && p.model ? G.Models.get(p.model) : null;
+          const clipNames = md && md.clips ? Object.keys(md.clips) : [];
+          selectField(body, 'Animation', [{ v: '', t: '(rest pose)' }].concat(clipNames.map(c => ({ v: c, t: c }))), () => p.clip || '', v => { p.clip = v; });
           selectField(body, 'Depth', [{ v: '0', t: 'gameplay layer' }, { v: '-0.3', t: 'just behind' }, { v: '-9', t: 'background' }, { v: '5', t: 'foreground' }], () => String(p.z !== undefined ? p.z : 0), v => { p.z = parseFloat(v); });
           numField(body, 'Scale', () => p.scale || 1, v => { p.scale = Math.max(0.1, v); }, 0.1);
           checkField(body, 'Flip', () => p.flip, v => { p.flip = v; });
@@ -2583,10 +2586,11 @@
   logicCanvas.addEventListener('wheel', e => { if (tab !== 'logic') return; e.preventDefault(); logicCam.zoom = Math.max(0.4, Math.min(2.2, logicCam.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); }, { passive: false });
 
   // ================= MODEL editor (build character / object models from primitives) =================
-  let modelScene = null, modelCam = null, modelGroup = null, modelMeshes = [];
-  let modelDoc = { name: 'untitled', parts: [] }, modelSel = -1;
-  const modelOrbit = { theta: 0.7, phi: 1.15, radius: 7, tx: 0, ty: 1, tz: 0 };
+  let modelScene = null, modelCam = null, modelGroup = null, modelRig = null, modelMeshes = [];
+  let modelDoc = { name: 'untitled', parts: [], clips: {}, shaded: false }, modelSel = -1;
+  const modelOrbit = { theta: 0, phi: 1.5, radius: 7, tx: 0, ty: 1, tz: 0 };   // front-view default
   let modelDrag = null, modelOrbiting = null, modelPan = null;
+  let modelClip = '', modelTime = 0, modelPlaying = false;
   const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
   const PART_COLORS = ['#c9cdd6', '#7a8aa0', '#c08a5a', '#9a5a5a', '#5a8a6a', '#caa24a', '#7a5a8a', '#2e3540'];
 
@@ -2601,13 +2605,25 @@
   }
   function rebuildModelMeshes() {
     ensureModelScene();
-    while (modelGroup.children.length) { const c = modelGroup.children.pop(); if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); }
-    modelMeshes = [];
-    for (const p of modelDoc.parts) { const m = G.Models.mesh(p); modelGroup.add(m); modelMeshes.push(m); }
+    while (modelGroup.children.length) modelGroup.remove(modelGroup.children[0]);
+    modelRig = G.Models.buildRig(modelDoc);   // bones start at the doc/working pose so inspector edits preview live
+    modelGroup.add(modelRig.group);
+    modelMeshes = Object.values(modelRig.meshes);
     highlightModelSel();
   }
+  // pull the keyed pose at time t into the working doc (so the playhead pose is editable & visible)
+  function syncPoseFromClip(t) {
+    if (!modelClip) return;
+    const pose = G.Models.clipPose(modelDoc, modelClip, t);
+    for (const p of modelDoc.parts) { const v = pose[p.id]; if (v) { p.rx = +(+v.rx).toFixed(1); p.ry = +(+v.ry).toFixed(1); p.rz = +(+v.rz).toFixed(1); } }
+  }
+  let modelSelBox = null;
+  function selMesh() { const p = modelDoc.parts[modelSel]; return p && modelRig ? modelRig.meshes[p.id] : null; }
   function highlightModelSel() {
-    modelMeshes.forEach((m, i) => { m.material.emissive.setHex(i === modelSel ? 0x223a30 : 0x000000); });
+    if (!modelScene) return;
+    if (!modelSelBox) { modelSelBox = new THREE.BoxHelper(new THREE.Object3D(), 0x6fe6b0); modelSelBox.material.depthTest = false; modelScene.add(modelSelBox); }
+    const m = selMesh();
+    if (m) { m.updateWorldMatrix(true, false); modelSelBox.visible = true; modelSelBox.setFromObject(m); } else modelSelBox.visible = false;
   }
   function updateModelCam() {
     const o = modelOrbit, sp = Math.sin(o.phi), cp = Math.cos(o.phi);
@@ -2615,28 +2631,55 @@
     modelCam.lookAt(o.tx, o.ty, o.tz);
     modelCam.aspect = (G.viewW || 1) / (G.viewH || 1); modelCam.updateProjectionMatrix();
   }
-  function drawModels() { ensureModelScene(); updateModelCam(); renderer.render(modelScene, modelCam); }
+  let _mLast = 0;
+  function drawModels() {
+    ensureModelScene();
+    const now = performance.now(), dt = _mLast ? Math.min(0.05, (now - _mLast) / 1000) : 0.016; _mLast = now;
+    if (modelPlaying && modelClip && modelDoc.clips[modelClip]) { modelTime += dt; refreshClipScrub(); applyClipPose(); }
+    if (modelSelBox && modelSelBox.visible) { const m = selMesh(); if (m) modelSelBox.setFromObject(m); }
+    updateModelCam(); renderer.render(modelScene, modelCam);
+  }
+  function newPartId() { let mx = 0; for (const p of modelDoc.parts) if (typeof p.id === 'number' && p.id > mx) mx = p.id; return mx + 1; }
 
   function modelAdd(shape) {
     const c = PART_COLORS[modelDoc.parts.length % PART_COLORS.length];
-    modelDoc.parts.push({ shape, x: 0, y: 1, z: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1, color: c, name: shape });
+    let mx = 0; for (const p of modelDoc.parts) if (typeof p.id === 'number' && p.id > mx) mx = p.id;
+    modelDoc.parts.push({ id: mx + 1, shape, parent: null, x: 0, y: 1, z: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1, ox: 0, oy: 0, oz: 0, color: c, name: shape });
     modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector();
   }
-  function modelDeletePart(i) { modelDoc.parts.splice(i, 1); if (modelSel >= modelDoc.parts.length) modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
-  function modelDupPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.x += 0.4; modelDoc.parts.splice(i + 1, 0, p); modelSel = i + 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
-  function modelMirrorPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.x = -p.x; p.ry = -p.ry; p.rz = -p.rz; p.name = (p.name || p.shape) + ' (mirror)'; modelDoc.parts.push(p); modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function isDescendant(id, ofId) { let p = modelDoc.parts.find(q => q.id === id); let g = 0; while (p && p.parent != null && g++ < 99) { if (p.parent === ofId) return true; p = modelDoc.parts.find(q => q.id === p.parent); } return false; }
+  function modelDeletePart(i) { const id = modelDoc.parts[i].id; modelDoc.parts.splice(i, 1); for (const q of modelDoc.parts) if (q.parent === id) q.parent = null; if (modelSel >= modelDoc.parts.length) modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function modelDupPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.id = newPartId(); p.x += 0.4; modelDoc.parts.splice(i + 1, 0, p); modelSel = i + 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function modelMirrorPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.id = newPartId(); p.x = -p.x; p.ox = -(p.ox || 0); p.ry = -p.ry; p.rz = -p.rz; p.name = (p.name || p.shape) + ' (mirror)'; modelDoc.parts.push(p); modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
 
-  function newModel() { modelDoc = { name: uniqueModelName('model'), parts: [] }; modelSel = -1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function newModel() { modelDoc = { name: uniqueModelName('model'), parts: [], clips: {}, shaded: false }; modelSel = -1; modelClip = ''; modelPlaying = false; modelTime = 0; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
   function uniqueModelName(base) { let n = base, i = 2; while (G.Models.get(n)) n = base + i++; return n; }
   function saveModel() { if (!modelDoc.name) modelDoc.name = uniqueModelName('model'); G.Models.save(modelDoc.name, modelDoc); refreshModelPanel(); }
-  function loadModel(name) { const m = G.Models.get(name); if (!m) return; modelDoc = JSON.parse(JSON.stringify(m)); modelDoc.name = name; modelSel = -1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function loadModel(name) { const m = G.Models.get(name); if (!m) return; modelDoc = JSON.parse(JSON.stringify(m)); modelDoc.name = name; modelDoc.clips = modelDoc.clips || {}; modelSel = -1; modelClip = ''; modelPlaying = false; modelTime = 0; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
+  function applyClipPose() { if (modelRig && modelClip && modelDoc.clips[modelClip]) G.Models.applyClip(modelDoc, modelRig.bones, modelClip, modelTime); }
+  function clipDur() { const c = modelDoc.clips[modelClip]; return c ? (c.dur || 1) : 1; }
+  // animation authoring: snapshot every part's current rest rotation into the clip at modelTime
+  function addClipKey() {
+    if (!modelClip) return; const clip = modelDoc.clips[modelClip]; clip.tracks = clip.tracks || {};
+    const t = +Math.min(modelTime, clip.dur || 1).toFixed(3);
+    for (const p of modelDoc.parts) {
+      const tr = clip.tracks[p.id] = clip.tracks[p.id] || [];
+      let k = tr.find(x => Math.abs(x.t - t) < 0.001);
+      if (!k) { k = { t }; tr.push(k); tr.sort((a, b) => a.t - b.t); }
+      k.rx = p.rx || 0; k.ry = p.ry || 0; k.rz = p.rz || 0;
+    }
+    markDirty(); refreshModelPanel();
+  }
+  function clipKeyTimes() { const c = modelDoc.clips[modelClip]; if (!c || !c.tracks) return []; const s = new Set(); for (const id in c.tracks) for (const k of c.tracks[id]) s.add(+k.t.toFixed(3)); return [...s].sort((a, b) => a - b); }
+  function refreshClipScrub() { const sl = document.getElementById('mScrub'); if (sl && modelClip) { const d = clipDur(); sl.value = ((modelTime % d) / d * 1000) | 0; } }
 
+  function partDepth(p) { let d = 0, q = p, g = 0; while (q && q.parent != null && g++ < 99) { d++; q = modelDoc.parts.find(x => x.id === q.parent); } return d; }
   function refreshModelPanel() {
     const box = $('modelPanel'); if (!box) return; box.innerHTML = '';
     el('div', { class: 'mlabel' }, box, 'MODEL');
     const nameRow = el('div', { class: 'mrow' }, box);
     const nin = el('input', { type: 'text', value: modelDoc.name, style: 'flex:1;min-width:0' }, nameRow);
-    nin.addEventListener('change', () => { const nn = nin.value.trim() || 'model'; modelDoc.name = nn; });
+    nin.addEventListener('change', () => { modelDoc.name = nin.value.trim() || 'model'; });
     const libRow = el('div', { class: 'mrow' }, box);
     const sel = el('select', { style: 'flex:1;min-width:0' }, libRow);
     el('option', { value: '' }, sel, '— load saved —');
@@ -2646,6 +2689,12 @@
     el('button', {}, ctl, '＋ New').addEventListener('click', newModel);
     el('button', {}, ctl, '💾 Save').addEventListener('click', saveModel);
     el('button', { class: 'danger' }, ctl, '🗑 Delete').addEventListener('click', () => { if (G.Models.get(modelDoc.name) && confirm('Delete saved model “' + modelDoc.name + '”?')) { G.Models.remove(modelDoc.name); refreshModelPanel(); } });
+    // shading mode
+    const shRow = el('div', { class: 'mrow' }, box);
+    const flatB = el('button', {}, shRow, 'Flat'); const shB = el('button', {}, shRow, 'Shaded');
+    (modelDoc.shaded ? shB : flatB).style.background = '#1d3a30';
+    flatB.addEventListener('click', () => { modelDoc.shaded = false; rebuildModelMeshes(); refreshModelPanel(); });
+    shB.addEventListener('click', () => { modelDoc.shaded = true; rebuildModelMeshes(); refreshModelPanel(); });
     el('div', { class: 'mlabel' }, box, 'ADD PART');
     const grid = el('div', { class: 'mrow' }, box);
     for (const s of G.Models.SHAPES) el('button', { title: 'Add ' + s }, grid, s).addEventListener('click', () => modelAdd(s));
@@ -2653,23 +2702,49 @@
     const list = el('div', { class: 'mparts' }, box);
     modelDoc.parts.forEach((p, i) => {
       const row = el('div', { class: 'mpart' + (i === modelSel ? ' sel' : '') }, list);
+      row.style.paddingLeft = (6 + partDepth(p) * 12) + 'px';
       const sw = el('div', { class: 'mswatch' }, row); sw.style.background = p.color || '#ccc';
       el('div', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis' }, row, (p.name || p.shape));
       row.addEventListener('click', () => { modelSel = i; highlightModelSel(); refreshModelPanel(); refreshInspector(); });
     });
+    // ---- animation ----
+    el('div', { class: 'mlabel' }, box, 'ANIMATION');
+    const clipRow = el('div', { class: 'mrow' }, box);
+    const csel = el('select', { style: 'flex:1;min-width:0' }, clipRow);
+    el('option', { value: '' }, csel, '— rest pose —');
+    for (const cn in (modelDoc.clips || {})) el('option', { value: cn }, csel, cn);
+    csel.value = modelClip; csel.addEventListener('change', () => { modelClip = csel.value; modelPlaying = false; modelTime = 0; syncPoseFromClip(0); rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); });
+    el('button', { title: 'New clip' }, clipRow, '＋').addEventListener('click', () => { const n = prompt('Clip name', 'idle'); if (!n) return; modelDoc.clips = modelDoc.clips || {}; modelDoc.clips[n] = modelDoc.clips[n] || { dur: 1, loop: true, tracks: {} }; modelClip = n; modelTime = 0; markDirty(); refreshModelPanel(); refreshInspector(); });
+    if (modelClip && modelDoc.clips[modelClip]) {
+      const clip = modelDoc.clips[modelClip];
+      const dRow = el('div', { class: 'mrow' }, box); el('label', { style: 'color:#9bbcb0;font-size:10px;align-self:center' }, dRow, 'dur'); const din = el('input', { type: 'number', step: 0.1, value: clip.dur || 1, style: 'width:48px' }, dRow); din.addEventListener('change', () => { clip.dur = Math.max(0.1, parseFloat(din.value) || 1); markDirty(); });
+      const lk = el('label', { style: 'color:#9bbcb0;font-size:10px;align-self:center;display:flex;gap:3px' }, dRow); const lc = el('input', { type: 'checkbox' }, lk); lc.checked = clip.loop !== false; lk.append('loop'); lc.addEventListener('change', () => { clip.loop = lc.checked; markDirty(); });
+      const pRow = el('div', { class: 'mrow' }, box);
+      el('button', {}, pRow, modelPlaying ? '⏸ Stop' : '▶ Play').addEventListener('click', () => { modelPlaying = !modelPlaying; if (!modelPlaying) { syncPoseFromClip(modelTime); rebuildModelMeshes(); } refreshModelPanel(); });
+      el('button', { title: 'Snapshot the current pose as a keyframe at the scrub time' }, pRow, '◉ Add Key').addEventListener('click', addClipKey);
+      el('button', { class: 'danger', title: 'Delete clip' }, pRow, '🗑').addEventListener('click', () => { if (confirm('Delete clip “' + modelClip + '”?')) { delete modelDoc.clips[modelClip]; modelClip = ''; modelPlaying = false; rebuildModelMeshes(); markDirty(); refreshModelPanel(); refreshInspector(); } });
+      const scr = el('input', { type: 'range', id: 'mScrub', min: 0, max: 1000, value: 0, style: 'width:100%' }, box);
+      scr.addEventListener('input', () => { modelPlaying = false; modelTime = (scr.value / 1000) * (clip.dur || 1); syncPoseFromClip(modelTime); rebuildModelMeshes(); refreshInspector(); });
+      const kt = clipKeyTimes(); if (kt.length) el('div', { style: 'color:#86a89c;font-size:10px;margin-top:2px' }, box, 'keys: ' + kt.map(t => t.toFixed(2)).join('  '));
+      el('div', { class: 'insNote', style: 'opacity:.5;font-size:10px' }, box, 'Pose the parts (rotation), then Add Key at a few scrub times → Play.');
+    }
   }
   function refreshModelInspector(body) {
     const p = modelSel >= 0 ? modelDoc.parts[modelSel] : null;
-    if (!p) { el('div', { class: 'insNote' }, body, 'Model editor — add primitive parts from the panel (top-left), then select one to shape it. Left-drag a part to move it; drag empty space to orbit; wheel to zoom; right-drag to pan.'); return; }
-    el('div', { class: 'insNote' }, body, 'PART — ' + (p.shape));
+    if (!p) { el('div', { class: 'insNote' }, body, 'Model editor — add primitive parts from the panel (top-left), then select one to shape it. Left-drag a part to move it; drag empty space to orbit; wheel to zoom; right-drag to pan. Build it facing you (front view) — that’s how it appears in-game.'); return; }
+    el('div', { class: 'insNote' }, body, 'PART — ' + (p.shape) + (modelClip ? '   ·   clip “' + modelClip + '”: pose & Add Key' : ''));
     textField(body, 'Name', () => p.name || p.shape, v => { p.name = v; refreshModelPanel(); });
     selectField(body, 'Shape', G.Models.SHAPES.map(s => ({ v: s, t: s })), () => p.shape, v => { p.shape = v; rebuildModelMeshes(); refreshModelPanel(); });
+    const popts = [{ v: '', t: '(root)' }];
+    for (const q of modelDoc.parts) if (q.id !== p.id && !isDescendant(q.id, p.id)) popts.push({ v: String(q.id), t: (q.name || q.shape) });
+    selectField(body, 'Parent', popts, () => p.parent != null ? String(p.parent) : '', v => { p.parent = v === '' ? null : parseInt(v); rebuildModelMeshes(); refreshModelPanel(); });
     const v3 = (lbl, kx, ky, kz, step) => { el('div', { class: 'mlabel', style: 'color:#7fb39c;margin-top:6px' }, body, lbl);
-      numField(body, 'X', () => p[kx], v => { p[kx] = v; rebuildModelMeshes(); }, step);
-      numField(body, 'Y', () => p[ky], v => { p[ky] = v; rebuildModelMeshes(); }, step);
-      numField(body, 'Z', () => p[kz], v => { p[kz] = v; rebuildModelMeshes(); }, step); };
-    v3('Position', 'x', 'y', 'z', 0.1);
-    v3('Rotation°', 'rx', 'ry', 'rz', 5);
+      numField(body, 'X', () => p[kx] || 0, v => { p[kx] = v; rebuildModelMeshes(); }, step);
+      numField(body, 'Y', () => p[ky] || 0, v => { p[ky] = v; rebuildModelMeshes(); }, step);
+      numField(body, 'Z', () => p[kz] || 0, v => { p[kz] = v; rebuildModelMeshes(); }, step); };
+    v3('Position / joint', 'x', 'y', 'z', 0.1);
+    v3('Rotation°  (pose this)', 'rx', 'ry', 'rz', 5);
+    v3('Pivot offset (mesh)', 'ox', 'oy', 'oz', 0.1);
     v3('Scale', 'sx', 'sy', 'sz', 0.1);
     colorField(body, 'Colour', () => p.color || '#c8c8c8', v => { p.color = v || '#c8c8c8'; rebuildModelMeshes(); refreshModelPanel(); });
     const btns = el('div', { class: 'frow', style: 'margin-top:10px;gap:5px' }, body);
@@ -2684,7 +2759,15 @@
     _ndc.set((mx / r.width) * 2 - 1, -(my / r.height) * 2 + 1);
     _ray.setFromCamera(_ndc, modelCam);
     const hits = _ray.intersectObjects(modelMeshes, false);
-    return hits.length ? modelMeshes.indexOf(hits[0].object) : -1;
+    if (!hits.length) return -1;
+    const pid = hits[0].object.userData.partId;       // map mesh -> part index by stable id
+    return modelDoc.parts.findIndex(p => p.id === pid);
+  }
+  // world-space position of a part's bone (parts may be nested under a parent)
+  function bonePos(p) {
+    const b = modelRig && modelRig.bones[p.id];
+    if (b) { b.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(b.matrixWorld); }
+    return new THREE.Vector3(p.x || 0, p.y || 0, p.z || 0);
   }
   function modelPlaneHit(mx, my, point) {
     const r = glCanvas.getBoundingClientRect();
@@ -2703,7 +2786,7 @@
     const i = modelPick(mx, my);
     if (i >= 0) {
       modelSel = i; highlightModelSel(); refreshModelPanel(); refreshInspector();
-      const p = modelDoc.parts[i], pos = new THREE.Vector3(p.x, p.y, p.z), hit = modelPlaneHit(mx, my, pos);
+      const p = modelDoc.parts[i], pos = bonePos(p), hit = modelPlaneHit(mx, my, pos);
       modelDrag = { i, off: hit ? pos.clone().sub(hit) : new THREE.Vector3(), moved: false };
     } else { modelOrbiting = { mx, my, theta: modelOrbit.theta, phi: modelOrbit.phi }; }
   });
@@ -2711,8 +2794,18 @@
     if (tab !== 'models') return;
     const r = glCanvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
     if (modelDrag) {
-      const p = modelDoc.parts[modelDrag.i], hit = modelPlaneHit(mx, my, new THREE.Vector3(p.x, p.y, p.z));
-      if (hit) { const np = hit.add(modelDrag.off); p.x = +np.x.toFixed(2); p.y = +np.y.toFixed(2); p.z = +np.z.toFixed(2); modelDrag.moved = true; const m = modelMeshes[modelDrag.i]; if (m) m.position.set(p.x, p.y, p.z); refreshInspectorThrottled(); }
+      const p = modelDoc.parts[modelDrag.i], hit = modelPlaneHit(mx, my, bonePos(p));
+      if (hit) {
+        const world = hit.add(modelDrag.off);                       // desired world position of the bone
+        const par = (p.parent != null && modelRig.bones[p.parent]) ? modelRig.bones[p.parent] : modelRig.group;
+        par.updateWorldMatrix(true, false);
+        const local = par.worldToLocal(world.clone());              // -> coords in the parent's frame
+        p.x = +local.x.toFixed(2); p.y = +local.y.toFixed(2); p.z = +local.z.toFixed(2);
+        modelDrag.moved = true;
+        const b = modelRig.bones[p.id]; if (b) { b.position.set(p.x, p.y, p.z); if (b.userData.base) { b.userData.base.x = p.x; b.userData.base.y = p.y; b.userData.base.z = p.z; } }
+        if (modelSelBox) modelSelBox.update();
+        refreshInspectorThrottled();
+      }
     } else if (modelOrbiting) {
       modelOrbit.theta = modelOrbiting.theta - (mx - modelOrbiting.mx) * 0.01;
       modelOrbit.phi = Math.max(0.12, Math.min(3.0, modelOrbiting.phi - (my - modelOrbiting.my) * 0.01));
@@ -2873,7 +2966,9 @@
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
     logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
     csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); },
-    modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; }
+    modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; },
+    modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
+    modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); }
   };
 
   boot();
