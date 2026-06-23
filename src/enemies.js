@@ -51,6 +51,7 @@
       G.FX.burst('spark', ent.body.x, ent.body.y + 0.2, { n: 8, dir });
       G.FX.ring(ent.body.x, ent.body.y + 0.2, { r1: 1.8, life: 0.3, color: 0xdfffe8, alpha: 0.5 });
       if (G.Main.dropGlimmer && !ent.noLoot) G.Main.dropGlimmer(ent.body.x, ent.body.y + 0.3, 2 + (Math.random() * 3 | 0));
+      if (G.Main.recordKill && !ent.noLoot) G.Main.recordKill(ent.type);   // fills the Hunter's Journal
       if (ent.onDeath) ent.onDeath();
       return true;
     }
@@ -984,6 +985,36 @@
   E.make = (type, x, y) => {
     const mk = MAKERS[type];
     return mk ? mk(x, y) : null;
+  };
+
+  // build just the visual group for a type, sandboxed so makers that auto-add to the room don't
+  E.preview = (type) => {
+    const real = G.room;
+    G.room = { entities: [], group: new THREE.Group() };
+    let ent = null;
+    try { ent = E.make(type, 0, 0); } finally { G.room = real; }
+    if (!ent || !ent.group) return null;
+    if (ent.group.parent) ent.group.parent.remove(ent.group);
+    ent.group.position.set(0, 0, 0);
+    return ent.group;
+  };
+
+  // Hunter's Journal lore, keyed by type id
+  E.BESTIARY = {
+    tumblebug: 'An armoured roller that trundles the old paths. Knock it and it rights itself, ever stubborn.',
+    gnatling: 'Winged and quick to anger. It harries wanderers who stray into the dark.',
+    bulbil: 'A rooted maw that spits seed-shot. Patient, and never hungry for long.',
+    bramblehog: 'Curls into a thorned wheel and charges. Best met with a steady nerve.',
+    lurcher: 'It leaps from shadow on long legs. Many have heard it before they saw it.',
+    spinemaw: 'Clings to the ceiling and drops without warning. Watch the dark above.',
+    driftwisp: 'A half-there ghost that phases through stone. Strike it when it remembers it is solid.',
+    shellback: 'Armoured at the front, soft behind. A lesson in patience, or a lesson in pain.',
+    skimmer: 'Dives from on high in a single screaming line. Step aside and it shatters.',
+    sporeling: 'It comes in numbers, never alone. The swarm remembers what one cannot.',
+    mortarbug: 'Lobs its burden from afar and waits for the bloom. Close the distance.',
+    blastcap: 'A fungus that keeps its anger inside until you are near enough to share it.',
+    hookworm: 'Burrows and surfaces, surfaces and burrows. The ground itself is its ambush.',
+    sentine: 'An unsleeping eye that fixes wanderers in its beam. It has watched a long time.'
   };
 
   // bosses live in bosses.js

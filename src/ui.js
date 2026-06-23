@@ -791,6 +791,85 @@
     cx.restore();
   }
 
+  // ---- Hunter's Journal (bestiary) ----
+  const portraitCache = {};   // type id -> canvas (rendered once via G.Thumb)
+  function portraitFor(id) {
+    if (portraitCache[id] !== undefined) return portraitCache[id];
+    let out = null;
+    try { const grp = G.Enemies.preview && G.Enemies.preview(id); if (grp && G.Thumb) out = G.Thumb.snapshot(grp, { size: 200 }); } catch (e) { out = null; }
+    portraitCache[id] = out;
+    return out;
+  }
+  function drawJournal() {
+    pmAcc = biomeAccent();
+    menuChrome({ vtitle: false });
+    menuHeader('JOURNAL');
+    const types = G.Enemies.TYPES || [], kills = (G.save && G.save.kills) || {};
+    const found = types.filter(t => kills[t.id] > 0).length;
+    cx.save();
+    cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    cx.font = `${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = 'rgba(190,210,200,0.8)';
+    cx.fillText('Discovered  ' + found + ' / ' + types.length, w * 0.30, h * 0.16 + 24);
+
+    // scrolling list (left column)
+    const idx = U.clamp(G.Main.journalIndex, 0, Math.max(0, types.length - 1));
+    const lx = w * 0.30, ly = h * 0.26, step = Math.min(h * 0.052, 34), fs = Math.round(Math.min(h * 0.03, 19));
+    const visible = Math.min(types.length, Math.floor((h * 0.62) / step));
+    let top = U.clamp(idx - (visible >> 1), 0, Math.max(0, types.length - visible));
+    cx.textBaseline = 'middle';
+    for (let r = 0; r < visible; r++) {
+      const i = top + r, t = types[i]; if (!t) break;
+      const yy = ly + r * step, sel = i === idx, seen = kills[t.id] > 0;
+      if (sel) { cx.globalAlpha = 0.9; cx.fillStyle = pmAcc; cx.fillRect(lx - 12, yy - step * 0.45, w * 0.22, step * 0.9); cx.globalAlpha = 1; }
+      cx.font = `${sel ? '900' : '700'} ${fs}px ${menuFont}`; cx.textAlign = 'left';
+      cx.fillStyle = sel ? '#06120e' : (seen ? 'rgba(202,226,216,0.9)' : 'rgba(120,135,128,0.5)');
+      cx.fillText(seen ? t.label.replace(/\s*\(.*\)/, '').toUpperCase() : '— — —', lx, yy);
+      if (seen) { cx.textAlign = 'right'; cx.font = `${Math.round(fs * 0.85)}px ${serif}`; cx.fillStyle = sel ? '#06120e' : 'rgba(150,200,180,0.7)'; cx.fillText('×' + kills[t.id], lx + w * 0.21 - 14, yy); }
+    }
+    cx.restore();
+
+    // detail panel (right): portrait + name + lore
+    const sel = types[idx];
+    if (sel) {
+      const seen = kills[sel.id] > 0;
+      const px = w * 0.60, py = h * 0.24, pw = w * 0.34, boxS = Math.min(w * 0.16, h * 0.28);
+      cx.save();
+      cx.strokeStyle = pmAcc; cx.globalAlpha = 0.5; cx.lineWidth = 2; cx.strokeRect(px, py, boxS, boxS); cx.globalAlpha = 1;
+      if (seen) {
+        const por = portraitFor(sel.id);
+        if (por) cx.drawImage(por, px + 4, py + 4, boxS - 8, boxS - 8);
+      } else {
+        cx.fillStyle = 'rgba(120,135,128,0.5)'; cx.font = `900 ${Math.round(boxS * 0.4)}px ${menuFont}`;
+        cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('?', px + boxS / 2, py + boxS / 2);
+      }
+      cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+      const tx = px + boxS + 26;
+      cx.fillStyle = '#eaf2ee'; cx.font = `900 ${Math.round(h * 0.04)}px ${menuFont}`;
+      cx.fillText(seen ? sel.label.replace(/\s*\(.*\)/, '') : 'Undiscovered', tx, py + boxS * 0.34);
+      cx.fillStyle = 'rgba(160,200,182,0.8)'; cx.font = `italic ${Math.round(h * 0.022)}px ${serif}`;
+      cx.fillText(seen ? (sel.label.match(/\((.*)\)/) ? sel.label.match(/\((.*)\)/)[1] : '') : '', tx, py + boxS * 0.34 + 26);
+      if (seen) { cx.fillStyle = 'rgba(150,200,180,0.7)'; cx.font = `${Math.round(h * 0.02)}px ${serif}`; cx.fillText('Slain  ×' + kills[sel.id], tx, py + boxS * 0.34 + 52); }
+      // lore (wrapped)
+      const lore = seen ? ((G.Enemies.BESTIARY && G.Enemies.BESTIARY[sel.id]) || '') : 'Slay this creature to record it in your journal.';
+      cx.fillStyle = 'rgba(214,228,221,0.9)'; cx.font = `${Math.round(h * 0.024)}px ${serif}`;
+      wrapText(cx, lore, px, py + boxS + 36, pw, Math.round(h * 0.034));
+      cx.restore();
+    }
+    cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  browse        Esc  back', w - 32, h - 32); cx.restore();
+  }
+  // simple word-wrap helper for canvas text
+  function wrapText(ctx, text, x, y, maxW, lh) {
+    const words = String(text).split(' '); let line = '', yy = y;
+    for (const wd of words) {
+      const test = line ? line + ' ' + wd : wd;
+      if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); line = wd; yy += lh; }
+      else line = test;
+    }
+    if (line) ctx.fillText(line, x, yy);
+  }
+
   // The pause menu's chrome (slanted dark backdrop, drifting bats, vertical title,
   // wanderer art), tinted by the current biome accent. Shared by Settings / Charms / Slots.
   // opts: { vtitle:false } hides the side MOSSVEIL · { nod:true } makes the wanderer nod.
@@ -994,6 +1073,7 @@
       drawPause(pmOpen);
     }
     if (st === 'charms') drawCharms();
+    if (st === 'journal') drawJournal();
     if (st === 'settings') drawSettings();
     if (st === 'bench') drawBench();
     if (st === 'travel') { drawTravel(); drawToasts(dt); }

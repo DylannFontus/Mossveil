@@ -116,15 +116,17 @@
   Main.menuItems = [];
   Main.confirm = null;   // { message, onYes, sel }
   Main.pauseIndex = 0;
-  Main.pauseItems = ['Resume', 'Charms', 'Map', 'Settings', 'Quit to Title'];
+  Main.pauseItems = ['Resume', 'Charms', 'Journal', 'Map', 'Settings', 'Quit to Title'];
   Main.pauseDescs = {
     'Resume': 'Return to the dream.',
     'Charms': 'Equip and inspect your charms.',
+    'Journal': "The Hunter's record of the creatures you have slain.",
     'Map': "Open the wanderer's map.",
     'Settings': 'Sound, screen shake, visual quality.',
     'Quit to Title': 'Leave to the title screen.'
   };
   Main.charmIndex = 0;
+  Main.journalIndex = 0;
   Main.settingsIndex = 0;
 
   // ---------------- settings ----------------
@@ -193,6 +195,7 @@
     const it = Main.pauseItems[Main.pauseIndex];
     if (it === 'Resume') { if (G.UI.closePause) G.UI.closePause(); Main.state = 'play'; }
     else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'pause'; menuGo('charms'); }
+    else if (it === 'Journal') { Main.journalIndex = 0; Main._journalReturn = 'pause'; menuGo('journal'); }
     else if (it === 'Map') { Main.mapView = Main.mapView || { pan: { x: 0, y: 0 }, zoom: 3 }; G.MapView.centerOn(G.room.id, Main.mapView); menuGo('map'); }
     else if (it === 'Settings') { Main.settingsIndex = 0; Main._settingsReturn = 'pause'; menuGo('settings'); }
     else if (it === 'Quit to Title') { G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; menuGo('title'); }
@@ -690,6 +693,14 @@
     if (G.UI.toast && glimmer > 0) G.UI.toast('Glimmer reclaimed: +' + glimmer);
   };
 
+  // Hunter's Journal: tally kills per enemy type (drives bestiary discovery)
+  Main.recordKill = (type) => {
+    if (!type || type === 'shade' || type === 'projectile') return;
+    G.save.kills = G.save.kills || {};
+    G.save.kills[type] = (G.save.kills[type] || 0) + 1;
+    Main.persist();
+  };
+
   Main.startEnding = () => {
     if (Main.state !== 'play') return;
     Main.state = 'ending';
@@ -813,6 +824,14 @@
         if (I.pressed('down')) { Main.charmIndex = (Main.charmIndex + 1) % n; G.Audio.sfx('clink'); }
         if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) { const ok = G.Charms.toggle(G.Charms.LIST[Main.charmIndex].id); G.Audio.sfx(ok ? 'uiBell' : 'clink'); }
         if (I.pressed('pause')) { G.Audio.sfx('clink'); menuGo(Main._charmReturn || 'pause'); }
+        break;
+      }
+      case 'journal': {
+        dt = 0;
+        const n = (G.Enemies.TYPES || []).length || 1;
+        if (I.pressed('up')) { Main.journalIndex = (Main.journalIndex - 1 + n) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.journalIndex = (Main.journalIndex + 1) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('pause') || I.pressed('confirm')) { G.Audio.sfx('clink'); menuGo(Main._journalReturn || 'pause'); }
         break;
       }
       case 'bench':
