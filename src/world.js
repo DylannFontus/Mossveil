@@ -1820,6 +1820,13 @@
       for (let i = room.entities.length - 1; i >= 0; i--) {
         const e = room.entities[i];
         if (e._inactive) continue;       // inactive objects don't run, collide or animate
+        if (e.stagT > 0) {               // staggered: AI frozen + a shudder, but still flashing
+          if (e._stagRot0 === undefined) e._stagRot0 = e.group ? e.group.rotation.z : 0;
+          e.stagT -= dt;
+          if (e.group) e.group.rotation.z = e._stagRot0 + Math.sin(G.time * 55) * 0.07;
+          if (e.stagT <= 0 && e.group) { e.group.rotation.z = e._stagRot0; e._stagRot0 = undefined; }
+          continue;
+        }
         e.update(dt);
         if (e.dead) {
           if (e.group) { room.group.remove(e.group); U.disposeDeep(e.group); }

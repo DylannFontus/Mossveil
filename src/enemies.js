@@ -18,6 +18,17 @@
   }
   E._contactPlayer = contactPlayer;
 
+  // freeze an enemy's AI for `secs` (the central update loop reads .stagT). Bosses opt out via noStagger.
+  E.stagger = (ent, secs) => {
+    if (!ent || !ent.alive || ent.noStagger) return;
+    ent.poise = 0;
+    ent.stagT = Math.max(ent.stagT || 0, secs || 0.5);
+    U.flashGroup(ent.group, Math.min(0.45, secs || 0.5), 0x9fe8ff);
+    G.FX.burst('spark', ent.body.x, ent.body.y + 0.3, { n: 7, color: 0x9fe8ff });
+    G.FX.ring(ent.body.x, ent.body.y + 0.2, { r1: 1.3, life: 0.25, color: 0x9fe8ff, alpha: 0.4 });
+    G.Audio.sfx('clink');
+  };
+
   function baseHurt(ent, dmg, dir, opts = {}) {
     if (!ent.alive) return;
     ent.hp -= dmg;
@@ -25,6 +36,11 @@
     if (!opts.noKb) {
       ent.body.vx = dir * (opts.kb || 7);
       if (ent.fly) ent.body.vy = U.rand(1, 3);
+    }
+    // poise: hits build it up; when it breaks the enemy staggers (mostly matters for tanky foes)
+    if (ent.hp > 0 && !opts.noStagger && !ent.noStagger) {
+      ent.poise = (ent.poise || 0) + dmg + (opts.poise || 0);
+      if (ent.poise >= (ent.poiseMax || 4)) E.stagger(ent, opts.stagT || 0.5);
     }
     if (ent.hp <= 0) {
       ent.alive = false;

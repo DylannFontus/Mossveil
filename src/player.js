@@ -9,6 +9,7 @@
   const WALL_SLIDE = -3.4, WJ_X = 9.8, WJ_Y = 15.5, WALL_LOCK = 0.14;
   const DASH_V = 23, DASH_T = 0.16, DASH_CD = 0.45;
   const ATK_CD = 0.36, ATK_ACTIVE0 = 0.02, ATK_ACTIVE1 = 0.13, POGO_V = 14.5;
+  const ART_CHARGE = 0.55;   // hold attack this long to ready a Great Slash (nail art)
   const MAX_HP = 5, SOUL_MAX = 99, SOUL_HIT = 12, FOCUS_COST = 33, FOCUS_TIME = 0.85, SPELL_COST = 33;
   const INVULN = 1.3;
 
@@ -108,6 +109,7 @@
       coyoteT: 0, jumpBufT: 0, jumpCut: false, wallLockT: 0,
       dashT: 0, dashCdT: 0, dashDir: 1, ghostT: 0,
       atkT: 0, atkCdT: 0, atkDir: 'side', atkHit: null, swingFlip: false,
+      atkHoldT: 0, artReady: false, isArt: false, parryT: 0,
       invulnT: 0, hurtT: 0, deathT: 0,
       focusT: 0, focusing: false, castPressT: -1,
       wingUsed: false, wingAnimT: 0,
@@ -120,6 +122,19 @@
       spendSoul(n) { this.soul = Math.max(0, this.soul - n); },
       damage(n, fromX) {
         if (this.dead || this.invulnT > 0) return false;
+        // nail clash / parry: if mid-swing into the threat, deflect it instead of taking damage
+        const threatDir = fromX >= this.body.x ? 1 : -1;
+        if (this.atkT > 0 && this.atkT <= ATK_ACTIVE1 + 0.04 &&
+            (this.atkDir === 'side' ? this.facing === threatDir : true)) {
+          this.parryT = 0.18;
+          const cx = (this.body.x + fromX) / 2;
+          G.Audio.sfx('clink');
+          G.FX.burst('spark', cx, this.body.y + 0.3, { n: 12, color: 0xfff0b0 });
+          G.FX.ring(cx, this.body.y + 0.3, { r1: 1.8, life: 0.22, color: 0xfff4cf, alpha: 0.6 });
+          G.FX.hitStop(0.08);
+          this.body.vx = -threatDir * 5;
+          return false;
+        }
         this.hp -= n;
         this.cancelFocus();
         G.UI.onPlayerHurt();
@@ -189,14 +204,34 @@
     else if (I.down('down') && !b.onGround) p.atkDir = 'down';
     else p.atkDir = 'side';
     G.Audio.sfx('swing');
+    p.isArt = false;
     const ang = p.atkDir === 'up' ? Math.PI / 2 : p.atkDir === 'down' ? -Math.PI / 2 : (p.facing > 0 ? 0 : Math.PI);
     const ox = p.atkDir === 'side' ? p.facing * 1.0 : 0;
     const oy = p.atkDir === 'up' ? 1.25 : p.atkDir === 'down' ? -1.25 : 0.2;
     G.FX.slash(b.x + ox, b.y + oy, ang + (p.swingFlip ? 0.12 : -0.12), false, 0xeef6ff, p.swingFlip);
   }
 
+  // Great Slash — the charged nail art: a heavy forward lunge that staggers and knocks back
+  function greatSlash(p) {
+    const b = p.body;
+    p.atkCdT = ATK_CD * 1.5;
+    p.atkT = 0.0001; p.atkHit = new Set();
+    p.atkDir = 'side'; p.isArt = true;
+    p.artReady = false; p.atkHoldT = 0;
+    p.swingFlip = !p.swingFlip;
+    b.vx += p.facing * 9;                              // lunge
+    const ang = p.facing > 0 ? 0 : Math.PI;
+    G.Audio.sfx('swing');
+    G.FX.slash(b.x + p.facing * 1.4, b.y + 0.1, ang, true, 0xffe39a, p.swingFlip);
+    G.FX.slash(b.x + p.facing * 1.7, b.y + 0.1, ang, true, 0xfff4d0, !p.swingFlip);  // doubled = thick blade
+    G.FX.shake(0.22, 0.2);
+    if (G.Main.camPunch) G.Main.camPunch(1.2);
+    if (G.Post) G.Post.punch(0.9);
+  }
+
   function attackHitbox(p) {
     const b = p.body;
+    if (p.isArt) return { x: b.x + p.facing * 1.7, y: b.y + 0.1, w: 3.6, h: 1.9 };
     if (p.atkDir === 'up') return { x: b.x, y: b.y + 1.45, w: 1.7, h: 1.6 };
     if (p.atkDir === 'down') return { x: b.x, y: b.y - 1.45, w: 1.55, h: 1.6 };
     return { x: b.x + p.facing * 1.2, y: b.y + 0.1, w: 2.05, h: 1.45 };
@@ -215,11 +250,16 @@
       if (e.isEnemy && e.alive && !p.atkHit.has(e) && U.overlap(hb, e.body)) {
         p.atkHit.add(e);
         const kdir = p.atkDir === 'side' ? p.facing : (e.body.x >= p.body.x ? 1 : -1);
-        e.hurt(p.nailDmg || 1, kdir, p.atkDir);
+        const dmg = p.isArt ? (p.nailDmg || 1) * 2 + 1 : (p.nailDmg || 1);
+        e.hurt(dmg, kdir, p.atkDir);
+        if (p.isArt && e.alive) {                       // heavy: extra shove + guaranteed stagger
+          e.body.vx += kdir * 7;
+          if (G.Enemies.stagger) G.Enemies.stagger(e, 0.6);
+        }
         landed = true;
         if (p.atkDir === 'down') pogo = true;
-        p.gainSoul(SOUL_HIT * (p.soulMul || 1));
-        G.FX.burst('spark', (hb.x + e.body.x) / 2, e.body.y + 0.2, { n: 9, dir: kdir });
+        p.gainSoul(SOUL_HIT * (p.soulMul || 1) * (p.isArt ? 1.6 : 1));
+        G.FX.burst('spark', (hb.x + e.body.x) / 2, e.body.y + 0.2, { n: p.isArt ? 14 : 9, dir: kdir });
         G.FX.burst('soul', e.body.x, e.body.y + 0.3, { n: 5 });
       }
       if (e.type === 'projectile' && !e.friendly && !e.dead && !p.atkHit.has(e) && U.overlap(hb, e.body)) {
@@ -385,7 +425,23 @@
     if (I.pressed('attack') && p.atkCdT <= 0 && p.hurtT <= 0) {
       p.cancelFocus();
       doAttack(p);
+      p.atkHoldT = 0; p.artReady = false;
     }
+    // charged nail art: keep holding attack to ready a Great Slash, release to unleash it
+    if (I.down('attack') && p.hurtT <= 0 && p.dashT <= 0) {
+      p.atkHoldT += dt;
+      if (!p.artReady && p.atkHoldT >= ART_CHARGE) {
+        p.artReady = true;
+        G.Audio.sfx('focus');
+        if (G.Main.camPunch) G.Main.camPunch(0.3);
+      }
+      if (p.artReady && U.chance(dt * 26))
+        G.FX.burst('soul', b.x + U.rand(-0.45, 0.45), b.y + U.rand(-0.1, 0.7), { n: 1, color: 0xffe7a0 });
+    } else {
+      if (p.artReady && I.released('attack') && p.hurtT <= 0) greatSlash(p);
+      if (I.released('attack')) { p.atkHoldT = 0; p.artReady = false; }
+    }
+    if (p.parryT > 0) p.parryT -= dt;
     resolveAttack(p, dt);
 
     // cast / focus

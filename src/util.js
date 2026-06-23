@@ -159,13 +159,13 @@ window.G = window.G || {};
     return { x: (_v3.x * .5 + .5) * vw, y: (-_v3.y * .5 + .5) * vh };
   };
 
-  // tint all mesh materials in a group white for `dur` seconds (hurt flash)
-  U.flashGroup = (group, dur = 0.07) => {
+  // tint all mesh materials in a group (white hurt-flash by default; pass a hex for e.g. stagger)
+  U.flashGroup = (group, dur = 0.07, hex = 0xffffff) => {
     const saved = [];
     group.traverse(c => {
       if (c.material && c.material.color) {
         saved.push([c.material, c.material.color.getHex()]);
-        c.material.color.setHex(0xffffff);
+        c.material.color.setHex(hex);
       }
     });
     setTimeout(() => { saved.forEach(([m, h]) => { m.color.setHex(h); }); }, dur * 1000);

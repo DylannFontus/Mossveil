@@ -459,7 +459,7 @@
     const rig = RIGS[cfg.rig](cfg.colors, cfg.scale);
     const fly = cfg.mode === 'fly';
     const bs = {
-      type: 'boss', isEnemy: true, alive: true, dead: false,
+      type: 'boss', isEnemy: true, alive: true, dead: false, noStagger: true,
       hp: cfg.hp, maxHp: cfg.hp, fly,
       gibColor: cfg.colors.accent,
       body: { x, y: y + (fly ? 2 : 0.5), w: 2.7 * cfg.scale, h: 2.5 * cfg.scale, vx: 0, vy: 0 },
