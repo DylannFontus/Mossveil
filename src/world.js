@@ -1535,6 +1535,34 @@
     };
   };
 
+  // a standing character — interact to open its (branching) dialogue
+  mkProp.npc = (p) => {
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    const s = p.scale || 1; grp.scale.set(s, s, 1);
+    const col = p.color ? parseInt(p.color.replace('#', ''), 16) : 0x5a6a7e;
+    grp.add(U.flat(U.splineShape([[-0.42, 0], [-0.48, 1.1], [-0.24, 1.85], [0.24, 1.85], [0.48, 1.1], [0.42, 0]]), col, {}));
+    grp.add(U.flat(U.splineShape([[-0.3, 1.5], [-0.32, 1.95], [0, 2.1], [0.32, 1.95], [0.3, 1.5]]), 0x0a0e12, { z: 0.02 }));   // hood
+    grp.add(U.flat(U.ellipse(0.065, 0.085), 0xbfe8ff, { z: 0.03, x: -0.1, y: 1.78, additive: true, opacity: 0.95 }));
+    grp.add(U.flat(U.ellipse(0.065, 0.085), 0xbfe8ff, { z: 0.03, x: 0.1, y: 1.78, additive: true, opacity: 0.95 }));
+    let bob = U.rand(0, 9);
+    return {
+      type: 'npc', x: p.x, y: p.y, group: grp, npcName: p.name,
+      update(dt) {
+        bob += dt; grp.position.y = p.y + Math.sin(bob * 1.5) * 0.05;
+        const pl = G.player;
+        if (!pl || pl.dead || G.Main.state !== 'play') return;
+        if (Math.abs(pl.body.x - p.x) < 1.9 && Math.abs(pl.body.y - p.y) < 2.6) {
+          G.UI.prompt(p.x, p.y + 2.5, 'speak — E or ↑');
+          if (G.Input.pressed('interact') || G.Input.pressed('up')) {
+            const dlg = (p.dialogue && p.dialogue.lines && p.dialogue.lines.length) ? p.dialogue : { lines: [{ speaker: p.name || '???', text: p.text || '...' }] };
+            dlg.name = dlg.name || p.name; if (p.color) dlg.color = p.color;
+            if (G.Dialogue) G.Dialogue.start(dlg);
+          }
+        }
+      }
+    };
+  };
+
   mkProp.light = p => {
     const grp = new THREE.Group();
     grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.5);

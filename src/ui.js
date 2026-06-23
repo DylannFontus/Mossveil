@@ -993,6 +993,52 @@
     cx.restore();
   }
 
+  // ---- NPC dialogue box ----
+  function drawNpcBust(ctx, ox, oy, s, color) {
+    ctx.save(); ctx.translate(ox, oy);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(-s, s * 1.1); ctx.quadraticCurveTo(-s * 1.15, -s * 0.2, -s * 0.5, -s * 0.95);
+    ctx.quadraticCurveTo(0, -s * 1.35, s * 0.5, -s * 0.95); ctx.quadraticCurveTo(s * 1.15, -s * 0.2, s, s * 1.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(6,10,14,0.9)'; ctx.beginPath(); ctx.ellipse(0, -s * 0.5, s * 0.44, s * 0.6, 0, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#bfe8ff';
+    ctx.beginPath(); ctx.ellipse(-s * 0.16, -s * 0.5, s * 0.06, s * 0.1, 0, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s * 0.16, -s * 0.5, s * 0.06, s * 0.1, 0, 0, 6.28); ctx.fill();
+    ctx.restore();
+  }
+  function drawDialogue() {
+    const D = G.Dialogue; if (!D || !D.active) return;
+    const boxH = Math.min(h * 0.3, 230), by = h - boxH - 18, bx = w * 0.06, bw = w * 0.88, acc = D.color();
+    cx.save();
+    cx.fillStyle = 'rgba(6,12,14,0.93)'; roundRect(bx, by, bw, boxH, 12); cx.fill();
+    cx.strokeStyle = acc + '99'; cx.lineWidth = 1.5; cx.stroke();
+    const ps = boxH * 0.32, pbx = bx + 16, pby = by + 16;
+    cx.save(); roundRect(pbx, pby, ps * 2, ps * 2, 8); cx.clip();
+    cx.fillStyle = 'rgba(10,16,20,0.6)'; cx.fillRect(pbx, pby, ps * 2, ps * 2);
+    drawNpcBust(cx, pbx + ps, pby + ps * 1.25, ps, acc); cx.restore();
+    cx.strokeStyle = acc + '55'; roundRect(pbx, pby, ps * 2, ps * 2, 8); cx.stroke();
+    const tx = pbx + ps * 2 + 28, tw = bx + bw - tx - 24;
+    cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    cx.fillStyle = acc; cx.font = `bold ${Math.round(h * 0.028)}px ${menuFont}`;
+    cx.fillText((D.speaker() || '').toUpperCase(), tx, by + 38);
+    cx.fillStyle = 'rgba(226,236,230,0.96)'; cx.font = `${Math.round(h * 0.026)}px ${serif}`;
+    wrapText(cx, D.shownText(), tx, by + 68, tw, Math.round(h * 0.036));
+    G.UI.dlgButtons = [];
+    const ch = (!D.isTyping()) ? D.choices() : null;
+    if (ch) {
+      const lh = h * 0.036, chY = by + boxH - 14 - ch.length * lh;
+      ch.forEach((c, i) => {
+        const yy = chY + i * lh, sel = i === (G.Main.dlgChoice || 0);
+        cx.fillStyle = sel ? acc : 'rgba(190,210,200,0.8)'; cx.font = `${sel ? 'bold ' : ''}${Math.round(h * 0.025)}px ${serif}`;
+        cx.fillText((sel ? '▸ ' : '    ') + c.label, tx, yy + h * 0.025);
+        G.UI.dlgButtons.push({ x: tx, y: yy, w: tw, h: lh, index: i });
+      });
+    } else if (!D.isTyping()) {
+      cx.fillStyle = acc; cx.font = `${Math.round(h * 0.03)}px serif`; cx.textAlign = 'right';
+      cx.fillText('▸', bx + bw - 22, by + boxH - 16);
+    }
+    cx.restore();
+  }
+
   // Controls / key-binding menu — same pause-style chrome; each row shows an action + its key,
   // selectable to rebind (the next key pressed becomes the binding). Scrolls like Settings.
   function drawControls() {
@@ -1152,7 +1198,7 @@
     // weather (rain/snow/wind…) over the world but under the HUD
     if (G.Weather && (st === 'play' || st === 'pause' || st === 'transition' || st === 'dead')) G.Weather.draw(cx, w, h);
 
-    if (st === 'play' || st === 'dead' || st === 'pause' || st === 'transition') {
+    if (st === 'play' || st === 'dead' || st === 'pause' || st === 'transition' || st === 'dialogue') {
       drawHud(dt);
       if (st === 'play') drawCompass();
       drawPrompts();
@@ -1183,6 +1229,7 @@
       pmOpen = U.damp(pmOpen, target, 14, dt);
       drawPause(pmOpen);
     }
+    if (st === 'dialogue') drawDialogue();
     if (st === 'charms') drawCharms();
     if (st === 'journal') drawJournal();
     if (st === 'settings') drawSettings();

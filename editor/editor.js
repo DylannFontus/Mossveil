@@ -275,6 +275,7 @@
     if (p.type === 'platform' || p.type === 'crusher' || p.type === 'conveyor' || p.type === 'fallfloor') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 1 };
     if (p.type === 'breakable') return { x: p.x, y: p.y, w: p.w || 2, h: p.h || 4 };
     if (p.type === 'door') return { x: p.x, y: p.y + (p.h || 5) / 2, w: p.w || 1.2, h: p.h || 5 };
+    if (p.type === 'npc') return { x: p.x, y: p.y + 1, w: 1.1 * (p.scale || 1), h: 2.1 * (p.scale || 1) };
     if (p.type === 'lever') return { x: p.x, y: p.y + 0.7, w: 1, h: 1.6 };
     if (p.type === 'plate') return { x: p.x, y: p.y + 0.12, w: p.w || 1.8, h: 0.5 };
     const s = PROP_SIZE[p.type] || [1.5, 1.5];
@@ -774,6 +775,7 @@
       if (it.ref.type === 'breakable') col = '#b0a090';
       if (it.ref.type === 'lever' || it.ref.type === 'plate') col = '#ffd060';
       if (it.ref.type === 'door') col = '#a0b0c0';
+      if (it.ref.type === 'npc') col = '#9fe8c0';
       // moving-platform travel path
       if (it.ref.type === 'platform' && (it.ref.dx || it.ref.dy)) {
         const a = U.toScreen(it.ref.x, it.ref.y), b = U.toScreen(it.ref.x + it.ref.dx, it.ref.y + it.ref.dy);
@@ -1281,6 +1283,37 @@
           el('div', { class: 'insNote' }, body, 'Opens when a lever/plate with this switch name is on (or the flag is set). Solid while closed.');
           break;
         }
+        case 'npc': {
+          textField(body, 'Name', () => p.name || '', v => { p.name = v; });
+          colorField(body, 'Colour', () => p.color || '#6a7a8a', v => { p.color = v || '#6a7a8a'; });
+          numField(body, 'Scale', () => p.scale || 1, v => { p.scale = Math.max(0.3, v); }, 0.1);
+          el('div', { class: 'hgroup' }, body, 'Dialogue');
+          p.dialogue = p.dialogue || { lines: [] };
+          const lines = p.dialogue.lines;
+          lines.forEach((ln, li) => {
+            const card = el('div', { style: 'border:1px solid #3a3a44;border-radius:5px;padding:6px;margin:5px 0' }, body);
+            const hd = el('div', { class: 'frow', style: 'justify-content:space-between;align-items:center' }, card);
+            el('div', { style: 'color:#9bbcb0;font-size:11px' }, hd, 'Line ' + li);
+            el('button', { class: 'tbtn dangerBtn', style: 'padding:1px 7px' }, hd, '✕').addEventListener('click', () => { lines.splice(li, 1); refreshInspector(); });
+            textField(card, 'Speaker', () => ln.speaker || '', v => { ln.speaker = v; });
+            const ta = el('textarea', { style: 'width:100%;min-height:42px;margin-top:3px;background:var(--bg2);color:var(--txt);border:1px solid #3c3c44;border-radius:4px;font:12px sans-serif;padding:4px' }, card);
+            ta.value = ln.text || ''; ta.addEventListener('input', () => { ln.text = ta.value; });
+            checkField(card, 'End dialogue after this line', () => ln.end, v => { if (v) ln.end = true; else delete ln.end; });
+            ln.choices = ln.choices || [];
+            if (ln.choices.length) el('div', { style: 'color:#86a89c;font-size:10px;margin-top:5px' }, card, 'Choices → goto line (-1 ends):');
+            ln.choices.forEach((c, ci) => {
+              const crow = el('div', { class: 'frow', style: 'gap:4px;align-items:center;margin-top:2px' }, card);
+              const lab = el('input', { type: 'text', placeholder: 'label', value: c.label || '', style: 'flex:1;min-width:0' }, crow); lab.addEventListener('change', () => c.label = lab.value);
+              const go = el('input', { type: 'number', title: 'goto line (-1 = end)', value: c.goto != null ? c.goto : -1, style: 'width:42px' }, crow); go.addEventListener('change', () => c.goto = parseInt(go.value));
+              const fl = el('input', { type: 'text', placeholder: 'flag', value: c.flag || '', style: 'width:62px' }, crow); fl.addEventListener('change', () => c.flag = fl.value || undefined);
+              el('button', { class: 'tbtn', style: 'padding:0 6px' }, crow, '✕').addEventListener('click', () => { ln.choices.splice(ci, 1); refreshInspector(); });
+            });
+            el('button', { class: 'tbtn', style: 'margin-top:4px;padding:1px 7px' }, card, '+ choice').addEventListener('click', () => { ln.choices.push({ label: '...', goto: -1 }); refreshInspector(); });
+          });
+          el('button', { class: 'tbtn', style: 'margin-top:6px' }, body, '+ Add line').addEventListener('click', () => { lines.push({ speaker: p.name || '', text: '' }); refreshInspector(); });
+          el('div', { class: 'insNote' }, body, 'Interact to talk. Lines play in order; a choice jumps to its goto line (-1 ends) and can set a flag.');
+          break;
+        }
         case 'decor': {
           const kinds = [...G.World.DECOR_KINDS.standing, ...G.World.DECOR_KINDS.hanging];
           selectField(body, 'Kind', kinds.map(k => ({ v: k, t: k })), () => p.kind, v => { p.kind = v; });
@@ -1549,7 +1582,8 @@
         { cat: 'prop', id: 'shrine', label: 'Ending shrine', ico: '🛕' },
         { cat: 'prop', id: 'gate', label: 'Boss gate', ico: '🚪', defaults: { id: 0 } },
         { cat: 'prop', id: 'vendor', label: 'Vendor (charm shop)', ico: '🧙' },
-        { cat: 'prop', id: 'charmPickup', label: 'Charm pickup', ico: '🔆', defaults: { charm: 'stoneheart' } }
+        { cat: 'prop', id: 'charmPickup', label: 'Charm pickup', ico: '🔆', defaults: { charm: 'stoneheart' } },
+        { cat: 'prop', id: 'npc', label: 'NPC (dialogue)', ico: '🧝', defaults: { name: 'Wanderer', color: '#6a7a8a', dialogue: { lines: [{ speaker: 'Wanderer', text: 'These tunnels remember more than they tell.' }] } } }
       ];
       case 'decor': {
         const out = [];

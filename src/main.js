@@ -128,6 +128,7 @@
   Main.charmIndex = 0;
   Main.journalIndex = 0;
   Main.ctrlIndex = 0; Main.ctrlListening = false;
+  Main.dlgChoice = 0;
   Main.settingsIndex = 0;
 
   // ---------------- settings ----------------
@@ -382,6 +383,10 @@
       } else if (Main.state === 'settings') {
         const b = hitButton(e, G.UI.settingsButtons);
         if (b) { Main.settingsIndex = b.index; settingsAdjust(1); }
+      } else if (Main.state === 'dialogue') {
+        const ch = (!G.Dialogue.isTyping()) ? G.Dialogue.choices() : null;
+        if (ch) { const b = hitButton(e, G.UI.dlgButtons); if (b) { Main.dlgChoice = b.index; G.Dialogue.choose(b.index); } }
+        else G.Dialogue.advance();
       } else if (Main.state === 'controls') {
         if (Main.ctrlListening) return;
         const b = hitButton(e, G.UI.controlButtons);
@@ -849,6 +854,20 @@
         if (I.pressed('down')) { Main.charmIndex = (Main.charmIndex + 1) % n; G.Audio.sfx('clink'); }
         if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) { const ok = G.Charms.toggle(G.Charms.LIST[Main.charmIndex].id); G.Audio.sfx(ok ? 'uiBell' : 'clink'); }
         if (I.pressed('pause')) { G.Audio.sfx('clink'); menuGo(Main._charmReturn || 'pause'); }
+        break;
+      }
+      case 'dialogue': {
+        dt = 0;
+        G.Dialogue.update(rdt);
+        const ch = (!G.Dialogue.isTyping()) ? G.Dialogue.choices() : null;
+        if (ch) {
+          if (I.pressed('up')) { Main.dlgChoice = (Main.dlgChoice - 1 + ch.length) % ch.length; G.Audio.sfx('clink'); }
+          if (I.pressed('down')) { Main.dlgChoice = (Main.dlgChoice + 1) % ch.length; G.Audio.sfx('clink'); }
+          if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack') || I.pressed('interact')) G.Dialogue.choose(Main.dlgChoice);
+        } else if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack') || I.pressed('interact') || I.pressed('down')) {
+          G.Dialogue.advance();
+        }
+        if (I.pressed('pause')) G.Dialogue.cancel();
         break;
       }
       case 'journal': {
