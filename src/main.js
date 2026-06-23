@@ -654,6 +654,15 @@
     G.UI.resetDeathText();
     G.Audio.setBoss(false);
     G.player.soul = Math.floor(G.player.soul / 2);
+    // drop a shade where you fell, holding the Glimmer you lose — reclaim it by destroying the shade
+    const carried = Main.glimmer();
+    if (carried > 0 && G.room) {
+      const sx = Math.max(2, Math.min((G.room.w || 100) - 2, G.player.body.x));
+      const sy = Math.max(2, Math.min((G.room.h || 100) - 2, G.player.body.y));
+      G.save.shade = { room: G.room.id, x: sx, y: sy, glimmer: carried };
+      G.save.glimmer = 0;
+      Main.persist();
+    }
     setTimeout(() => {
       G.UI.setFade(1, 3, () => {
         let roomId = 'steps', sx, sy;
@@ -668,6 +677,17 @@
         G.UI.setFade(0, 4);
       });
     }, 1500);
+  };
+
+  // your shade was destroyed — give the Glimmer back and clear it from the save
+  Main.recoverShade = (x, y, glimmer) => {
+    if (glimmer > 0) G.save.glimmer = (G.save.glimmer || 0) + glimmer;
+    G.save.shade = null;
+    Main.persist();
+    G.Audio.sfx('pickup');
+    G.FX.ring(x, y + 0.3, { r1: 3, life: 0.5, color: 0x6cc6ff, alpha: 0.6 });
+    G.FX.burst('soul', x, y + 0.3, { n: 12, color: 0x6cc6ff });
+    if (G.UI.toast && glimmer > 0) G.UI.toast('Glimmer reclaimed: +' + glimmer);
   };
 
   Main.startEnding = () => {

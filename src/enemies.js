@@ -50,7 +50,7 @@
       G.FX.burst('soul', ent.body.x, ent.body.y + 0.3, { n: 6 });
       G.FX.burst('spark', ent.body.x, ent.body.y + 0.2, { n: 8, dir });
       G.FX.ring(ent.body.x, ent.body.y + 0.2, { r1: 1.8, life: 0.3, color: 0xdfffe8, alpha: 0.5 });
-      if (G.Main.dropGlimmer) G.Main.dropGlimmer(ent.body.x, ent.body.y + 0.3, 2 + (Math.random() * 3 | 0));
+      if (G.Main.dropGlimmer && !ent.noLoot) G.Main.dropGlimmer(ent.body.x, ent.body.y + 0.3, 2 + (Math.random() * 3 | 0));
       if (ent.onDeath) ent.onDeath();
       return true;
     }
@@ -921,6 +921,42 @@
     };
     return addToRoom(ent);
   };
+
+  // =========================== SHADE (your dropped self) ===========================
+  // Spawned where you fell, holding the Glimmer you lost. Destroy it to reclaim them.
+  function mkShade(x, y, glimmer) {
+    const grp = new THREE.Group();
+    const vis = new THREE.Group(); grp.add(vis);
+    if (U.glowSprite) { const aura = U.glowSprite(0x6cc6ff, 3.6, 0.22); aura.position.set(0, 0.2, -0.1); vis.add(aura); }
+    vis.add(U.flat(U.splineShape([[-0.5, 0], [-0.42, 0.6], [-0.18, 0.96], [0.18, 0.96], [0.42, 0.6], [0.5, 0], [0.32, -0.5], [0.12, -0.18], [0, -0.56], [-0.12, -0.18], [-0.32, -0.5]]), 0x0a0e1a, { opacity: 0.88 }));
+    vis.add(U.flat(U.ellipse(0.08, 0.13), 0xbfe8ff, { additive: true, z: 0.05, x: -0.16, y: 0.52, opacity: 0.95 }));
+    vis.add(U.flat(U.ellipse(0.08, 0.13), 0xbfe8ff, { additive: true, z: 0.05, x: 0.16, y: 0.52, opacity: 0.95 }));
+    return {
+      type: 'shade', isEnemy: true, alive: true, dead: false, fly: true, noStagger: true, noLoot: true,
+      hp: 4, glimmer: glimmer || 0, gibColor: 0x6cc6ff,
+      body: { x, y, w: 0.9, h: 1.35, vx: 0, vy: 0 },
+      group: grp, ph: U.rand(0, 9), homeX: x, homeY: y,
+      hurt(d, dir) { baseHurt(this, d, dir, { kb: 5 }); G.Audio.sfx('hit'); },
+      onDeath() { if (G.Main && G.Main.recoverShade) G.Main.recoverShade(this.body.x, this.body.y, this.glimmer); },
+      update(dt) {
+        const b = this.body, p = G.player;
+        this.ph += dt;
+        if (!this.alive) return;
+        let tx = this.homeX, ty = this.homeY + Math.sin(this.ph * 1.3) * 0.5;
+        if (p && !p.dead) { const d = U.dist(b.x, b.y, p.body.x, p.body.y); if (d < 11) { tx = p.body.x; ty = p.body.y + 0.4; } }
+        b.vx = U.clamp(b.vx + U.clamp(tx - b.x, -1, 1) * 6 * dt, -3.2, 3.2);
+        b.vy = U.clamp(b.vy + U.clamp(ty - b.y, -1, 1) * 6 * dt, -3, 3);
+        b.vx *= 1 - dt * 0.9; b.vy *= 1 - dt * 0.9;
+        b.x += b.vx * dt; b.y += b.vy * dt;        // a ghost — passes through terrain
+        contactPlayer(this);
+        if (Math.abs(b.vx) > 0.3) vis.scale.x = b.vx > 0 ? 1 : -1;
+        vis.position.y = Math.sin(this.ph * 2) * 0.08;
+        grp.position.set(b.x, b.y, -0.04);
+        if (U.chance(dt * 8)) G.FX.burst('soul', b.x + U.rand(-0.3, 0.3), b.y + U.rand(-0.3, 0.3), { n: 1, color: 0x6cc6ff });
+      }
+    };
+  }
+  E.spawnShade = (x, y, glimmer) => mkShade(x, y, glimmer);   // caller adds it to the room
 
   // =========================== FACTORY ===========================
   const MAKERS = {

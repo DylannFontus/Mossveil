@@ -1838,6 +1838,11 @@
         else W.setEntityActive(ent, false);
       }
     }
+    // your shade waits in the room where you fell, holding the Glimmer you dropped
+    if (!G.EDITOR && G.save && G.save.shade && G.save.shade.room === id && G.Enemies.spawnShade) {
+      const sh = G.save.shade;
+      room.entities.push(G.Enemies.spawnShade(sh.x, sh.y, sh.glimmer || 0));
+    }
     for (const e of room.entities) if (e.group) group.add(e.group);
 
     // ---- transitions ----
