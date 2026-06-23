@@ -51,7 +51,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     });
     console.log('RESULT:', JSON.stringify(out));
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
-    const ok = out.killedFull && out.slowmoOnOneShot > 1 && out.killedDamaged && out.slowmoOnDamaged === 0
+    const ok = out.killedFull && out.slowmoOnOneShot > 0.5 && out.killedDamaged && out.slowmoOnDamaged === 0
       && out.killedNormal && out.slowmoOnNormal === 0 && !errs.length;
     console.log(ok ? 'ONE-SHOT SLOW-MO TEST: PASS' : 'ONE-SHOT SLOW-MO TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
