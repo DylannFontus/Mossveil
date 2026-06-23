@@ -698,7 +698,14 @@
   Main.recordKill = (type) => {
     if (!type || type === 'shade' || type === 'projectile') return;
     G.save.kills = G.save.kills || {};
+    const firstKill = !G.save.kills[type];
     G.save.kills[type] = (G.save.kills[type] || 0) + 1;
+    if (firstKill && G.UI.toast) {                    // newly discovered → note it in the journal
+      const t = (G.Enemies.TYPES || []).find(e => e.id === type);
+      const nm = t ? t.label.replace(/\s*\(.*\)/, '') : type;
+      G.UI.toast('Journal entry added — ' + nm);
+      G.Audio.sfx('uiBell');
+    }
     Main.persist();
   };
 

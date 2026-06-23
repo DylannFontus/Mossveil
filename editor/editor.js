@@ -2746,6 +2746,82 @@
   function modelDupPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.id = newPartId(); p.x += 0.4; modelDoc.parts.splice(i + 1, 0, p); modelSel = i + 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
   function modelMirrorPart(i) { const p = JSON.parse(JSON.stringify(modelDoc.parts[i])); p.id = newPartId(); p.x = -p.x; p.ox = -(p.ox || 0); p.ry = -p.ry; p.rz = -p.rz; p.name = (p.name || p.shape) + ' (mirror)'; modelDoc.parts.push(p); modelSel = modelDoc.parts.length - 1; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
 
+  // ---- humanoid auto-rig: guess a skeleton from part layout, set pivots, generate idle + walk ----
+  function autoRigHumanoid() {
+    const parts = modelDoc.parts;
+    if (parts.length < 3) { alert('Add at least a torso, head and a couple of limbs first, then auto-rig.'); return; }
+    // 1) flatten to model space (read each part's current world joint position, drop parenting/rotation)
+    rebuildModelMeshes();
+    const MP = {};
+    for (const p of parts) {
+      const b = modelRig.bones[p.id];
+      if (b) { b.updateWorldMatrix(true, false); const v = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld); MP[p.id] = { x: v.x, y: v.y, z: v.z }; }
+      else MP[p.id] = { x: p.x || 0, y: p.y || 0, z: p.z || 0 };
+      p.parent = null; p.rx = 0; p.ry = 0; p.rz = 0; p.ox = 0; p.oy = 0; p.oz = 0;
+    }
+    const halfH = p => Math.max(0.05, (p.sy || 1) * 0.5);
+    const vol = p => (p.sx || 1) * (p.sy || 1) * (p.sz || 1);
+    // 2) torso = biggest part; classify the rest by position relative to it
+    let torso = parts.reduce((a, b) => vol(b) > vol(a) ? b : a, parts[0]);
+    const tx = MP[torso.id].x, ty = MP[torso.id].y, halfW = Math.max(0.25, (torso.sx || 1) * 0.5);
+    const role = { [torso.id]: 'torso' };
+    const arms = { L: [], R: [] }, legs = { L: [], R: [] }; let head = null;
+    for (const p of parts) {
+      if (p === torso) continue;
+      const dx = MP[p.id].x - tx, dy = MP[p.id].y - ty, side = dx < 0 ? 'L' : 'R';
+      if (dy > 0 && Math.abs(dx) < halfW * 0.9) { if (!head || MP[p.id].y > MP[head.id].y) head = p; }
+      else if (dy >= -halfW * 0.4 && Math.abs(dx) >= halfW * 0.4) arms[side].push(p);
+      else if (dy < 0) legs[side].push(p);
+      else role[p.id] = 'torso-child';      // unclassified → hangs off the torso
+    }
+    if (head) role[head.id] = 'head';
+    // 3) parent chains (closest-to-torso segment first), with pivots at the joint (top of each limb)
+    const bonePos = {};
+    bonePos[torso.id] = { x: tx, y: ty, z: MP[torso.id].z };
+    if (head) bonePos[head.id] = { ...MP[head.id] };
+    const chain = (group, roleName) => {
+      group.sort((a, b) => MP[b.id].y - MP[a.id].y);   // top (shoulder/hip) first
+      group.forEach((p, i) => {
+        role[p.id] = roleName;
+        p.parent = i === 0 ? torso.id : group[i - 1].id;
+        bonePos[p.id] = { x: MP[p.id].x, y: MP[p.id].y + halfH(p), z: MP[p.id].z };  // joint at the top
+        p.oy = -halfH(p);                              // mesh hangs below the joint
+      });
+    };
+    chain(arms.L, 'armL'); chain(arms.R, 'armR'); chain(legs.L, 'legL'); chain(legs.R, 'legR');
+    if (head) head.parent = torso.id;
+    for (const p of parts) if (role[p.id] === 'torso-child') { p.parent = torso.id; bonePos[p.id] = { ...MP[p.id] }; }
+    // 4) convert every bone position to parent-local
+    for (const p of parts) {
+      const bp = bonePos[p.id] || MP[p.id];
+      const par = p.parent != null ? bonePos[p.parent] : null;
+      p.x = +(bp.x - (par ? par.x : 0)).toFixed(3);
+      p.y = +(bp.y - (par ? par.y : 0)).toFixed(3);
+      p.z = +(bp.z - (par ? par.z : 0)).toFixed(3);
+    }
+    // 5) generate clips by role
+    const idTrack = (pred, keys) => { const t = {}; for (const p of parts) if (pred(role[p.id])) t[p.id] = keys.map(k => ({ t: k.t, rx: k.rx || 0, ry: k.ry || 0, rz: k.rz || 0 })); return t; };
+    const merge = (...objs) => Object.assign({}, ...objs);
+    modelDoc.clips = modelDoc.clips || {};
+    modelDoc.clips.walk = { dur: 0.8, loop: true, tracks: merge(
+      idTrack(r => r === 'legL', [{ t: 0, rx: 24 }, { t: 0.4, rx: -24 }, { t: 0.8, rx: 24 }]),
+      idTrack(r => r === 'legR', [{ t: 0, rx: -24 }, { t: 0.4, rx: 24 }, { t: 0.8, rx: -24 }]),
+      idTrack(r => r === 'armL', [{ t: 0, rx: -18 }, { t: 0.4, rx: 18 }, { t: 0.8, rx: -18 }]),
+      idTrack(r => r === 'armR', [{ t: 0, rx: 18 }, { t: 0.4, rx: -18 }, { t: 0.8, rx: 18 }]),
+      idTrack(r => r === 'torso', [{ t: 0, rz: 2 }, { t: 0.4, rz: -2 }, { t: 0.8, rz: 2 }])
+    ) };
+    modelDoc.clips.idle = { dur: 2.6, loop: true, tracks: merge(
+      idTrack(r => r === 'armL' || r === 'armR', [{ t: 0, rz: 4 }, { t: 1.3, rz: -4 }, { t: 2.6, rz: 4 }]),
+      idTrack(r => r === 'torso', [{ t: 0, rx: 0 }, { t: 1.3, rx: 3 }, { t: 2.6, rx: 0 }]),
+      idTrack(r => r === 'head', [{ t: 0, ry: -4 }, { t: 1.3, ry: 4 }, { t: 2.6, ry: -4 }])
+    ) };
+    modelClip = 'walk'; modelTime = 0; modelPlaying = true;
+    markDirty();
+    rebuildModelMeshes(); refreshModelPanel(); refreshInspector();
+    const n = arms.L.length + arms.R.length, l = legs.L.length + legs.R.length;
+    $('viewportHint') && ($('viewportHint').textContent = `Auto-rigged: torso + ${head ? 'head, ' : ''}${n} arm part(s), ${l} leg part(s). Idle & Walk clips generated — tweak as needed.`);
+  }
+
   function newModel() { modelDoc = { name: uniqueModelName('model'), parts: [], clips: {}, shaded: false }; modelSel = -1; modelClip = ''; modelPlaying = false; modelTime = 0; rebuildModelMeshes(); refreshModelPanel(); refreshInspector(); }
   function uniqueModelName(base) { let n = base, i = 2; while (G.Models.get(n)) n = base + i++; return n; }
   function saveModel() { if (!modelDoc.name) modelDoc.name = uniqueModelName('model'); G.Models.save(modelDoc.name, modelDoc); refreshModelPanel(); }
@@ -2801,6 +2877,10 @@
       el('div', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis' }, row, (p.name || p.shape));
       row.addEventListener('click', () => { modelSel = i; highlightModelSel(); refreshModelPanel(); refreshInspector(); });
     });
+    // ---- auto-rig ----
+    const arRow = el('div', { class: 'mrow' }, box);
+    el('button', { title: 'Guess a humanoid skeleton (torso/head/arms/legs), set pivots, and generate idle + walk clips' }, arRow, '🦴 Auto-rig (humanoid)')
+      .addEventListener('click', autoRigHumanoid);
     // ---- animation ----
     el('div', { class: 'mlabel' }, box, 'ANIMATION');
     const clipRow = el('div', { class: 'mrow' }, box);
@@ -3064,7 +3144,8 @@
     csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); },
     modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; },
     modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
-    modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); }
+    modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); },
+    modelAutoRig: () => autoRigHumanoid()
   };
 
   boot();
