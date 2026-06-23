@@ -69,13 +69,24 @@
       type: 'tumblebug', isEnemy: true, alive: true, dead: false, hp: 2, fly: false,
       gibColor: 0x2e3c30,
       body: { x, y: y - 0.15, w: 0.85, h: 0.6, vx: 0, vy: 0 },
-      group: grp, dir: U.chance(0.5) ? 1 : -1, ph: U.rand(0, 9), turnCd: 0,
-      hurt(d, dir) { baseHurt(this, d, dir, { kb: 6 }); G.Audio.sfx('hit'); },
+      group: grp, dir: U.chance(0.5) ? 1 : -1, ph: U.rand(0, 9), turnCd: 0, kbT: 0,
+      hurt(d, dir) {
+        const dead = baseHurt(this, d, dir, { kb: 6 });
+        G.Audio.sfx('hit');
+        if (!dead) {                                  // brief free slide, then turn back toward the player
+          this.kbT = 0.22;
+          const p = G.player; if (p) this.dir = p.body.x < this.body.x ? -1 : 1;
+          this.turnCd = 0.3;                          // keep the chosen facing; don't edge-flip it right away
+        }
+      },
       update(dt) {
         const b = this.body;
         this.turnCd -= dt;
+        if (this.kbT > 0) this.kbT -= dt;
         if (this.alive) {
-          if (Math.abs(b.vx) < 2.5) b.vx = U.damp(b.vx, this.dir * 1.7, 6, dt);
+          // free knockback slide for a beat, then always damp toward the walk speed so the
+          // knockback decays (physics has no ground friction) and it heads back toward the player
+          if (this.kbT <= 0) b.vx = U.damp(b.vx, this.dir * 1.7, 6, dt);
           b.vy -= 50 * dt;
           G.Physics.move(b, dt);
           if (b.onGround && this.turnCd <= 0) { const d0 = this.dir; turnAtEdges(this); if (d0 !== this.dir) this.turnCd = 0.3; }
