@@ -199,7 +199,10 @@
   const SFX = {
     jump() { tone({ type: 'sine', f0: 340, f1: 520, t: 0.13, vol: 0.10 }); noiseHit({ f0: 900, f1: 1600, t: 0.08, vol: 0.05 }); },
     wings() { tone({ type: 'sine', f0: 420, f1: 700, t: 0.18, vol: 0.12 }); noiseHit({ f0: 1800, f1: 3200, t: 0.16, vol: 0.07, q: 2 }); },
-    dash() { noiseHit({ f0: 1400, f1: 240, t: 0.2, vol: 0.22, q: 0.8 }); },
+    dash() {                                                          // faint airy swoosh
+      noiseHit({ f0: 500, f1: 2400, t: 0.24, vol: 0.07, ftype: 'bandpass', q: 0.5, a: 0.03 });   // rising air band
+      noiseHit({ f0: 3000, f1: 1100, t: 0.18, vol: 0.035, ftype: 'highpass', q: 0.4, a: 0.02, delay: 0.02 }); // soft high tail
+    },
     swing() { noiseHit({ f0: 2400, f1: 700, t: 0.09, vol: 0.18, q: 1.2 }); tone({ type: 'triangle', f0: 260, f1: 170, t: 0.07, vol: 0.05 }); },
     hit() { noiseHit({ f0: 800, f1: 300, t: 0.1, vol: 0.3, ftype: 'lowpass' }); tone({ type: 'square', f0: 150, f1: 85, t: 0.09, vol: 0.16 }); },
     clink() { tone({ type: 'triangle', f0: 1250, f1: 900, t: 0.06, vol: 0.1 }); },
