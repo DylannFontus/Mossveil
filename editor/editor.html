@@ -187,6 +187,17 @@
   .asset.on { border-color:var(--acc); background:#253a52; }
   .asset .ico { font-size:17px; }
   .asset .nm { font-size:10px; color:var(--txt2); line-height:1.15; }
+  .asset .favstar { position:absolute; top:1px; left:4px; font-size:12px; color:#444; cursor:pointer; line-height:1; }
+  .asset .favstar.on { color:#ffcf5a; }
+  .asset:hover .favstar { color:#777; }
+  .asset:hover .favstar.on { color:#ffcf5a; }
+  #assetSearchRow { display:flex; gap:6px; padding:6px 8px 0; align-items:center; }
+  #assetSearch { flex:1; min-width:0; background:var(--bg2); border:1px solid #3c3c44; border-radius:5px;
+    color:var(--txt); font-size:12px; padding:5px 8px; outline:none; }
+  #assetSearch:focus { border-color:var(--acc); }
+  .favToggle { width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    background:var(--bg2); border:1px solid #3c3c44; border-radius:5px; cursor:pointer; color:#555; font-size:15px; }
+  .favToggle.on { color:#ffcf5a; border-color:#7a6a33; background:#2a2620; }
 
   /* status */
   #status { grid-area:status; background:var(--bg2); border-top:1px solid var(--line);
@@ -308,6 +319,10 @@
 
   <div id="assets">
     <div class="ptabs" id="assetTabs"></div>
+    <div id="assetSearchRow">
+      <input id="assetSearch" type="text" placeholder="Search assets…" autocomplete="off">
+      <div id="assetFavToggle" class="favToggle" title="Show favourites only">★</div>
+    </div>
     <div id="assetBody"></div>
   </div>
 
@@ -334,7 +349,7 @@
   var scripts = [
     '../lib/three.min.js',
     '../data/levels.js', '../data/cutscenes.js',
-    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js', '../src/eventgraph.js', '../src/models.js',
+    '../src/util.js', '../src/audio.js', '../src/physics.js', '../src/fx.js', '../src/post.js', '../src/lights.js', '../src/profiler.js', '../src/eventgraph.js', '../src/models.js', '../src/thumb.js',
     '../src/world.js', '../src/weather.js', '../src/map.js', '../src/charms.js', '../src/player.js', '../src/enemies.js',
     '../src/bosses.js', '../src/cutscene.js', 'editor.js'
   ];

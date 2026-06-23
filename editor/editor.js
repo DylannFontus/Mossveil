@@ -1486,7 +1486,7 @@
   function buildAssetObject(a) {
     const pal = G.World.PAL.verdant;
     try {
-      if (a.cat === 'enemy') { const e = G.Enemies.make(a.id, 0, 0); return e && e.group ? e.group : null; }
+      if (a.cat === 'enemy') { return (G.Enemies.preview ? G.Enemies.preview(a.id) : (G.Enemies.make(a.id, 0, 0) || {}).group) || null; }
       if (a.id === 'bossTrigger') return G.Bosses.preview(a.boss || 'mossSovereign');
       if (a.cat === 'prop' && G.World.mkProp && G.World.mkProp[a.id]) {
         const params = Object.assign({ x: 0, y: 0, kind: a.kind, boss: a.boss, model: a.model }, JSON.parse(JSON.stringify(a.defaults || {})));
@@ -1523,6 +1523,12 @@
   }
 
   function refreshAssets() {
+    if (!refreshAssets._wired) {                          // attach the static search-row listeners once
+      refreshAssets._wired = true;
+      const si = $('assetSearch'), ft = $('assetFavToggle');
+      if (si) si.addEventListener('input', () => { assetQuery = si.value; refreshAssets(); });
+      if (ft) ft.addEventListener('click', () => { assetFavOnly = !assetFavOnly; ft.classList.toggle('on', assetFavOnly); refreshAssets(); });
+    }
     const tabs = $('assetTabs');
     tabs.innerHTML = '';
     for (const c of ASSET_CATS) {
@@ -1538,19 +1544,35 @@
       save.addEventListener('click', savePrefab);
       if (!Object.keys(prefabs).length) { const note = el('div', { class: 'nm', style: 'width:100%;padding:8px;color:var(--txt2)' }, body, 'Marquee-drag or Shift-click objects, then save them as a reusable prefab.'); }
     }
-    for (const a of assetList()) {
+    // filter by the search query and the favourites toggle
+    const q = (assetQuery || '').trim().toLowerCase();
+    let items = assetList();
+    if (q) items = items.filter(a => (a.label || '').toLowerCase().includes(q));
+    if (assetFavOnly) items = items.filter(a => assetFavs[assetKey(a)]);
+    items = items.slice().sort((a, b) => (assetFavs[assetKey(b)] ? 1 : 0) - (assetFavs[assetKey(a)] ? 1 : 0));  // favourites first
+    if (!items.length) el('div', { class: 'nm', style: 'width:100%;padding:10px;color:var(--txt2)' }, body, q ? 'No assets match “' + assetQuery + '”.' : 'No favourites yet — click a ☆ on any asset.');
+    for (const a of items) {
       const d = el('div', { class: 'asset' + (placing && placing.label === a.label ? ' on' : '') }, body);
       const url = assetThumb(a);                         // a rendered 3D preview, when available
       if (url) el('img', { class: 'ico', src: url, style: 'width:42px;height:42px;object-fit:contain;image-rendering:auto' }, d);
       else el('div', { class: 'ico' }, d, a.ico);        // markers / prefabs fall back to the emoji
       el('div', { class: 'nm' }, d, a.label + (a.n ? ' (' + a.n + ')' : ''));
       d.addEventListener('click', () => setPlacing(placing && placing.label === a.label ? null : a));
+      const key = assetKey(a);
+      const star = el('div', { class: 'favstar' + (assetFavs[key] ? ' on' : ''), title: 'Favourite' }, d, assetFavs[key] ? '★' : '☆');
+      star.addEventListener('click', ev => { ev.stopPropagation(); if (assetFavs[key]) delete assetFavs[key]; else assetFavs[key] = 1; saveFavs(); refreshAssets(); });
       if (a.del) {
         const x = el('div', { class: 'nm', style: 'position:absolute;top:1px;right:4px;color:#c66;cursor:pointer', title: 'Delete prefab' }, d, '✕');
         x.addEventListener('click', ev => { ev.stopPropagation(); if (confirm('Delete prefab "' + a.prefab + '"?')) deletePrefab(a.prefab); });
       }
     }
   }
+  // asset search + favourites state
+  let assetQuery = '', assetFavOnly = false;
+  let assetFavs = {};
+  try { assetFavs = JSON.parse(localStorage.getItem('mossveil-ed-favs')) || {}; } catch (e) { assetFavs = {}; }
+  function saveFavs() { try { localStorage.setItem('mossveil-ed-favs', JSON.stringify(assetFavs)); } catch (e) { } }
+  function assetKey(a) { return a.cat + ':' + a.id + ':' + (a.kind || a.boss || a.model || a.prefab || a.label || ''); }
   function setPlacing(a) {
     placing = a;
     if (a) tool = 'select';
