@@ -130,8 +130,10 @@ its current key/button; select one and press a new key **or gamepad button** to 
 
 **Spells** — cast with `F`/`L`. Aim it: hold `↑` for an upward **Wraith Cry**, hold `↓` in the
 air for an **Abyss Dive** slam, or neither for a forward **Soul Bolt**. Learn and empower spells
-(two tiers each) at a **soul well** — including **Ember Bolt**, which makes your Soul Bolt **set
-grass alight in the direction you throw it** and **sear foes over time** (fire damage-over-time).
+(two tiers each) at a **soul well**. Your Soul Bolt can be **attuned to an element** there:
+**Ember** (ignites grass + sears foes), **Frost** (snuffs fire, freezes foes solid), or **Gale**
+(hurls foes back, fans fire, blows poison gas away) — one element at a time; re-confirm a learned
+element in the soul well to switch.
 
 **Progression** — spend **Glimmer** at a **nailsmith** to forge a stronger nail, and at a soul
 well to grow your spells. **Charms** can **synergise** in pairs for bonus effects, and you can
@@ -186,11 +188,20 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   footsteps and impacts are **surface-aware** (wood / grass / stone / metal), positioned and
   panned by distance. Short **stingers** punctuate boss reveals, item pickups and quests.
 - **Dynamic environment** — grass **catches fire** (e.g. from an Ember Bolt): a layered,
-  additive **flame + ember + smoke** effect burns for ~10s, leaving **scorched ash** that
-  lingers for two hours of gameplay before recovering. **Weather rewrites the rules** — rain,
-  snow and blizzards **douse it on contact** (with a puff of smoke), **embers** make it burn
-  longer (~20s), and **wind spreads** it downwind to fresh grass. **Reflective water freezes to
-  mirror-ice** with drifting frost during snow/blizzards. All procedural — no asset files.
+  additive **flame + ember + smoke + heat-haze** effect burns for ~10s, leaving **scorched ash**
+  that lingers for two hours of gameplay before recovering. **Weather rewrites the rules** — rain,
+  snow and blizzards **douse it on contact** (hissing **steam** where fire meets water), **embers**
+  make it burn longer (~20s), and **wind spreads** it downwind to fresh grass. After rain the
+  ground stays **too wet to catch** until it dries. **Reflective water freezes to mirror-ice**
+  with drifting frost during snow/blizzards, **deep snow accumulates** on the ground (you wade and
+  slow through it, kicking it up), **frost creeps in from the screen edges**, **wind pushes the
+  wanderer**, landings throw **dust**, and running scatters **leaves** (ash on scorched ground).
+- **Placeable hazards (editor → Dynamic)** — **mud / quicksand / ash** soft-ground blocks slow
+  (and sink) you; **lava / acid pools** sear on contact and bounce you out (lava radiates heat,
+  acid eats breakable walls); **poison-gas** clouds drift, damage over time, **disperse in wind**,
+  and **ignite in a flash** when struck by an Ember Bolt; **bioluminescent flora** (glow flower /
+  mushroom) brightens as you pass, with an editor toggle for whether it's **destructible**
+  (cut by the nail, withered by fire) or permanent. All procedural — no asset files.
 - **Bosses** get a named **health bar** with **phase pips**, a cinematic **name-card + epithet**
   intro, a phase-transition, attack telegraphs, and a **slow-motion final blow**.
 - **Charms** — equip up to your **notch** budget (which grows as you fell bosses) for effects
