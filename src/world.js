@@ -31,6 +31,11 @@
       if (on && i < 0) arr.push(e._solid);
       else if (!on && i >= 0) arr.splice(i, 1);
     }
+    if (e._colSolid) {                                   // a custom collision box toggles with the object
+      const arr = G.Physics.solids, i = arr.indexOf(e._colSolid);
+      if (on && i < 0) arr.push(e._colSolid);
+      else if (!on && i >= 0) arr.splice(i, 1);
+    }
   };
   // apply a setActiveTrigger's target list: persist each to the save, and live-toggle
   // anything that's in the room we're standing in right now.
@@ -1344,6 +1349,14 @@
     c.h = Math.abs(w * sn) + Math.abs(h * cs);
     return c;
   }
+  // editor-authored custom collision box (obj.col = { w, h, ox, oy }) on ANY placed object.
+  // Opt-in: a solid box, centred at the object + offset, that blocks the player and follows rotation.
+  function applyColBox(ent, p, on) {
+    if (!ent || !p.col || !(p.col.w > 0) || !(p.col.h > 0)) return;
+    const cb = rotCollider({ x: p.x + (p.col.ox || 0), y: p.y + (p.col.oy || 0), w: p.col.w, h: p.col.h }, p.rot, p.x, p.y);
+    ent._colSolid = cb;                                  // setEntityActive toggles it; entity removal frees it
+    if (on && !G.EDITOR) G.Physics.solids.push(cb);
+  }
 
   // a platform that travels (x,y)->(x+dx,y+dy) and carries the player riding on it
   mkProp.platform = (p) => {
@@ -2142,6 +2155,7 @@
       const ent = mk(p, pal);
       ent.oid = p.oid;
       if (p.rot != null && ent.group) ent.group.rotation.z = p.rot;   // editor-authored rotation (radians, about screen Z)
+      applyColBox(ent, p, on);                          // optional custom collision box
       room.entities.push(ent);
       if (!on) {
         if (G.EDITOR) ent.editorInactive = true;          // editor keeps it visible (dimmed) so you can re-enable it
@@ -2155,6 +2169,7 @@
       if (!ent) continue;
       ent.oid = e.oid;
       if (e.rot != null && ent.group) ent.group.rotation.z = e.rot;   // editor-authored rotation
+      applyColBox(ent, e, on);                          // optional custom collision box
       room.entities.push(ent);
       if (!on) {
         if (G.EDITOR) ent.editorInactive = true;
@@ -2221,6 +2236,7 @@
         e.update(dt);
         if (e.dead) {
           if (e.group) { room.group.remove(e.group); U.disposeDeep(e.group); }
+          if (e._colSolid) rmSolid(e._colSolid);        // free its custom collision box
           room.entities.splice(i, 1);
         }
       }

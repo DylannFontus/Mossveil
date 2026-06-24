@@ -229,6 +229,12 @@ the world map (the same map shown in-game on `M`).
   applied live in both the editor and the game. The **selection box rotates to match** the
   model, clicks **hit-test against the rotated box**, and **static solid props** (doors,
   breakable walls, fall-floors, gates) carry their **collision** through the rotation too.
+- **Custom collision box** — any object (prop, decor, furniture, model, build, dynamic, light,
+  enemy…) can be given a **Solid box** in the Inspector with its own **W / H and offset X/Y**.
+  It blocks the player, **rotates with the object**, toggles with the active/inactive system,
+  and is drawn as a **red dashed outline** in the viewport. Great for making decorative pieces
+  solid or fine-tuning a hitbox. (Doors / breakables / platforms already collide via their own
+  Width/Height.)
 - **Assets** — click an asset, then click in the scene to place it (hold `Shift` to place
   many). Categories:
   - *Props*: bench (rest & save), tutorial sign, **lore readable** (tablet / effigy / totem
