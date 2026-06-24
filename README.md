@@ -166,11 +166,16 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   vignette, film grain and chromatic aberration**, plus a living camera (look-ahead +
   zoom-punch on impacts), squash-&-stretch juice, a lantern glow, and per-biome atmosphere
   (drifting haze, fireflies, wind). Visual quality is adjustable in **Settings** (Low/Med/High).
-- **Adaptive audio** — the procedural score grows an upbeat **combat-tension layer** that
-  swells when enemies can see you and relaxes when the room clears; reverb **changes per biome**
-  (ringing stone halls vs dry forges) and per **reverb zone**; footsteps and impacts are
-  **surface-aware** (wood / grass / stone / metal), positioned and panned by distance. Short
-  **stingers** punctuate boss reveals, item pickups and quest completions.
+- **Composed adaptive soundtrack** — a from-scratch synth **score** (6 per-mood themes:
+  verdant / gloom / city / forge / tomb / garden) where each biome's theme is a chord
+  progression driving a pad, bassline, arpeggio, stepwise lead and drums. Exploration is
+  sparse; **as enemies that can see you crowd in, the same theme intensifies** — the lead
+  melody and full drums fade in (and a harder variant plays for bosses), then it relaxes when
+  the room clears. A **Classic** setting restores the original ambient drones, and each level
+  can pick its **Score track** (or Auto-by-biome) in the editor. All synthesised live — no files.
+- Reverb **changes per biome** (ringing stone halls vs dry forges) and per **reverb zone**;
+  footsteps and impacts are **surface-aware** (wood / grass / stone / metal), positioned and
+  panned by distance. Short **stingers** punctuate boss reveals, item pickups and quests.
 - **Bosses** get a named **health bar** with **phase pips**, a cinematic **name-card + epithet**
   intro, a phase-transition, attack telegraphs, and a **slow-motion final blow**.
 - **Charms** — equip up to your **notch** budget (which grows as you fell bosses) for effects
@@ -314,7 +319,8 @@ geometry naturally. Depth fog tints each layer toward the biome palette.
 - `data/levels.json` / `data/cutscenes.json` — levels and cutscenes (the editor's save
   targets); the matching `.js` files are generated mirrors so the game runs from `file://`
 - `src/` — engine: util, input (keyboard + gamepad + rebinds), audio (procedural WebAudio +
-  adaptive layers/reverb/stingers), physics, fx, post, lights, world (20 biome looks, props,
+  reverb/stingers, Score/Classic switch), music (composed adaptive soundtrack engine),
+  physics, fx, post, lights, world (20 biome looks, props,
   dynamic elements, builders), map (world-map renderer), models (custom-model rig + clips),
   thumb (3D→portrait snapshotter), eventgraph (visual-scripting runtime), dialogue (branching
   NPC dialogue), quests, debug (in-play inspector), player, enemies (incl. data-driven custom
