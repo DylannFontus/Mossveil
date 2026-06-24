@@ -13,7 +13,7 @@
   let banners = [];          // placed text banners (from the Logic graph) {text, place, t, secs}
   let bossT = -1, bossText = '', bossSub = '';
   let maskFlash = 0, healFlash = 0, lowHpPulse = 0;
-  const fade = { val: 1, target: 1, speed: 2, cb: null };
+  const fade = { val: 1, target: 1, speed: 2, cb: null, iris: false, ix: null, iy: null };
   let deathTextT = 0;
 
   UI.init = () => {
@@ -74,7 +74,12 @@
   UI.bossBarShown = () => bossBar.shown;   // for tests
   UI.onPlayerHurt = () => { maskFlash = 0.6; };
   UI.onHeal = () => { healFlash = 0.6; };
-  UI.setFade = (target, speed, cb) => { fade.target = target; fade.speed = speed; fade.cb = cb || null; };
+  UI.setFade = (target, speed, cb, opts) => {
+    fade.target = target; fade.speed = speed; fade.cb = cb || null;
+    fade.iris = !!(opts && opts.iris);
+    if (opts && opts.x != null) { fade.ix = opts.x; fade.iy = opts.y; }
+    else if (fade.ix == null) { fade.ix = w / 2; fade.iy = h / 2; }
+  };
   UI.resetDeathText = () => { deathTextT = 0; };
 
   const serif = 'Georgia, "Times New Roman", serif';
@@ -1335,8 +1340,19 @@
       cb();
     }
     if (fade.val > 0.01) {
-      cx.fillStyle = `rgba(2,5,7,${U.clamp(fade.val, 0, 1)})`;
-      cx.fillRect(0, 0, w, h);
+      if (fade.iris) {                                   // iris transition: black with a shrinking/growing hole
+        const maxR = Math.hypot(w, h) * 0.62, R = (1 - U.clamp(fade.val, 0, 1)) * maxR;
+        cx.save();
+        cx.fillStyle = 'rgba(2,5,7,1)';
+        cx.beginPath(); cx.rect(0, 0, w, h);
+        cx.moveTo(fade.ix + R, fade.iy); cx.arc(fade.ix, fade.iy, R, 0, Math.PI * 2, true);
+        cx.fill('evenodd');
+        if (R > 1) { cx.strokeStyle = 'rgba(150,200,180,0.25)'; cx.lineWidth = 3; cx.beginPath(); cx.arc(fade.ix, fade.iy, R, 0, Math.PI * 2); cx.stroke(); }
+        cx.restore();
+      } else {
+        cx.fillStyle = `rgba(2,5,7,${U.clamp(fade.val, 0, 1)})`;
+        cx.fillRect(0, 0, w, h);
+      }
     }
   };
 })();
