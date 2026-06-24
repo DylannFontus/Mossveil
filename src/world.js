@@ -1535,6 +1535,31 @@
     };
   };
 
+  // a nailsmith — interact to forge the nail (spends Glimmer to raise base damage)
+  mkProp.smith = (p) => {
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    grp.add(U.flat(U.poly([[-0.85, 0], [0.85, 0], [0.6, 0.55], [0.22, 0.55], [0.22, 0.82], [-0.22, 0.82], [-0.22, 0.55], [-0.85, 0.55]]), 0x282c32, {}));   // anvil
+    grp.add(U.flat(U.splineShape([[-0.55, 0.5], [-0.6, 1.5], [-0.24, 2.05], [0.24, 2.05], [0.6, 1.5], [0.55, 0.5]]), 0x3a2c22, { x: -0.05, y: 0.05 }));   // smith
+    grp.add(U.flat(U.ellipse(0.26, 0.3), 0x0a0e12, { z: 0.02, x: -0.05, y: 1.9 }));
+    const emberGlow = U.glowSprite ? U.glowSprite(0xff8030, 3, 0.25) : null; if (emberGlow) { emberGlow.position.set(0.5, 0.3, -0.1); grp.add(emberGlow); }
+    return {
+      type: 'smith', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        if (U.chance(dt * 4)) G.FX.burst('ember', p.x + 0.5, p.y + 0.4, { n: 1, color: 0xff9040 });
+        const pl = G.player;
+        if (!pl || pl.dead || G.Main.state !== 'play') return;
+        if (Math.abs(pl.body.x - p.x) < 2.1 && Math.abs(pl.body.y - p.y) < 2.6) {
+          const lvl = G.Main.nailLevel();
+          if (lvl >= G.Main.NAIL_MAX) G.UI.prompt(p.x, p.y + 2.7, 'nail fully forged');
+          else {
+            G.UI.prompt(p.x, p.y + 2.7, 'forge nail +' + (lvl + 1) + ' — ' + G.Main.nailCost(lvl) + ' ✦   E or ↑');
+            if (G.Input.pressed('interact') || G.Input.pressed('up')) G.Main.forgeNail();
+          }
+        }
+      }
+    };
+  };
+
   // a standing character — interact to open its (branching) dialogue
   mkProp.npc = (p) => {
     const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);

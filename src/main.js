@@ -675,6 +675,22 @@
   }
   Main.benchSelect = benchSelect; Main.travelTo = travelTo; Main.shopBuy = shopBuy;
 
+  // nailsmith: forge the nail (a Glimmer sink that raises base nail damage)
+  Main.NAIL_MAX = 4;
+  Main.nailLevel = () => (G.save && G.save.nailLevel) || 0;
+  Main.nailCost = lvl => 60 * (lvl + 1);                // 60, 120, 180, 240
+  Main.forgeNail = () => {
+    const lvl = Main.nailLevel();
+    if (lvl >= Main.NAIL_MAX) { G.UI.toast('The nail is fully forged.'); return; }
+    const cost = Main.nailCost(lvl);
+    if (Main.glimmer() < cost) { G.Audio.sfx('clink'); G.UI.toast('Not enough Glimmer — ' + cost + ' needed.'); return; }
+    Main.spendGlimmer(cost);
+    G.save.nailLevel = lvl + 1; Main.persist();
+    if (G.Charms) G.Charms.apply(G.player);
+    G.Audio.sfx('heal'); G.FX.shake(0.22, 0.3); if (G.Post) G.Post.flash(0.3, 0xffe7a0);
+    G.UI.toast('Nail forged — strike +' + (lvl + 1));
+  };
+
   Main.onPlayerDeath = () => {
     if (Main.state === 'dead') return;
     Main.state = 'dead';

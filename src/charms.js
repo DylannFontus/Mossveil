@@ -56,7 +56,7 @@
   // recompute a player's charm-derived stats from the equipped set
   C.apply = p => {
     if (!p) return;
-    let hp = 5, nail = 1, dashMul = 1, focusMul = 1, soulMul = 1;
+    let hp = 5, nail = 1 + ((G.save && G.save.nailLevel) || 0), dashMul = 1, focusMul = 1, soulMul = 1;
     for (const id of C.equipped()) {
       switch (id) {
         case 'stoneheart': hp += 1; break;
