@@ -1985,7 +1985,7 @@
     ['Quests', 'Dialogue choices can start a quest (title + objective, optional done-flag). Active quests show an on-screen objective and appear in the pause → Quests log; a quest auto-completes when its done-flag is set.'],
     ['Progression', 'Glimmer sinks: a Nailsmith forges the nail (+damage), and a Soul well learns/empowers spells. Charms can pair into synergies, and the player can overcharm (one over notches) for double damage taken.'],
     ['Custom enemies', 'Enemies → Custom (behavior): author a creature from a spec (health/speed/sight/size/colour, flies or walks, idle pattern, on-sight reaction, attack type) — data-driven AI with no code.'],
-    ['Soundtrack', 'A composed adaptive “Score” (per-biome themes that intensify with on-screen danger) plays by default; in-game Settings → Soundtrack switches to the original “Classic” drones. Per level, the “Music (Score)” field picks a specific theme or Auto-by-biome.']
+    ['Soundtrack', 'A composed adaptive “Score” (per-biome themes that intensify with on-screen danger) plays by default; in-game Settings → Soundtrack switches to the original “Classic” drones. Per level, the “Music (Score)” field picks a specific theme or Auto-by-biome. Boss fights are automatic: the biome theme full-stops, a dedicated boss theme plays the fight, and the biome fades back in on the boss’s death.']
   ];
   const TOOLS = [
     ['Auto-tile (⊞ Auto)', 'While painting terrain, exposed edges become the smooth/curvy variant and buried interior stays hard. Shift+click the button retiles the whole level.'],

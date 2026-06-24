@@ -172,9 +172,10 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   sparse; **the instant an enemy that can see you engages, the theme turns menacing** — a low
   tritone drone, driving four-on-the-floor kick, hard snare and a harsher, chromatic lead make
   a fight feel *threatening* from the start, then it relaxes when the room clears. When a **boss
-  fight begins the biome music does a full stop**, and it **fades back in once the boss is
-  beaten**. It hushes during the new-game prologue, and the old theme **fades out under a
-  second** when you change rooms. A
+  fight begins the biome music does a full stop**; after a beat of silence a dedicated **boss
+  theme** (harmonic-minor, sawtooth lead, relentless drums) drives the fight, then the **biome
+  music fades back in once the boss is beaten**. It hushes during the new-game prologue, and the
+  old theme **fades out under a second** when you change rooms. A
   **Classic** setting restores the original ambient drones, and each level picks its **Score
   track** (or Auto-by-biome) in the editor. All synthesised live — no files.
 - Reverb **changes per biome** (ringing stone halls vs dry forges) and per **reverb zone**;

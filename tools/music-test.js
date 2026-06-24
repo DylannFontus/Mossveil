@@ -32,14 +32,24 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       o.aggressive = call(() => { A.setIntensity(0.95); for (let i = 0; i < 120; i++) A.update(0.04); });
       o.silenceProl = call(() => { A.musicForState('prologue'); for (let i = 0; i < 20; i++) A.update(0.04); });
       o.resumePlay = call(() => { A.musicForState('play'); for (let i = 0; i < 20; i++) A.update(0.04); });
-      // boss fight: the biome score fully stops, and comes back when the boss is beaten
-      A.setIntensity(0); A.setMusicStyle('score'); A.musicForState('play');
-      o.playingPreBoss = G.Music.playing();
-      A.setBoss(true); o.stoppedOnBoss = G.Music.playing() === false;
-      A.setBoss(false); o.resumedAfterBoss = G.Music.playing() === true;
       o.classicSwitch = call(() => { A.setMusicStyle('classic'); for (let i = 0; i < 20; i++) A.update(0.04); A.setMusicStyle('score'); });
       return o;
     });
+
+    // boss fight (async — biome full-stops, the boss theme drives in, then the biome returns):
+    await game.evaluate(() => { const A = G.Audio; A.setIntensity(0); A.setMusicStyle('score'); A.setMusicTrack('gloom'); A.musicForState('play'); });
+    await wait(500);
+    o.playingPreBoss = await game.evaluate(() => G.Music.playing() && G.Music.current() !== 'boss');
+    await game.evaluate(() => G.Audio.setBoss(true));
+    await wait(250);                                  // dramatic full-stop before the boss theme
+    o.stoppedOnBoss = await game.evaluate(() => G.Music.playing() === false);
+    await wait(900);                                  // boss theme drives in (~850ms)
+    const bt = await game.evaluate(() => ({ p: G.Music.playing(), t: G.Music.current() }));
+    o.bossTheme = bt.p === true && bt.t === 'boss';
+    await game.evaluate(() => G.Audio.setBoss(false));
+    await wait(800);                                  // boss fades out, biome fades back in
+    const ab = await game.evaluate(() => ({ p: G.Music.playing(), t: G.Music.current() }));
+    o.resumedAfterBoss = ab.p === true && ab.t !== 'boss';
 
     // editor lists the tracks in the per-level Music dropdown
     const ed = await browser.newPage();
@@ -51,7 +61,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     console.log('GAME:', JSON.stringify(o), ' EDITOR tracks:', edTracks);
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
     const ok = o.tracks >= 20 && o.hasUpbeat && o.hasDark && o.crossfade === true && o.aggressive === true
-      && o.silenceProl === true && o.resumePlay === true && o.playingPreBoss && o.stoppedOnBoss && o.resumedAfterBoss
+      && o.silenceProl === true && o.resumePlay === true && o.playingPreBoss && o.stoppedOnBoss && o.bossTheme && o.resumedAfterBoss
       && o.classicSwitch === true && edTracks >= 20 && !errs.length;
     console.log(ok ? 'MUSIC TEST: PASS' : 'MUSIC TEST: FAIL');
     process.exitCode = ok ? 0 : 2;

@@ -47,11 +47,13 @@
   }
 
   // switch between the composed score and the classic drones: fade the drones, start/stop G.Music
-  // the composed score plays only in Score style, when not hushed (cutscene) and not in a boss fight
+  // the composed score plays in Score style when not hushed (cutscene). A boss fight has its
+  // own theme, managed by startBoss/endBoss — gateScore leaves that alone.
   function gateScore(fastStop) {
     if (!G.Music) return;
-    if (musicStyle === 'score' && !musicSilenced && !bossOn) { G.Music.setIntensity(intensity); G.Music.resume(); }
-    else G.Music.pause(fastStop);
+    if (musicStyle !== 'score' || musicSilenced) { G.Music.pause(fastStop); return; }
+    if (bossOn) return;                                  // boss theme is managed separately
+    G.Music.setIntensity(intensity); G.Music.resume();
   }
   function applyMusicStyle() {
     if (!started) return;
@@ -280,7 +282,8 @@
         if (musicStyle === 'classic') droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
         if (windGain) windGain.gain.setTargetAtTime(on ? 0.16 : 0.10, ctx.currentTime, 1.5);
       }
-      gateScore(on);   // boss start: the biome score does a fast full stop; boss death: it fades back in
+      // score: biome music full-stops, then the boss theme drives in; on death it fades back to the biome
+      if (G.Music && musicStyle === 'score' && !musicSilenced) { if (on) G.Music.startBoss(); else G.Music.endBoss(musicTrack); }
     },
     // soundtrack style: 'score' (composed adaptive music) or 'classic' (the original drones)
     setMusicStyle(style) { musicStyle = (style === 'classic') ? 'classic' : 'score'; applyMusicStyle(); },

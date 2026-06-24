@@ -7,7 +7,7 @@
   const M = G.Music = {};
   let ctx = null, busDry = null, busWet = null, noiseBuf = null;
   let playing = false, intensity = 0, bossOn = false;
-  let trackId = 'verdant', track = null;
+  let trackId = 'verdant', track = null, bossReturn = 'gloom';
   let nextTime = 0, step = 0;
   const LOOK = 0.14;                                  // schedule this far ahead (s)
 
@@ -40,7 +40,9 @@
     chase: { bpm: 138, root: 146.8, scale: PHR, prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 900, bass: 'sawtooth', leadCut: 1900, drums: 0.95 },
     frantic: { bpm: 132, root: 130.8, scale: LOC, prog: [0, 4, 1, 5], pad: 'sawtooth', padCut: 840, bass: 'sawtooth', leadCut: 1800, drums: 0.95 },
     abyss: { bpm: 56, root: 110.0, scale: PHR, prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 560, bass: 'sine', leadCut: 1300, drums: 0.3 },
-    void: { bpm: 52, root: 98.0, scale: LOC, prog: [0, 6, 1, 0], pad: 'sine', padCut: 500, bass: 'sine', leadCut: 1200, drums: 0.25 }
+    void: { bpm: 52, root: 98.0, scale: LOC, prog: [0, 6, 1, 0], pad: 'sine', padCut: 500, bass: 'sine', leadCut: 1200, drums: 0.25 },
+    // the boss theme — driving, dramatic harmonic-minor; always plays at full intensity
+    boss: { bpm: 118, root: 130.8, scale: HARM, prog: [0, 6, 1, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1750, drums: 0.95 }
   };
   const BIOME = {
     verdant: 'verdant', garden: 'garden', village: 'verdant', warm: 'verdant', crown: 'verdant',
@@ -49,7 +51,7 @@
     forge: 'forge', ember: 'forge',
     tombs: 'tomb', bone: 'tomb', archive: 'tomb'
   };
-  M.TRACK_IDS = Object.keys(TRACKS);
+  M.TRACK_IDS = Object.keys(TRACKS).filter(id => id !== 'boss');   // 'boss' is internal, not a per-level choice
   M.trackForBiome = b => BIOME[b] || 'gloom';
 
   function chord(t, d) {                              // triad semitone offsets for scale-degree d
@@ -141,12 +143,40 @@
   };
   M.setIntensity = v => { intensity = Math.max(0, Math.min(1, v || 0)); };
   M.setBoss = on => { bossOn = !!on; };
+  // boss fight: the biome track does a dramatic full stop, then the boss theme drives in
+  M.startBoss = () => {
+    if (!ctx) return;
+    bossOn = true; bossReturn = trackId; playing = false;
+    const now = ctx.currentTime;
+    busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
+    busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + 0.15);
+    busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.15);
+    setTimeout(() => {                                  // ~0.85s of silence (the boss roar/stinger swells), then the theme
+      if (!bossOn || !ctx) return;
+      trackId = 'boss'; track = TRACKS.boss; step = 0; lead = 0; nextTime = ctx.currentTime + 0.05; playing = true;
+      busDry.gain.cancelScheduledValues(ctx.currentTime);
+      busDry.gain.setTargetAtTime(0.95, ctx.currentTime, 0.18); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.18);
+    }, 850);
+  };
+  // boss beaten: fade the boss theme out, bring the biome theme back in
+  M.endBoss = (biomeId) => {
+    bossOn = false; const id = biomeId || bossReturn || 'gloom';
+    if (!ctx) { trackId = id; track = TRACKS[id] || track; return; }
+    const swap = () => { trackId = id; track = TRACKS[id] || track; step = 0; lead = 0; nextTime = ctx.currentTime + 0.05; playing = true; busDry.gain.cancelScheduledValues(ctx.currentTime); busDry.gain.setTargetAtTime(0.9, ctx.currentTime, 0.9); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.9); };
+    if (!playing) { swap(); return; }                  // boss died during the dramatic silence
+    const now = ctx.currentTime;
+    busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
+    busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + 0.3);
+    busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.3);
+    setTimeout(swap, 330);
+  };
   M.resume = () => {                                  // fade the music in (e.g. on boss death / after a cutscene)
     if (!ctx || playing) return; playing = true; nextTime = ctx.currentTime + 0.06; step = 0;
     busDry.gain.cancelScheduledValues(ctx.currentTime);
     busDry.gain.setTargetAtTime(0.9, ctx.currentTime, 0.9); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.9);
   };
   M.playing = () => playing;
+  M.current = () => trackId;
   M.pause = (fast) => {                                // fast = a hard full-stop (e.g. a boss fight begins)
     if (!ctx || !playing) return; playing = false; const now = ctx.currentTime;
     busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
