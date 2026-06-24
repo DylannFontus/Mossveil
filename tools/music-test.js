@@ -32,6 +32,11 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       o.aggressive = call(() => { A.setIntensity(0.95); for (let i = 0; i < 120; i++) A.update(0.04); });
       o.silenceProl = call(() => { A.musicForState('prologue'); for (let i = 0; i < 20; i++) A.update(0.04); });
       o.resumePlay = call(() => { A.musicForState('play'); for (let i = 0; i < 20; i++) A.update(0.04); });
+      // boss fight: the biome score fully stops, and comes back when the boss is beaten
+      A.setIntensity(0); A.setMusicStyle('score'); A.musicForState('play');
+      o.playingPreBoss = G.Music.playing();
+      A.setBoss(true); o.stoppedOnBoss = G.Music.playing() === false;
+      A.setBoss(false); o.resumedAfterBoss = G.Music.playing() === true;
       o.classicSwitch = call(() => { A.setMusicStyle('classic'); for (let i = 0; i < 20; i++) A.update(0.04); A.setMusicStyle('score'); });
       return o;
     });
@@ -46,7 +51,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     console.log('GAME:', JSON.stringify(o), ' EDITOR tracks:', edTracks);
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
     const ok = o.tracks >= 20 && o.hasUpbeat && o.hasDark && o.crossfade === true && o.aggressive === true
-      && o.silenceProl === true && o.resumePlay === true && o.classicSwitch === true && edTracks >= 20 && !errs.length;
+      && o.silenceProl === true && o.resumePlay === true && o.playingPreBoss && o.stoppedOnBoss && o.resumedAfterBoss
+      && o.classicSwitch === true && edTracks >= 20 && !errs.length;
     console.log(ok ? 'MUSIC TEST: PASS' : 'MUSIC TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
   } catch (e) { console.error('FAILED', e); process.exitCode = 1; }

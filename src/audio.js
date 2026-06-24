@@ -47,11 +47,17 @@
   }
 
   // switch between the composed score and the classic drones: fade the drones, start/stop G.Music
+  // the composed score plays only in Score style, when not hushed (cutscene) and not in a boss fight
+  function gateScore(fastStop) {
+    if (!G.Music) return;
+    if (musicStyle === 'score' && !musicSilenced && !bossOn) { G.Music.setIntensity(intensity); G.Music.resume(); }
+    else G.Music.pause(fastStop);
+  }
   function applyMusicStyle() {
     if (!started) return;
     const classic = musicStyle === 'classic';
     droneNodes.forEach(n => n.g.gain.setTargetAtTime(classic ? (bossOn ? n.baseVol * 2 : n.baseVol) : 0.0001, ctx.currentTime, 1.2));
-    if (G.Music) { if (classic || musicSilenced) G.Music.pause(); else { G.Music.setBoss(bossOn); G.Music.setIntensity(intensity); G.Music.resume(); } }
+    gateScore();
   }
 
   function startAmbience() {
@@ -270,10 +276,11 @@
     setArea(root) { areaRoot = root; if (started) retune(); },
     setBoss(on) {
       bossOn = on;
-      if (G.Music) G.Music.setBoss(on);
-      if (!started) return;
-      if (musicStyle === 'classic') droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
-      if (windGain) windGain.gain.setTargetAtTime(on ? 0.16 : 0.10, ctx.currentTime, 1.5);
+      if (started) {
+        if (musicStyle === 'classic') droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
+        if (windGain) windGain.gain.setTargetAtTime(on ? 0.16 : 0.10, ctx.currentTime, 1.5);
+      }
+      gateScore(on);   // boss start: the biome score does a fast full stop; boss death: it fades back in
     },
     // soundtrack style: 'score' (composed adaptive music) or 'classic' (the original drones)
     setMusicStyle(style) { musicStyle = (style === 'classic') ? 'classic' : 'score'; applyMusicStyle(); },
@@ -289,7 +296,7 @@
       const silence = (state === 'prologue' || state === 'cutscene');
       if (silence === musicSilenced) return;
       musicSilenced = silence;
-      if (musicStyle === 'score' && G.Music) { if (silence) G.Music.pause(); else G.Music.resume(); }
+      gateScore();
     },
     // adaptive music: 0 = calm exploration, 1 = full combat tension (driven by on-screen danger)
     setIntensity(v) { targetIntensity = Math.max(0, Math.min(1, v || 0)); },

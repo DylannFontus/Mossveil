@@ -169,10 +169,12 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
 - **Composed adaptive soundtrack** — a from-scratch synth **score**: ~24 themes (6 biome
   defaults + standalone moods from **radiant / triumph** to **abyss / void**), each a chord
   progression driving a pad, bassline, arpeggio, stepwise lead and drums. Exploration is
-  sparse; **as enemies that can see you crowd in, the theme turns aggressive** — a low tritone
-  drone, driving four-on-the-floor kick, hard snare and a harsher, chromatic lead make a fight
-  feel *threatening*, then it relaxes when the room clears (bosses drive harder still). It
-  hushes during the new-game prologue, and **crossfades quickly** when you change rooms. A
+  sparse; **the instant an enemy that can see you engages, the theme turns menacing** — a low
+  tritone drone, driving four-on-the-floor kick, hard snare and a harsher, chromatic lead make
+  a fight feel *threatening* from the start, then it relaxes when the room clears. When a **boss
+  fight begins the biome music does a full stop**, and it **fades back in once the boss is
+  beaten**. It hushes during the new-game prologue, and the old theme **fades out under a
+  second** when you change rooms. A
   **Classic** setting restores the original ambient drones, and each level picks its **Score
   track** (or Auto-by-biome) in the editor. All synthesised live — no files.
 - Reverb **changes per biome** (ringing stone halls vs dry forges) and per **reverb zone**;
