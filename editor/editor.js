@@ -1976,7 +1976,13 @@
     ['Model editor', 'Models tab: build characters or props from primitives, parent parts into a rig, set pivots, and author animation clips. “🦴 Auto-rig (humanoid)” guesses a torso/head/arms/legs skeleton from the layout and generates idle + walk clips. Place a saved model in a level from Props → Model (with an Animation dropdown).'],
     ['Hunter’s Journal', 'In-game bestiary (pause → Journal) that fills as you defeat each creature: kill counts, lore and a live 3D portrait. The first kill of a type pops a “Journal entry added” notice.'],
     ['Shade', 'On death you drop your Glimmer and a shade spawns where you fell (saved to the file). Return to that room and destroy the shade to reclaim the Glimmer.'],
-    ['Map pins & compass', 'On the in-game map: Z drops a pin, X clears the nearest one; the header shows exploration %. In play, an edge arrow points to the nearest bench when it’s off-screen.']
+    ['Map pins & compass', 'On the in-game map: Z drops a pin, X clears the nearest one; the header shows exploration %. In play, an edge arrow points to the nearest bench when it’s off-screen.'],
+    ['Dynamic elements', 'Dynamic category: moving platforms (carry the rider), crushers, conveyors, wind currents, collapsing floors and timed spikes — interactive hazards/traversal that bring rooms to life.'],
+    ['Switches & doors', 'Breakable walls (nail them to reveal secrets), levers (interact) and pressure plates (stand-on / latch) toggle a named switch — doors with that name open/close, and the name also fires as a Logic signal; both can save a flag.'],
+    ['NPCs & dialogue', 'Place an NPC (Props) and author its branching dialogue right in the inspector: lines (speaker + text), per-line choices (label / goto line / set flag / start quest), and an “end here” terminator. Interact to talk; the box shows a portrait + typewriter text.'],
+    ['Quests', 'Dialogue choices can start a quest (title + objective, optional done-flag). Active quests show an on-screen objective and appear in the pause → Quests log; a quest auto-completes when its done-flag is set.'],
+    ['Progression', 'Glimmer sinks: a Nailsmith forges the nail (+damage), and a Soul well learns/empowers spells. Charms can pair into synergies, and the player can overcharm (one over notches) for double damage taken.'],
+    ['Custom enemies', 'Enemies → Custom (behavior): author a creature from a spec (health/speed/sight/size/colour, flies or walks, idle pattern, on-sight reaction, attack type) — data-driven AI with no code.']
   ];
   const TOOLS = [
     ['Auto-tile (⊞ Auto)', 'While painting terrain, exposed edges become the smooth/curvy variant and buried interior stays hard. Shift+click the button retiles the whole level.'],
@@ -1990,7 +1996,9 @@
     ['World graph (Map tab)', 'The Map tab doubles as a connection graph: room thumbnails + door links, a ▶START badge on the entry room, dimmed unreachable rooms, and red/amber outlines on rooms with lint errors/warnings.'],
     ['Nested prefabs', 'A saved prefab can embed other prefabs — click ⊕ on a prefab card to nest one inside. Stamping expands them recursively (cycle-guarded); edit the stamped copies freely for per-instance variants.'],
     ['Hot-reload (↻)', 'In the ▶ Play-here overlay, the ↻ Reload button saves your latest edits and reloads the running room in place — no need to stop and relaunch.'],
-    ['Model editor (Models tab)', 'Build & animate custom models from primitives; “🦴 Auto-rig (humanoid)” auto-builds a skeleton + idle/walk clips. Flat-shaded by default to match the art; place results from Props → Model.']
+    ['Model editor (Models tab)', 'Build & animate custom models from primitives; “🦴 Auto-rig (humanoid)” auto-builds a skeleton + idle/walk clips. Flat-shaded by default to match the art; place results from Props → Model.'],
+    ['Debug inspector (F4)', 'In ▶ Play here, press F4 for a live entity inspector — click any entity to read its state (hp/aggro/pos/vel…); [T] teleports it to the player, [`] kills it.'],
+    ['Controls & gamepad', 'In-game Settings → Controls rebinds every action to a key OR gamepad button (Xbox/PS glyphs auto-detected); bindings persist. Controllers rumble on impacts.']
   ];
   function buildGuide() {
     const box = $('guide'); if (!box) return; box.innerHTML = '';

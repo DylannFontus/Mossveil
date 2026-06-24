@@ -111,16 +111,30 @@ only in that device's browser. Revoke/rotate it anytime from GitHub's token sett
 | Focus (hold, mends a mask) / Soul-wisp (tap) | `F` or `L` |
 | Interact / rest at bench | `↑` or `E` |
 | **World map** (drop / clear a pin) | `M` (arrows pan, `+`/`−` zoom, `Z`/`X` pin) |
+| Cast spell (aim with `↑` / `↓`) | `F` or `L` (in air for `↓`) |
 | Drop through platforms | `↓` + jump |
 | Pause / Mute | `ESC` / `U` |
+| Debug inspector (dev) | `F4` |
 
 The map fills in as you discover rooms (with an exploration-% readout); drop pins to
 mark spots, and an on-screen compass points to the nearest bench when it's off-screen.
 Rest at benches to record your journey.
 
+**Gamepad supported** — Xbox / PlayStation controllers work out of the box (sticks move/aim,
+face buttons + d-pad map to the actions, `Start`/`Back` for pause/map), with **rumble** on
+impacts. Buttons show the right glyphs and are rebindable too.
+
 **Rebind any control** — *Settings → Controls / key bindings* opens a menu of every action and
-its current key; select one and press a new key to rebind it (or *Reset to defaults*). Your
-bindings are saved and persist across sessions.
+its current key/button; select one and press a new key **or gamepad button** to rebind it (or
+*Reset to defaults*). Bindings are saved and persist across sessions. (Rumble has its own toggle.)
+
+**Spells** — cast with `F`/`L`. Aim it: hold `↑` for an upward **Wraith Cry**, hold `↓` in the
+air for an **Abyss Dive** slam, or neither for a forward **Soul Bolt**. Learn and empower spells
+(two tiers each) at a **soul well**.
+
+**Progression** — spend **Glimmer** at a **nailsmith** to forge a stronger nail, and at a soul
+well to grow your spells. **Charms** can **synergise** in pairs for bonus effects, and you can
+**overcharm** (one charm over your notches) for an extra slot at the cost of double damage taken.
 
 **Combat feel** — strikes land a real crescent slash that sweeps and follows through.
 **Hold Strike** to charge a **Great Slash** nail art (a lunging heavy blow that staggers
@@ -135,6 +149,11 @@ return to that room and destroy it to reclaim what you lost.
 creature, with kill counts, lore and a live 3D portrait. The first kill of a type pops a
 "Journal entry added" notice.
 
+**NPCs, dialogue & quests** — speak with the folk you meet for **branching dialogue** (a
+typewriter box with portraits and choices). Choices can set flags, fire Logic signals, or
+**start quests** — tracked by an on-screen objective and a **Quests** log (pause → Quests),
+and auto-completed when their goal flag is met.
+
 **On a touch device (iPad), on-screen controls appear automatically:** a directional pad
 on the bottom-left, an action cluster (Jump / Strike / Dash / Focus) on the bottom-right,
 and Pause + Map buttons top-right. Hold the D-pad up (▲) to interact / rest at a bench, hold
@@ -147,10 +166,11 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   vignette, film grain and chromatic aberration**, plus a living camera (look-ahead +
   zoom-punch on impacts), squash-&-stretch juice, a lantern glow, and per-biome atmosphere
   (drifting haze, fireflies, wind). Visual quality is adjustable in **Settings** (Low/Med/High).
-- **Adaptive audio** — the procedural score grows a **combat-tension layer** that swells when
-  enemies crowd you and relaxes when the room clears; reverb **changes per biome** (ringing
-  stone halls vs dry forges) and per **reverb zone**; footsteps and impacts are
-  **surface-aware** (wood / grass / stone / metal), positioned and panned by distance.
+- **Adaptive audio** — the procedural score grows an upbeat **combat-tension layer** that
+  swells when enemies can see you and relaxes when the room clears; reverb **changes per biome**
+  (ringing stone halls vs dry forges) and per **reverb zone**; footsteps and impacts are
+  **surface-aware** (wood / grass / stone / metal), positioned and panned by distance. Short
+  **stingers** punctuate boss reveals, item pickups and quest completions.
 - **Bosses** get a named **health bar** with **phase pips**, a cinematic **name-card + epithet**
   intro, a phase-transition, attack telegraphs, and a **slow-motion final blow**.
 - **Charms** — equip up to your **notch** budget (which grows as you fell bosses) for effects
@@ -202,6 +222,14 @@ the world map (the same map shown in-game on `M`).
     you're inside), or a music trigger (sets the adaptive-music mood).
   - *Furniture / Build*: full-colour Victorian furniture and a procedural **building generator**
     (multi-storey shell + wood floors + furnishings), plus tileable interior **wall backdrops**.
+  - *Dynamic*: interactive elements — **moving platforms** (carry the rider), **crushers**,
+    **conveyors**, **wind currents**, **collapsing floors**, **timed spikes**, **breakable
+    walls** (reveal secrets), and **levers / pressure plates → doors** wired by a switch name
+    (which also fires as a Logic signal).
+  - *Props* also include an **NPC** (author its branching dialogue inline), a **Nailsmith**, a
+    **Soul well** (spell tree), and the existing vendor / benches / pickups.
+  - *Enemies* include a **Custom (behavior)** type whose AI you author from a spec — health,
+    speed, sight, flies/walks, idle pattern, on-sight reaction and attack — no code.
   - *My Models*: custom models you built in the **Models tab** (see below).
 
   The asset browser renders a **live 3D thumbnail** for every item; **search** by name and
@@ -245,8 +273,9 @@ the world map (the same map shown in-game on `M`).
   cutscene is included as a reference for all the emotive animations (delete it freely).
 - **Test / Play here** — `▶ Play here` saves and launches the game directly in the room
   you're editing, inside the editor; the playtest overlay has a **↻ Reload** (hot-reload)
-  that saves your latest edits and reloads the running room in place. `▶ From Start` plays
-  from the title screen.
+  that saves your latest edits and reloads the running room in place. Press **`F4`** in play
+  for a **debug inspector** — click any entity to see its live state (hp/aggro/pos/vel…), with
+  teleport/kill shortcuts. `▶ From Start` plays from the title screen.
 - **Prefabs** — marquee-drag or `Shift`-click objects and save them as a reusable prefab
   (`Ctrl+G`). Prefabs can be **nested** (⊕ on a prefab card embeds another prefab; stamping
   expands them recursively), and stamped copies are edited freely for per-instance variants.
@@ -284,11 +313,12 @@ geometry naturally. Depth fog tints each layer toward the biome palette.
 - `index.html` — the game · `editor/` — the editor app · `MOSSVEIL Editor.cmd` — launcher
 - `data/levels.json` / `data/cutscenes.json` — levels and cutscenes (the editor's save
   targets); the matching `.js` files are generated mirrors so the game runs from `file://`
-- `src/` — engine: util, input, audio (procedural WebAudio + adaptive layers/reverb),
-  physics, fx, post, lights, world (20 biome looks, props, builders), map (world-map
-  renderer), models (custom-model rig + clips), thumb (3D→portrait snapshotter), eventgraph
-  (visual-scripting runtime), player, enemies, bosses, cutscene (cinematic timeline runtime),
-  ui, main
+- `src/` — engine: util, input (keyboard + gamepad + rebinds), audio (procedural WebAudio +
+  adaptive layers/reverb/stingers), physics, fx, post, lights, world (20 biome looks, props,
+  dynamic elements, builders), map (world-map renderer), models (custom-model rig + clips),
+  thumb (3D→portrait snapshotter), eventgraph (visual-scripting runtime), dialogue (branching
+  NPC dialogue), quests, debug (in-play inspector), player, enemies (incl. data-driven custom
+  AI), bosses, cutscene (cinematic timeline runtime), ui, main
 - `tools/` — editor server + headless test harnesses (`smoke.js`, `systems.js`,
   `editor-smoke.js`, `boss-test.js`, plus per-feature tests: `combat-texture-test.js`,
   `audio-smoke.js`, `shade-test.js`, `journal-test.js`, `boss-cinematic-test.js`,
