@@ -678,7 +678,7 @@
     }
     if (a.cat === 'enemy') {
       L.enemies = L.enemies || [];
-      L.enemies.push({ type: a.id, x, y });
+      L.enemies.push(Object.assign({ type: a.id, x, y }, JSON.parse(JSON.stringify(a.defaults || {}))));
       sel = { kind: 'enemy', i: L.enemies.length - 1 };
     } else if (a.cat === 'spawn') {
       L.spawns = L.spawns || {};
@@ -1073,7 +1073,23 @@
       el('div', { class: 'insNote' }, body, 'Tip: the destination level needs a spawn point with that id. Place one from the Markers category.');
     }
     if (it.kind === 'enemy') {
-      selectField(body, 'Type', G.Enemies.TYPES.map(t2 => ({ v: t2.id, t: t2.label })), () => p.type, v => { p.type = v; });
+      const types = G.Enemies.TYPES.map(t2 => ({ v: t2.id, t: t2.label })).concat([{ v: 'custom', t: 'Custom (behavior)' }]);
+      selectField(body, 'Type', types, () => p.type, v => { p.type = v; if (v === 'custom' && !p.spec) p.spec = { hp: 3, speed: 2, sight: 9, fly: false, color: '#8a5a7a', size: 0.8, idle: 'patrol', onSight: 'chase', attack: 'contact', shootCd: 2 }; refreshInspector(); });
+      if (p.type === 'custom') {
+        const sp = p.spec = p.spec || {};
+        el('div', { class: 'hgroup' }, body, 'Behavior');
+        numField(body, 'Health', () => sp.hp || 3, v => { sp.hp = Math.max(1, Math.round(v)); }, 1);
+        numField(body, 'Speed', () => sp.speed || 2, v => { sp.speed = Math.max(0.2, v); }, 0.5);
+        numField(body, 'Sight range', () => sp.sight || 9, v => { sp.sight = Math.max(1, v); }, 1);
+        numField(body, 'Size', () => sp.size || 0.8, v => { sp.size = Math.max(0.3, v); }, 0.1);
+        colorField(body, 'Colour', () => sp.color || '#8a5a7a', v => { sp.color = v || '#8a5a7a'; });
+        checkField(body, 'Flies', () => sp.fly, v => { sp.fly = v; });
+        selectField(body, 'Idle', [{ v: 'patrol', t: 'Patrol (walk & turn)' }, { v: 'wander', t: 'Wander near home' }, { v: 'still', t: 'Stay still' }], () => sp.idle || 'patrol', v => { sp.idle = v; });
+        selectField(body, 'On sight', [{ v: 'chase', t: 'Chase the player' }, { v: 'flee', t: 'Flee' }], () => sp.onSight || 'chase', v => { sp.onSight = v; });
+        selectField(body, 'Attack', [{ v: 'contact', t: 'Contact damage' }, { v: 'shoot', t: 'Shoot projectiles' }, { v: 'leap', t: 'Leap at player' }], () => sp.attack || 'contact', v => { sp.attack = v; refreshInspector(); });
+        if (sp.attack === 'shoot') numField(body, 'Shoot every (s)', () => sp.shootCd || 2, v => { sp.shootCd = Math.max(0.3, v); }, 0.5);
+        el('div', { class: 'insNote' }, body, 'A data-driven creature: pick how it idles, reacts to the player, and attacks. No code needed.');
+      }
     }
     if (it.kind === 'prop') {
       switch (p.type) {
@@ -1626,7 +1642,8 @@
         { cat: 'prop', id: 'light', label: 'Flickering light', ico: '🔥', defaults: { color: '#ffc878', scale: 7, opacity: 0.35, flicker: true } },
         { cat: 'prop', id: 'ray', label: 'God ray', ico: '🌤', defaults: { w: 5, h: 18, rot: -0.15, opacity: 0.1 } }
       ];
-      case 'enemies': return G.Enemies.TYPES.map(t => ({ cat: 'enemy', id: t.id, label: t.label, ico: '🐛' }));
+      case 'enemies': return G.Enemies.TYPES.map(t => ({ cat: 'enemy', id: t.id, label: t.label, ico: '🐛' }))
+        .concat([{ cat: 'enemy', id: 'custom', label: 'Custom (behavior)', ico: '🧠', defaults: { spec: { hp: 3, speed: 2, sight: 9, fly: false, color: '#8a5a7a', size: 0.8, idle: 'patrol', onSight: 'chase', attack: 'contact', shootCd: 2 } } }]);
       case 'bosses': return G.Bosses.LIST.map(b2 => ({ cat: 'prop', id: 'bossTrigger', boss: b2.id, label: b2.label, ico: '👑', defaults: { r: 6 } }));
       case 'markers': return [
         { cat: 'spawn', id: 'spawn', label: 'Spawn point', ico: '📍' },

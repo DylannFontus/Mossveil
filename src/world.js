@@ -2127,7 +2127,7 @@
     for (const e of (def.enemies || [])) {
       const on = W.isActive(id, e);
       if (!on && !G.EDITOR && e.oid == null) continue;
-      const ent = G.Enemies.make(e.type, e.x, e.y);
+      const ent = G.Enemies.make(e.type, e.x, e.y, e);
       if (!ent) continue;
       ent.oid = e.oid;
       room.entities.push(ent);

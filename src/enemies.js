@@ -961,6 +961,57 @@
   }
   E.spawnShade = (x, y, glimmer) => mkShade(x, y, glimmer);   // caller adds it to the room
 
+  // =========================== CUSTOM (behavior-driven) ===========================
+  // A creature whose AI is authored as a small spec in the editor (a node/data-driven FSM):
+  //   { hp, speed, sight, fly, color, size, idle:'patrol'|'wander'|'still',
+  //     onSight:'chase'|'flee', attack:'contact'|'shoot'|'leap', shootCd }
+  E.behaviorPresets = { idle: ['patrol', 'wander', 'still'], onSight: ['chase', 'flee'], attack: ['contact', 'shoot', 'leap'] };
+  function mkBehaviorEnemy(x, y, spec) {
+    spec = spec || {};
+    const col = spec.color ? parseInt(('' + spec.color).replace('#', ''), 16) : 0x8a5a7a;
+    const sz = spec.size || 0.8, fly = !!spec.fly, spd = spec.speed || 2, sight = spec.sight || 9;
+    const grp = new THREE.Group(), vis = new THREE.Group(); grp.add(vis);
+    vis.add(U.flat(U.ellipse(sz * 0.62, sz * 0.52), col, {}));
+    vis.add(U.flat(U.ellipse(sz * 0.5, sz * 0.4), U.colLerp ? U.colLerp(col, 0xffffff, 0.18) : col, { z: 0.01, y: sz * 0.05 }));
+    vis.add(U.flat(U.ellipse(sz * 0.1, sz * 0.13), 0x140e16, { z: 0.04, x: sz * 0.22, y: sz * 0.08 }));
+    vis.add(U.flat(U.ellipse(sz * 0.05, sz * 0.07), 0xffffff, { z: 0.05, x: sz * 0.25, y: sz * 0.1, additive: true }));
+    if (!fly) for (let i = 0; i < 3; i++) { const leg = U.flat(U.poly([[-0.03, 0], [0.03, 0], [0.025, -0.16], [-0.025, -0.16]]), 0x171018, { z: 0.01 }); leg.position.set(-0.2 * sz + i * 0.2 * sz, -sz * 0.42, 0.01); vis.add(leg); }
+    else { const w1 = U.flat(U.ellipse(sz * 0.4, sz * 0.18), col, { additive: true, opacity: 0.4, x: -sz * 0.1, y: sz * 0.3 }); vis.add(w1); }
+    return {
+      type: 'custom', isEnemy: true, alive: true, dead: false, fly, hp: spec.hp || 3, gibColor: col,
+      body: { x, y, w: sz * 1.1, h: sz * 0.9, vx: 0, vy: 0 },
+      group: grp, dir: U.chance(0.5) ? 1 : -1, ph: U.rand(0, 9), homeX: x, homeY: y, state: 'idle', cd: U.rand(0.6, 2), turnCd: 0,
+      hurt(d, dir) { baseHurt(this, d, dir, { kb: fly ? 8 : 6 }); G.Audio.sfx('hit'); },
+      update(dt) {
+        const b = this.body, p = G.player; this.ph += dt; this.turnCd -= dt; this.cd -= dt;
+        if (!this.alive) return;
+        const sees = p && !p.dead && U.dist(b.x, b.y, p.body.x, p.body.y) < sight && (fly || (G.Physics.los && G.Physics.los(b.x, b.y, p.body.x, p.body.y + 0.4)));
+        if (sees) this.state = 'engaged'; else if (this.state === 'engaged') this.state = 'idle';
+        if (this.state === 'idle') {
+          if (spec.idle === 'wander') { const tx = this.homeX + Math.sin(this.ph * 0.6) * 2.4; b.vx = U.damp(b.vx, Math.sign(tx - b.x) * spd * 0.6, 4, dt); if (fly) b.vy = U.damp(b.vy, Math.sin(this.ph) * 0.5, 4, dt); }
+          else if (spec.idle === 'still') b.vx = U.damp(b.vx, 0, 8, dt);
+          else if (!fly && Math.abs(b.vx) < 2.5) b.vx = U.damp(b.vx, this.dir * spd * 0.7, 6, dt);   // patrol
+        } else {
+          const react = spec.onSight || 'chase', s = react === 'flee' ? -1 : 1;
+          b.vx = U.clamp(b.vx + Math.sign(p.body.x - b.x) * s * spd * 4 * dt, -spd * 1.7, spd * 1.7);
+          if (fly) b.vy = U.clamp(b.vy + Math.sign(p.body.y + 0.4 - b.y) * s * spd * 4 * dt, -spd * 1.6, spd * 1.6);
+          if (spec.attack === 'shoot' && this.cd <= 0) {
+            this.cd = spec.shootCd || 2; const dx = p.body.x - b.x, dy = p.body.y + 0.3 - b.y, dl = Math.hypot(dx, dy) || 1;
+            spawnProjectile({ x: b.x + dx / dl * 0.6, y: b.y + 0.3 + dy / dl * 0.6, vx: dx / dl * 9, vy: dy / dl * 9, r: 0.22, color: col, friendly: false, life: 2.5 });
+            G.Audio.sfx('spore');
+          } else if (spec.attack === 'leap' && b.onGround && this.cd <= 0) { this.cd = 1.4; b.vy = 14; b.vx = Math.sign(p.body.x - b.x) * spd * 2; }
+        }
+        if (fly) { b.vx *= 1 - dt * 0.7; b.vy *= 1 - dt * 0.7; b.x += b.vx * dt; b.y += b.vy * dt; }
+        else { b.vy -= 50 * dt; G.Physics.move(b, dt); if (b.onGround && this.turnCd <= 0 && this.state === 'idle' && spec.idle !== 'still') { const d0 = this.dir; turnAtEdges(this); if (d0 !== this.dir) this.turnCd = 0.3; } }
+        contactPlayer(this);
+        vis.scale.x = (this.state === 'engaged' && p) ? (p.body.x < b.x ? -1 : 1) : this.dir;
+        vis.position.y = Math.abs(Math.sin(this.ph * (fly ? 8 : 4))) * 0.04;
+        grp.position.set(b.x, b.y - 0.05, -0.05);
+      }
+    };
+  }
+  E.spawnCustom = (x, y, spec) => addToRoom(mkBehaviorEnemy(x, y, spec));
+
   // =========================== FACTORY ===========================
   const MAKERS = {
     tumblebug: mkTumblebug, gnatling: mkGnatling, bulbil: mkBulbil, bramblehog: mkBramblehog,
@@ -984,7 +1035,8 @@
     { id: 'hookworm', label: 'Hookworm (burrower)' },
     { id: 'sentine', label: 'Sentine (turret eye)' }
   ];
-  E.make = (type, x, y) => {
+  E.make = (type, x, y, def) => {
+    if (type === 'custom') return mkBehaviorEnemy(x, y, (def && def.spec) || {});
     const mk = MAKERS[type];
     return mk ? mk(x, y) : null;
   };
