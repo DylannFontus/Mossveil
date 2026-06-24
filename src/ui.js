@@ -838,8 +838,15 @@
     menuHeader('CHARMS');
     const C = G.Charms;
     cx.save(); cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
-    cx.font = `${Math.round(h * 0.024)}px ${serif}`; cx.fillStyle = 'rgba(190,210,200,0.85)';
-    cx.fillText('Notches  ' + C.usedNotches() + ' / ' + C.notches(), w * 0.42, h * 0.16 + 26);
+    cx.font = `${Math.round(h * 0.024)}px ${serif}`;
+    const over = C.isOvercharmed && C.isOvercharmed();
+    cx.fillStyle = over ? 'rgba(255,120,110,0.95)' : 'rgba(190,210,200,0.85)';
+    cx.fillText('Notches  ' + C.usedNotches() + ' / ' + C.notches() + (over ? '   ⚠ OVERCHARMED (×2 damage taken)' : ''), w * 0.42, h * 0.16 + 26);
+    const syns = C.synergies ? C.synergies() : [];
+    if (syns.length) {
+      cx.fillStyle = 'rgba(150,235,190,0.9)'; cx.font = `italic ${Math.round(h * 0.02)}px ${serif}`;
+      cx.fillText('Synergy: ' + syns.map(s => s.name).join(' · '), w * 0.42, h * 0.16 + 48);
+    }
     cx.restore();
 
     const list = C.LIST;

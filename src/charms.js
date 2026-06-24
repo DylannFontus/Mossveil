@@ -26,7 +26,24 @@
   C.equipped = () => (G.save && G.save.charmsEquipped) || [];
   C.usedNotches = () => C.equipped().reduce((a, id) => a + (byId[id] ? byId[id].cost : 0), 0);
   C.isEquipped = id => C.equipped().indexOf(id) >= 0;
-  C.canEquip = id => { const c = byId[id]; return c && (C.usedNotches() + c.cost <= C.notches()); };
+  // overcharm: you may exceed the budget by equipping one charm over — but only if you're not
+  // already over (HK rule). Overcharmed = take double damage.
+  C.canEquip = id => {
+    const c = byId[id]; if (!c) return false;
+    const used = C.usedNotches();
+    if (used + c.cost <= C.notches()) return true;       // fits normally
+    return used <= C.notches();                          // overcharm (one over) allowed if not already over
+  };
+  C.isOvercharmed = () => C.usedNotches() > C.notches();
+
+  // charm synergies — bonus effects when specific charms are equipped together
+  const SYNERGIES = [
+    { need: ['keenedge', 'glassheart'], name: 'Ruin Edge', desc: 'Keen Edge + Glass Heart — strikes cut deeper still (+1 damage).', apply: st => { st.nail += 1; } },
+    { need: ['swiftfocus', 'soulsiphon'], name: 'Soul Flow', desc: 'Swift Focus + Soul Siphon — soul gathers and mends faster.', apply: st => { st.focusMul *= 0.85; st.soulMul *= 1.25; } },
+    { need: ['stoneheart', 'windstep'], name: 'Sure Footing', desc: 'Stoneheart + Wind Step — a steadier frame (+1 mask).', apply: st => { st.hp += 1; } }
+  ];
+  C.SYNERGIES = SYNERGIES;
+  C.synergies = () => SYNERGIES.filter(s => s.need.every(id => C.isEquipped(id)));
 
   // ownership — charms are found in the world (pickups) or bought from a vendor
   C.owned = () => (G.save && G.save.charmsOwned) || [];
@@ -46,7 +63,7 @@
     const eq = C.equipped().slice();
     const i = eq.indexOf(id);
     if (i >= 0) eq.splice(i, 1);
-    else { if (C.usedNotches() + c.cost > C.notches()) return false; eq.push(id); }
+    else { if (!C.canEquip(id)) return false; eq.push(id); }
     G.save.charmsEquipped = eq;
     if (G.Main && G.Main.persist) G.Main.persist();
     if (G.player) C.apply(G.player);
@@ -56,22 +73,24 @@
   // recompute a player's charm-derived stats from the equipped set
   C.apply = p => {
     if (!p) return;
-    let hp = 5, nail = 1 + ((G.save && G.save.nailLevel) || 0), dashMul = 1, focusMul = 1, soulMul = 1;
+    const st = { hp: 5, nail: 1 + ((G.save && G.save.nailLevel) || 0), dashMul: 1, focusMul: 1, soulMul: 1 };
     for (const id of C.equipped()) {
       switch (id) {
-        case 'stoneheart': hp += 1; break;
-        case 'keenedge': nail += 1; break;
-        case 'swiftfocus': focusMul *= 0.55; break;
-        case 'windstep': dashMul *= 0.6; break;
-        case 'soulsiphon': soulMul *= 1.6; break;
-        case 'glassheart': nail += 2; hp -= 1; break;
+        case 'stoneheart': st.hp += 1; break;
+        case 'keenedge': st.nail += 1; break;
+        case 'swiftfocus': st.focusMul *= 0.55; break;
+        case 'windstep': st.dashMul *= 0.6; break;
+        case 'soulsiphon': st.soulMul *= 1.6; break;
+        case 'glassheart': st.nail += 2; st.hp -= 1; break;
       }
     }
-    p.maxHp = Math.max(1, hp);
-    p.nailDmg = nail;
-    p.dashCdMul = dashMul;
-    p.focusMul = focusMul;
-    p.soulMul = soulMul;
+    for (const s of SYNERGIES) if (s.need.every(id => C.isEquipped(id))) s.apply(st);
+    p.maxHp = Math.max(1, st.hp);
+    p.nailDmg = st.nail;
+    p.dashCdMul = st.dashMul;
+    p.focusMul = st.focusMul;
+    p.soulMul = st.soulMul;
+    p.overcharmed = C.isOvercharmed();
     if (p.hp > p.maxHp) p.hp = p.maxHp;
   };
 })();
