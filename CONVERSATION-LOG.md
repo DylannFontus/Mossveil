@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T20:17:31.463Z_
+_Last generated: 2026-06-24T20:24:33.069Z_
 
 ---
 
@@ -16472,3 +16472,104 @@ The diagnostics render well ("Found 3 things to check…" with per-issue Show bu
 ---
 
 > 🔧 _Actions: PowerShell ×3, Write_
+
+## 🤖 Claude
+
+Pushed (`7ece568..f664ad4`). The Companion is now a much fuller "ultimate companion."
+
+## What I added this round
+
+**Way more coverage** — ~20 new recipes (charms, vendor, nailsmith, soul well, set-active/text/look/audio triggers, reflective water, building generator, the Models/rigging flow, prefabs, scatter, traps, play & hot-reload, save, new levels…). The knowledge base is now **236 entries**, all auto-current.
+
+**Scene diagnostics** — ask *"check this room for problems"* and it cross-checks your **live level**:
+- doors whose **Signal** nobody emits (and levers/plates nobody listens to),
+- doors with **no signal set** (will never open),
+- **boss triggers without gates**,
+- plus the world validator's findings for this room — each with a **▶ Show** button that selects and focuses the object.
+
+**Scene-aware answers** — the lever/door, portal and boss recipes now weave in your actual scene: *"this room already has signal `lift2` — reuse it as the door's Signal"*, *"rooms you can link to: …"*, *"no boss gates yet."*
+
+**Inspector field highlighting** — step buttons can flash the exact Inspector field they mention (falls back to the panel if nothing's selected).
+
+**Follow-ups** — type *"more"* / *"what else"* and it returns related topics for the last answer.
+
+**UX** — **drag the panel** by its header (position remembered), **open state persists**, and press **`?`** anywhere to toggle it.
+
+The screenshot shows it answering the lever/door recipe and, below, the *"Found 3 things to check…"* diagnostics with per-issue **Show** buttons and an **Open Lint** button.
+
+## Verified
+`companion-test` (extended) passes: 236 KB entries, all new recipe routings correct, **focus/diagnostics/follow-up** all work, the broken-door wiring is flagged, and **still zero outbound network calls** (fully offline). `editor-smoke` green.
+
+If you want, next I can: have it **proactively** surface diagnostics when you open a room, add **per-asset field walkthroughs** (it highlights each Inspector field in sequence), or wire the deferred **vendored local embedding model** (~30 MB, editor-only, no wifi) if any phrasings still trip it up. Otherwise this is a solid, self-maintaining companion.
+
+---
+
+## 👤 You
+
+yes do that too
+
+---
+
+## 🤖 Claude
+
+On it. I'll add all three: **proactive diagnostics**, **per-asset field walkthroughs**, and an **offline semantic ranker**. (Honest note up front on the third — I'll come back to it.) Let me start with the semantic-matching blend. First the n-gram helpers:
+
+---
+
+> 🔧 _Actions: Edit ×2_
+
+## 🤖 Claude
+
+Now the proactive issue badge + the field walkthrough. Let me add a cheap issue counter and the walkthrough:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now the field-walkthrough function (after `highlightUI`) + the `walk` dispatch and label:
+
+---
+
+> 🔧 _Actions: Edit ×2_
+
+## 🤖 Claude
+
+Now add a `walk` action to the asset answers' "tune in Inspector" step:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now wire the proactive badge + a "Walk fields" header button into `build()`, and add the badge CSS + test hooks:
+
+---
+
+> 🔧 _Actions: Edit ×4_
+
+## 🤖 Claude
+
+Now the test hooks for the new features:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Let me extend the test for the badge + walkthrough, and re-verify the semantic blend didn't break routings:
+
+---
+
+> 🔧 _Actions: Edit ×2, PowerShell_
+
+## 🤖 Claude
+
+All pass — including the paraphrase *"how can i set a foe on fire"* → fire recipe (semantic nudge working), badge=1 issue, walk stepped 10 fields, and **0 network**. Let me commit:
+
+---
+
+> 🔧 _Actions: Write, PowerShell_
