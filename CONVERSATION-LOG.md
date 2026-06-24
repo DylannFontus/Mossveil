@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T20:31:13.180Z_
+_Last generated: 2026-06-24T20:39:39.526Z_
 
 ---
 
@@ -16623,6 +16623,131 @@ Let me add a few routing assertions for the new recipes and re-run to confirm no
 ## 🤖 Claude
 
 All pass — 257 KB entries now, every new recipe routes correctly, and **no regressions** in the existing routings. Let me commit and push:
+
+---
+
+> 🔧 _Actions: PowerShell_
+
+## 🤖 Claude
+
+Pushed (`ba2371b..6f1f63f`). Recipe coverage is much wider now.
+
+## Added ~22 recipes (KB is now 257 entries)
+
+**Logic-graph walkthroughs** (you'd flagged these):
+- Make something happen when the player **enters an area** (On Zone → action)
+- **Remember a choice with a flag** (Set Flag / If Flag)
+- **Open a path after defeating enemies/a boss** (death → signal → door)
+- **Fan one event out to many** (Emit / On Signal)
+- **Do something after a delay** (Timer)
+- **End the game / win condition**
+
+**Progression:** equip charms & overcharm, Glimmer (earn/spend), Moth Wings double-jump, attune **Frost/Gale** bolts.
+
+**Decor / lights / lore:** god ray, glow light/lamp, background decor & parallax, lore sign/readable.
+
+**Level settings:** change **biome**, show an **area title**, **resize** the room, set the **starting room**.
+
+**Editor workflow:** select / move / copy / duplicate / delete / align / snap / gizmos / undo-redo.
+
+**Plus:** model **auto-rig & animate**, and **reverb/ambient audio** zones.
+
+## Verified
+`companion-test` now checks seven of the new topics route correctly (`logic-zone`, `wings`, `biome`, `elements`, `select`, `godray`, `logic-timer`) **and** confirms every prior routing is unchanged — no regressions. Badge, field-walk, diagnostics, follow-ups, and the paraphrase test all still pass, with **zero network calls**.
+
+The Companion now covers essentially the whole editor surface — placing every asset, the major multi-step tasks, the Logic graph, level settings, workflow, and the systems we built (fire/hazards/flora/bolts) — all self-maintaining and fully offline. If you want, I can keep going (e.g. per-charm explanations, individual enemy/boss bestiary entries, or cutscene-timeline authoring step-by-step), but it's already a very complete companion.
+
+---
+
+## 👤 You
+
+yes do these other things too
+
+---
+
+## 🤖 Claude
+
+On it. These should harvest from the game's own data so they stay current. Let me check the charm, enemy/boss, and cutscene data structures first:
+
+---
+
+> 🔧 _Actions: Grep ×2_
+
+## 🤖 Claude
+
+`G.Charms.LIST` and `G.Enemies.TYPES`/`BESTIARY` are clean. Let me check the boss list and the cutscene event-type registry (with hints):
+
+---
+
+> 🔧 _Actions: Grep, Read_
+
+## 🤖 Claude
+
+I have all the data. Let me expose the cutscene event registry to the Companion:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now the harvesting + cutscene recipes in companion.js. Let me add the charm/enemy/boss/cutscene-event harvest to `buildKB` (after the Guide harvest):
+
+---
+
+> 🔧 _Actions: Read ×2, Edit_
+
+## 🤖 Claude
+
+Now the detailed cutscene recipes. Let me append them after the reverb recipe:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now add test assertions for the harvested charm/enemy/boss/cutscene entries:
+
+---
+
+> 🔧 _Actions: Edit ×2, PowerShell_
+
+## 🤖 Claude
+
+Three issues: the **asset** entries for enemies/bosses already cover those, so my separate entries duplicated and lost the tie; and the charm query lost to the vendor recipe via synonym expansion. Cleaner fix: drop the duplicate enemy/boss entries, **enrich the existing asset entries** with bestiary lore, and boost charm weight. Let me view the asset-harvest block:
+
+---
+
+> 🔧 _Actions: Read, Edit_
+
+## 🤖 Claude
+
+Now remove the duplicate enemy/boss harvest blocks and boost charm weight:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now update the test assertions to substring checks (since enemy/boss info now lives in the enriched asset entries):
+
+---
+
+> 🔧 _Actions: Edit, PowerShell_
+
+## 🤖 Claude
+
+All pass — charm explanations route to the specific charm, enemy/boss queries hit the lore-enriched asset entries, and cutscene-camera routes correctly (kb=292, 0 network). Let me capture one shot of an enemy bestiary answer, then commit:
+
+---
+
+> 🔧 _Actions: Edit, PowerShell, Read_
+
+## 🤖 Claude
+
+The Lurcher answer shows its bestiary lore woven in with place/walk buttons. Let me commit and push:
 
 ---
 

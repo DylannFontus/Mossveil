@@ -3482,6 +3482,7 @@
       assets: cat => assetListFor(cat),
       allAssets: () => ASSET_CATS.map(c => ({ cat: c.id, label: c.label, items: assetListFor(c.id) })),
       guide: () => ({ concepts: CONCEPTS, tools: TOOLS, nodes: (G.EventGraph && G.EventGraph.TYPES) || {}, nodeDesc: NODE_DESC }),
+      csEvents: () => CS_EVENTS,
       level: () => { try { return lvl(); } catch (e) { return null; } },
       currentId: () => currentId,
       openAssetCat: cat => { setTab('scene'); setLeftTab('H'); assetCat = cat; refreshAssets(); },

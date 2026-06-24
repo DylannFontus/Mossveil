@@ -102,9 +102,10 @@
       for (const it of group.items) {
         if (!it || it.cat === 'none' || !it.id) continue;
         const akind = it.kind || it.boss || it.model || null;
-        const desc = ASSET_DESC[(it.id + ':' + akind)] || ASSET_DESC[it.id] || ('a ' + group.label.toLowerCase() + ' object you can place.');
+        let desc = ASSET_DESC[(it.id + ':' + akind)] || ASSET_DESC[it.id] || ('a ' + group.label.toLowerCase() + ' object you can place.');
+        if (group.cat === 'enemies') { const lore = (G.Enemies && G.Enemies.BESTIARY && G.Enemies.BESTIARY[it.id]) || ''; if (lore) desc = lore + ' (' + it.label + ')'; }   // weave in bestiary lore
         entry({
-          id: 'asset:' + group.cat + ':' + it.id + ':' + (akind || ''), kind: 'asset', title: 'Place ' + it.label,
+          id: 'asset:' + group.cat + ':' + it.id + ':' + (akind || ''), kind: 'asset', title: (group.cat === 'enemies' ? 'Enemy: ' : group.cat === 'bosses' ? 'Boss: ' : 'Place ') + it.label,
           text: it.label + ' ' + group.label + ' ' + (akind || '') + ' ' + (ASSET_SYN[it.id] || '') + ' ' + desc + ' place add create',
           body: '**' + it.label + '** — ' + desc,
           steps: [
@@ -124,6 +125,23 @@
       for (const k in T) { const def = T[k]; entry({ id: 'logic:' + k, kind: 'logic', title: 'Logic ' + def.kind + ': ' + def.title, text: def.title + ' ' + (ND[k] || '') + ' logic graph trigger event condition action', body: (ND[k] || def.title) + ' — add it in the **Logic** tab.', actions: [{ label: 'Open Logic tab', action: { kind: 'tab', tab: 'logic' } }], weight: 0.7 });
       }
     }
+    // ---- charms (per-charm explanations, from the game's own list) ----
+    const charms = (G.Charms && G.Charms.LIST) || [];
+    for (const c of charms) entry({
+      id: 'charm:' + c.id, kind: 'charm', title: 'Charm: ' + c.name,
+      text: c.name + ' ' + c.id + ' charm notch effect ' + (c.desc || '') + ' equip',
+      body: '**' + c.name + '** (' + c.cost + ' notch' + (c.cost === 1 ? '' : 'es') + ') — ' + (c.desc || ''),
+      steps: [{ text: 'Place a **Charm pickup** and set its charm to **' + c.name + '** in the Inspector; the player equips it at a **bench**.', action: { kind: 'place', cat: 'props', id: 'charmPickup', label: 'Charm pickup' } }], weight: 1.8
+    });
+    // (enemies & bosses are covered by the enriched asset entries above)
+    // ---- cutscene event types (with their hints) ----
+    const cse = ed ? ed.csEvents() : {};
+    for (const k in cse) entry({
+      id: 'cs:' + k, kind: 'cutscene', title: 'Cutscene event: ' + k,
+      text: k + ' cutscene cinematic timeline event ' + (cse[k].hint || ''),
+      body: '**' + k + '** — ' + (cse[k].hint || 'a cutscene event') + '. Add it on a track in the **Cutscene** tab.',
+      actions: [{ label: 'Open Cutscene tab', action: { kind: 'tab', tab: 'cutscene' } }], weight: 0.6
+    });
     // ---- authored recipes (the high-value "how do I make X") ----
     for (const r of RECIPES) entry(Object.assign({ kind: 'recipe', weight: 1.6 }, r, { text: (r.title + ' ' + (r.syn || '') + ' ' + (r.body || '') + ' ' + r.steps.map(s => s.text).join(' ')) }));
     // ---- meta / capabilities ----
@@ -752,6 +770,26 @@
       body: 'An **Audio zone** can be a reverb zone (swaps room reverb), an ambient emitter, or a music-mood trigger.',
       steps: [
         { text: 'Markers → place an **Audio zone** and pick **mode** = reverb / emitter / music.', action: { kind: 'place', cat: 'markers', id: 'audio', label: 'Audio zone' } }
+      ] },
+    // ---- cutscene authoring ----
+    { id: 'rec:cs-author', title: 'Author a cutscene (timeline)', syn: 'cutscene cinematic timeline author make create scene tracks events screen actor protagonist animation',
+      body: 'Build a cutscene on a two-track timeline (screen effects + protagonist animation) in the **Cutscene** tab.',
+      steps: [
+        { text: 'Open the **Cutscene** tab and create a new cutscene.', action: { kind: 'tab', tab: 'cutscene' } },
+        { text: 'Add **screen** events (fade, letterbox, blur, text caption, camera, shake, sfx) and **protagonist** events (wake, stand, look, talk, nod, laugh…) onto the tracks. Drag a block sideways to retime it; click it to edit its fields in the Inspector.' },
+        { text: 'Put a **cameraRestore** event last for a seamless hand-off back to gameplay, then press **▶ Test** to preview.' }
+      ] },
+    { id: 'rec:cs-camera', title: 'Add a camera move or caption to a cutscene', syn: 'cutscene camera move pan zoom caption text subtitle letterbox bars cinematic shot',
+      body: 'Camera, text and letterbox are **screen** events on the cutscene timeline.',
+      steps: [
+        { text: 'In the **Cutscene** tab add a **camera** event (set dx/dy + distance z) to move the shot, a **text** event for a centred caption, and **letterbox** for cinematic bars.', action: { kind: 'tab', tab: 'cutscene' } },
+        { text: 'Finish with a **cameraRestore** event so it blends back into play.' }
+      ] },
+    { id: 'rec:cs-intro', title: 'Play a cutscene when entering a room (or on new game)', syn: 'cutscene intro trigger enter room new game opening play in place zone start',
+      body: 'Trigger a built cutscene from a zone, or set a room’s intro.',
+      steps: [
+        { text: 'Place a **Cutscene trigger** zone (Markers) and pick your cutscene — it plays in place when the player enters.', action: { kind: 'place', cat: 'markers', id: 'cutsceneTrigger', label: 'Cutscene trigger' } },
+        { text: 'For a room intro, deselect → **Level settings** → set the **Intro cutscene**.', action: { kind: 'highlight', field: 'Intro' } }
       ] }
   ];
 

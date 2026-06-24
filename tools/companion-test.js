@@ -48,6 +48,11 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       out.del = top('how do I duplicate and delete objects');          // -> rec:select
       out.godray = top('add a god ray light shaft');                   // -> rec:godray
       out.timer = top('do something after a delay on a timer');        // -> rec:logic-timer
+      // harvested charm / enemy / boss / cutscene knowledge
+      out.charmInfo = top('what does the stoneheart charm do');        // -> charm:stoneheart
+      out.enemyInfo = top('tell me about the tumblebug');              // -> enemy:tumblebug
+      out.bossInfo = top('tell me about the moss sovereign');          // -> boss:mossSovereign
+      out.csCam = top('add a camera move to a cutscene');              // -> rec:cs-camera
       // answer() renders steps + act buttons into the log
       C.ask('how do I make a door open with a lever?');
       const log = document.getElementById('cpLog');
@@ -87,6 +92,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.charm === 'rec:charm-pickup' && o.prefab === 'rec:prefab' && o.water === 'rec:water' && o.nail === 'rec:nailsmith'
       && o.zone === 'rec:logic-zone' && o.wings === 'rec:wings' && o.biome === 'rec:biome'
       && o.elements === 'rec:elements' && o.del === 'rec:select' && o.godray === 'rec:godray' && o.timer === 'rec:logic-timer'
+      && o.charmInfo === 'charm:stoneheart' && /tumblebug/.test(String(o.enemyInfo)) && /mossSovereign/.test(String(o.bossInfo)) && o.csCam === 'rec:cs-camera'
       && o.rendered === true && o.armed === true && o.focus === true
       && o.diag === true && o.followup === true
       && o.issueCount >= 1 && o.badge === 'block' && o.walk > 0
