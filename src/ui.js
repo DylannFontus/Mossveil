@@ -246,6 +246,31 @@
     cx.save(); cx.textAlign = 'right'; cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`; cx.fillText('↑ ↓  browse        Esc  back', w - 32, h - 32); cx.restore();
   }
 
+  // soul-well spell tree (same menu chrome)
+  function drawSpellTree() {
+    pmAcc = biomeAccent(); menuChrome(); menuHeader('SPELLS');
+    const tree = G.Main.SPELL_TREE || [], idx = U.clamp(G.Main.spellIndex || 0, 0, tree.length - 1);
+    cx.save(); cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+    cx.font = `${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = 'rgba(201,160,255,0.85)';
+    cx.fillText('Glimmer  ' + (G.Main.glimmer ? G.Main.glimmer() : 0) + ' ✦', w * 0.3, h * 0.16 + 26);
+    const lx = w * 0.3, ly = h * 0.28, step = Math.min(h * 0.1, 76);
+    for (let i = 0; i < tree.length; i++) {
+      const s = tree[i], yy = ly + i * step, sel = i === idx, lvl = G.Main.spellLevel(s.id), cost = G.Main.spellCost(s.id);
+      if (sel) { cx.globalAlpha = 0.9; cx.fillStyle = pmAcc; cx.fillRect(lx - 12, yy - 26, w * 0.5, step - 12); cx.globalAlpha = 1; }
+      cx.font = `${sel ? '900' : '700'} ${Math.round(h * 0.032)}px ${menuFont}`; cx.textAlign = 'left';
+      cx.fillStyle = sel ? '#06120e' : (lvl >= 1 ? 'rgba(222,210,245,0.95)' : 'rgba(150,140,165,0.7)');
+      cx.fillText(s.name + (lvl >= 2 ? '  ★★' : lvl >= 1 ? '  ★' : ''), lx, yy);
+      cx.font = `italic ${Math.round(h * 0.021)}px ${serif}`; cx.fillStyle = sel ? 'rgba(6,18,14,0.8)' : 'rgba(180,200,190,0.7)';
+      cx.fillText(s.tiers[lvl] || s.tiers[1], lx, yy + Math.round(h * 0.03));
+      cx.textAlign = 'right'; cx.font = `${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = sel ? 'rgba(6,18,14,0.85)' : 'rgba(201,160,255,0.8)';
+      cx.fillText(lvl >= 2 ? 'mastered' : (cost + ' ✦  ·  ' + s.cast), lx + w * 0.5 - 16, yy);
+      cx.textAlign = 'left';
+    }
+    cx.restore();
+    cx.save(); cx.textAlign = 'right'; cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`;
+    cx.fillText('↑ ↓  select        Enter  learn / empower        Esc  back', w - 32, h - 32); cx.restore();
+  }
+
   function drawPrompts() {
     cx.textAlign = 'center';
     for (const pr of prompts) {
@@ -1286,6 +1311,7 @@
     }
     if (st === 'dialogue') drawDialogue();
     if (st === 'quests') drawQuestLog();
+    if (st === 'spelltree') drawSpellTree();
     if (st === 'charms') drawCharms();
     if (st === 'journal') drawJournal();
     if (st === 'settings') drawSettings();

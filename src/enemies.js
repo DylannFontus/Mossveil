@@ -898,8 +898,9 @@
   }
   E.spawnProjectile = spawnProjectile;
 
-  E.fireBolt = (x, y, dir) => {
-    spawnProjectile({ x, y, vx: dir * 17, vy: 0, r: 0.32, color: 0xcfeaff, friendly: true, life: 1.1, dmg: 3 });
+  E.fireBolt = (x, y, dir, o) => {
+    o = o || {};
+    spawnProjectile({ x, y, vx: dir * (o.speed || 17), vy: 0, r: o.r || 0.32, color: o.color || 0xcfeaff, friendly: true, life: 1.1, dmg: o.dmg || 3 });
   };
 
   // =========================== SHOCKWAVE ===========================

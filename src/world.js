@@ -1535,6 +1535,28 @@
     };
   };
 
+  // a soul well — interact to open the spell tree (learn / empower spells with Glimmer)
+  mkProp.spellwell = (p) => {
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    grp.add(U.flat(U.poly([[-1.1, 0], [1.1, 0], [0.75, 0.7], [-0.75, 0.7]]), 0x16202e, {}));
+    const orb = U.flat(U.ellipse(0.42, 0.55), 0xc9a0ff, { additive: true, opacity: 0.55, y: 1.2 }); grp.add(orb);
+    if (U.glowSprite) { const g = U.glowSprite(0xb070ff, 4.5, 0.3); g.position.set(0, 1.2, -0.1); grp.add(g); }
+    let ph = U.rand(0, 9);
+    return {
+      type: 'spellwell', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        ph += dt; orb.position.y = 1.2 + Math.sin(ph * 1.5) * 0.1; orb.material.opacity = 0.45 + Math.sin(ph * 2.2) * 0.12;
+        if (U.chance(dt * 5)) G.FX.p(true, { x: p.x + U.rand(-0.4, 0.4), y: p.y + 1, vx: 0, vy: U.rand(0.5, 1.5), life: 0.9, size: 0.14, color: 0xc9a0ff, alpha: 0.5 });
+        const pl = G.player;
+        if (!pl || pl.dead || G.Main.state !== 'play') return;
+        if (Math.abs(pl.body.x - p.x) < 2.1 && Math.abs(pl.body.y - p.y) < 3) {
+          G.UI.prompt(p.x, p.y + 2.5, 'commune — E or ↑');
+          if (G.Input.pressed('interact') || G.Input.pressed('up')) G.Main.openSpellTree();
+        }
+      }
+    };
+  };
+
   // a nailsmith — interact to forge the nail (spends Glimmer to raise base damage)
   mkProp.smith = (p) => {
     const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);

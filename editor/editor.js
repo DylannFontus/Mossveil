@@ -264,7 +264,7 @@
     bench: [2.6, 1.5], sign: [1.1, 1.4], readable: [1.1, 1.6], lamp: [0.8, 2.1],
     crystal: [1.3, 1.8], wings: [1.6, 1.2], shrine: [1.8, 2.8], gate: [1.1, 5],
     bossTrigger: [2, 2], decor: [1.6, 1.6], light: [1.4, 1.4], ray: [2, 2], textTrigger: [3, 3],
-    vendor: [1.2, 2], charmPickup: [1, 1], smith: [1.9, 2.2]
+    vendor: [1.2, 2], charmPickup: [1, 1], smith: [1.9, 2.2], spellwell: [2.2, 1.9]
   };
   function propRect(p) {
     if (p.type === 'textTrigger' || p.type === 'cutsceneTrigger') return { x: p.x, y: p.y, w: p.w || 3, h: p.h || 3 };
@@ -1589,6 +1589,7 @@
         { cat: 'prop', id: 'gate', label: 'Boss gate', ico: '🚪', defaults: { id: 0 } },
         { cat: 'prop', id: 'vendor', label: 'Vendor (charm shop)', ico: '🧙' },
         { cat: 'prop', id: 'smith', label: 'Nailsmith (forge)', ico: '⚒️' },
+        { cat: 'prop', id: 'spellwell', label: 'Soul well (spells)', ico: '🔮' },
         { cat: 'prop', id: 'charmPickup', label: 'Charm pickup', ico: '🔆', defaults: { charm: 'stoneheart' } },
         { cat: 'prop', id: 'npc', label: 'NPC (dialogue)', ico: '🧝', defaults: { name: 'Wanderer', color: '#6a7a8a', dialogue: { lines: [{ speaker: 'Wanderer', text: 'These tunnels remember more than they tell.' }] } } }
       ];

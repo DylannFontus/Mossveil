@@ -518,6 +518,13 @@
     if (b.onGround) {
       p.coyoteT = COYOTE;
       p.wingUsed = false;
+      if (!wasGround && p.diveActive) {                  // Desolate Dive shockwave on landing
+        const dv = p.diveActive; p.diveActive = null;
+        for (const e of G.room.entities) if (e.isEnemy && e.alive && Math.abs(e.body.x - b.x) < dv.r && Math.abs(e.body.y - b.y) < 2.2) e.hurt(dv.dmg, e.body.x >= b.x ? 1 : -1, 'down');
+        G.FX.ring(b.x, b.y, { r1: dv.r, life: 0.36, color: dv.dark ? 0x8050c0 : 0xb070ff, alpha: 0.65 });
+        G.FX.burst('spark', b.x, b.y, { n: 18, color: 0xc9a0ff }); G.FX.burst('dust', b.x, b.y, { n: 12 });
+        G.FX.shake(0.3, 0.3); G.Audio.sfx('stomp'); if (G.Input.rumble) G.Input.rumble(0.7, 0.6, 220);
+      }
       if (!wasGround) {
         const impact = Math.min(1, -b.vyLand / 22 || 0.4);
         G.FX.burst('land', b.x, b.y - 0.62);
@@ -568,14 +575,37 @@
     p.root.position.set(b.x, b.y, 0);
   }
 
+  function spellLvl(id) { const s = G.save.spells; return s && s[id] != null ? s[id] : (id === 'bolt' ? 1 : 0); }
   function trySpell(p) {
     if (p.soul < SPELL_COST) { G.Audio.sfx('soul'); return; }
+    const I = G.Input;
+    let kind = 'bolt';                                   // aim the spell with the d-pad
+    if (I.down('up') && spellLvl('scream') >= 1) kind = 'scream';
+    else if (I.down('down') && !p.body.onGround && spellLvl('dive') >= 1) kind = 'dive';
+    if (spellLvl(kind) < 1) { G.Audio.sfx('clink'); return; }
     p.spendSoul(SPELL_COST);
     G.Audio.sfx('spell');
-    G.Enemies.fireBolt(p.body.x + p.facing * 0.7, p.body.y + 0.35, p.facing);
-    p.body.vx -= p.facing * 3;
-    G.FX.shake(0.1, 0.12);
-    G.FX.burst('soul', p.body.x + p.facing * 0.8, p.body.y + 0.35, { n: 6 });
+    if (kind === 'bolt') castBolt(p, spellLvl('bolt'));
+    else if (kind === 'scream') castScream(p, spellLvl('scream'));
+    else castDive(p, spellLvl('dive'));
+  }
+  function castBolt(p, lvl) {
+    const big = lvl >= 2, b = p.body;
+    G.Enemies.fireBolt(b.x + p.facing * 0.7, b.y + 0.35, p.facing, { dmg: big ? 5 : 3, speed: big ? 22 : 17, r: big ? 0.5 : 0.32, color: big ? 0xc9a0ff : 0xcfeaff });
+    b.vx -= p.facing * 3; G.FX.shake(big ? 0.15 : 0.1, 0.12);
+    G.FX.burst('soul', b.x + p.facing * 0.8, b.y + 0.35, { n: big ? 10 : 6 });
+  }
+  function castScream(p, lvl) {                          // Howling Wraiths — burst upward
+    const b = p.body, dmg = lvl >= 2 ? 6 : 4, range = lvl >= 2 ? 5.2 : 4;
+    const hb = { x: b.x, y: b.y + range / 2 + 0.4, w: range * 1.5, h: range };
+    for (const e of G.room.entities) if (e.isEnemy && e.alive && U.overlap(hb, e.body)) e.hurt(dmg, e.body.x >= b.x ? 1 : -1, 'up');
+    G.FX.burst('soul', b.x, b.y + 1, { n: 18, color: lvl >= 2 ? 0xc9a0ff : 0xc9d8ff });
+    G.FX.ring(b.x, b.y + 1.5, { r1: range, life: 0.32, color: lvl >= 2 ? 0xc9a0ff : 0xc9d8ff, alpha: 0.6 });
+    G.FX.shake(0.18, 0.2); if (G.Input.rumble) G.Input.rumble(0.4, 0.4, 160);
+  }
+  function castDive(p, lvl) {                            // Desolate Dive — slam down, shockwave on landing
+    p.body.vy = -28; p.diveActive = { dmg: lvl >= 2 ? 7 : 5, r: lvl >= 2 ? 5.2 : 4, dark: lvl >= 2 };
+    G.FX.burst('soul', p.body.x, p.body.y, { n: 12, color: 0xb070ff });
   }
 
   // ---------------- procedural animation ----------------

@@ -691,6 +691,28 @@
     G.UI.toast('Nail forged — strike +' + (lvl + 1));
   };
 
+  // spell tree: three spells (forward bolt / upward cry / downward dive), each with two tiers,
+  // unlocked/empowered with Glimmer at a soul well.
+  Main.SPELL_TREE = [
+    { id: 'bolt', name: 'Soul Bolt', cast: 'Cast', tiers: ['', 'A bolt of soul flung forward.', 'Shade Soul — a greater, faster bolt.'], cost: [0, 0, 130] },
+    { id: 'scream', name: 'Wraith Cry', cast: 'Hold ↑ + Cast', tiers: ['Not yet learned.', 'Howling Wraiths — spirits burst upward.', 'Abyss Shriek — a greater, wider cry.'], cost: [0, 80, 170] },
+    { id: 'dive', name: 'Abyss Dive', cast: 'Hold ↓ + Cast (airborne)', tiers: ['Not yet learned.', 'Desolate Dive — slam down with a shockwave.', 'Descending Dark — a darker, wider dive.'], cost: [0, 110, 190] }
+  ];
+  Main.spellIndex = 0;
+  Main.spellLevel = id => { const s = G.save && G.save.spells; return s && s[id] != null ? s[id] : (id === 'bolt' ? 1 : 0); };
+  Main.spellCost = id => { const t = Main.SPELL_TREE.find(s => s.id === id); const lvl = Main.spellLevel(id); return (t && lvl < 2) ? t.cost[lvl + 1] : 0; };
+  Main.upgradeSpell = id => {
+    const lvl = Main.spellLevel(id); if (lvl >= 2) { G.UI.toast('Already mastered.'); return; }
+    const cost = Main.spellCost(id);
+    if (Main.glimmer() < cost) { G.Audio.sfx('clink'); G.UI.toast('Not enough Glimmer — ' + cost + ' needed.'); return; }
+    Main.spendGlimmer(cost);
+    G.save.spells = G.save.spells || { bolt: 1 }; G.save.spells[id] = lvl + 1; Main.persist();
+    G.Audio.sfx('heal'); if (G.Post) G.Post.flash(0.3, 0xc9a0ff); G.FX.shake(0.18, 0.25);
+    const nm = Main.SPELL_TREE.find(s => s.id === id).name;
+    G.UI.toast((lvl === 0 ? 'Learned — ' : 'Empowered — ') + nm);
+  };
+  Main.openSpellTree = () => { Main.spellIndex = 0; G.save.spells = G.save.spells || { bolt: 1 }; menuGo('spelltree'); };
+
   Main.onPlayerDeath = () => {
     if (Main.state === 'dead') return;
     Main.state = 'dead';
@@ -887,6 +909,15 @@
           G.Dialogue.advance();
         }
         if (I.pressed('pause')) G.Dialogue.cancel();
+        break;
+      }
+      case 'spelltree': {
+        dt = 0;
+        const n = Main.SPELL_TREE.length;
+        if (I.pressed('up')) { Main.spellIndex = (Main.spellIndex - 1 + n) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.spellIndex = (Main.spellIndex + 1) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('confirm') || I.pressed('jump') || I.pressed('attack')) Main.upgradeSpell(Main.SPELL_TREE[Main.spellIndex].id);
+        if (I.pressed('pause')) { G.Audio.sfx('clink'); Main.state = 'play'; }
         break;
       }
       case 'quests': {
