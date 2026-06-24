@@ -14,7 +14,7 @@
   // tone()/noiseHit() connect here; sfxAt() temporarily redirects it through a panner for positional one-shots
   let sfxTarget = null;
   // 'score' = the composed G.Music engine; 'classic' = the original drones + generative plucks
-  let musicStyle = 'score', musicTrack = 'gloom';
+  let musicStyle = 'score', musicTrack = 'gloom', musicSilenced = false;
 
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
@@ -51,7 +51,7 @@
     if (!started) return;
     const classic = musicStyle === 'classic';
     droneNodes.forEach(n => n.g.gain.setTargetAtTime(classic ? (bossOn ? n.baseVol * 2 : n.baseVol) : 0.0001, ctx.currentTime, 1.2));
-    if (G.Music) { if (classic) G.Music.pause(); else { G.Music.setBoss(bossOn); G.Music.setIntensity(intensity); G.Music.resume(); } }
+    if (G.Music) { if (classic || musicSilenced) G.Music.pause(); else { G.Music.setBoss(bossOn); G.Music.setIntensity(intensity); G.Music.resume(); } }
   }
 
   function startAmbience() {
@@ -283,6 +283,13 @@
     setMusicTrack(track, biome) {
       const id = (!track || track === 'auto') ? (G.Music ? G.Music.trackForBiome(biome) : 'gloom') : track;
       musicTrack = id; if (G.Music) G.Music.setTrack(id);
+    },
+    // hush the composed score during the new-game prologue / cutscenes (they have their own audio)
+    musicForState(state) {
+      const silence = (state === 'prologue' || state === 'cutscene');
+      if (silence === musicSilenced) return;
+      musicSilenced = silence;
+      if (musicStyle === 'score' && G.Music) { if (silence) G.Music.pause(); else G.Music.resume(); }
     },
     // adaptive music: 0 = calm exploration, 1 = full combat tension (driven by on-screen danger)
     setIntensity(v) { targetIntensity = Math.max(0, Math.min(1, v || 0)); },

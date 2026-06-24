@@ -7,19 +7,40 @@
   const M = G.Music = {};
   let ctx = null, busDry = null, busWet = null, noiseBuf = null;
   let playing = false, intensity = 0, bossOn = false;
-  let trackId = 'verdant', track = null, pendingTrack = null;
+  let trackId = 'verdant', track = null;
   let nextTime = 0, step = 0;
   const LOOK = 0.14;                                  // schedule this far ahead (s)
 
-  const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10], DOR = [0, 2, 3, 5, 7, 9, 10], PHR = [0, 1, 3, 5, 7, 8, 10], PENT = [0, 3, 5, 7, 10];
+  const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10], DOR = [0, 2, 3, 5, 7, 9, 10], PHR = [0, 1, 3, 5, 7, 8, 10],
+    PENT = [0, 3, 5, 7, 10], LYD = [0, 2, 4, 6, 7, 9, 11], HARM = [0, 2, 3, 5, 7, 8, 11], WHOLE = [0, 2, 4, 6, 8, 10], LOC = [0, 1, 3, 5, 6, 8, 10];
   // root in Hz, a scale, a 4-bar chord progression (scale-degree roots), instrument character
   const TRACKS = {
+    // ---- the six biome themes (used by Auto-by-biome) ----
     verdant: { bpm: 86, root: 220.0, scale: MAJ, prog: [0, 5, 3, 4], pad: 'sawtooth', padCut: 950, bass: 'triangle', leadCut: 2400, drums: 0.5 },
     gloom: { bpm: 70, root: 146.8, scale: MIN, prog: [0, 5, 3, 4], pad: 'sawtooth', padCut: 720, bass: 'sine', leadCut: 1900, drums: 0.45 },
     city: { bpm: 74, root: 196.0, scale: MIN, prog: [0, 3, 4, 3], pad: 'triangle', padCut: 1050, bass: 'triangle', leadCut: 2500, drums: 0.4 },
     forge: { bpm: 110, root: 130.8, scale: DOR, prog: [0, 0, 6, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1700, drums: 0.8 },
     tomb: { bpm: 58, root: 130.8, scale: PHR, prog: [0, 1, 4, 1], pad: 'sine', padCut: 620, bass: 'sine', leadCut: 1500, drums: 0.3 },
-    garden: { bpm: 92, root: 261.6, scale: PENT, prog: [0, 2, 3, 4], pad: 'triangle', padCut: 1150, bass: 'triangle', leadCut: 2700, drums: 0.4 }
+    garden: { bpm: 92, root: 261.6, scale: PENT, prog: [0, 2, 3, 4], pad: 'triangle', padCut: 1150, bass: 'triangle', leadCut: 2700, drums: 0.4 },
+    // ---- standalone moods (pick per-level): upbeat → dark, plus some off-vibe ----
+    radiant: { bpm: 128, root: 293.7, scale: MAJ, prog: [0, 4, 5, 4], pad: 'sawtooth', padCut: 1300, bass: 'triangle', leadCut: 3000, drums: 0.85 },
+    triumph: { bpm: 112, root: 261.6, scale: MAJ, prog: [0, 3, 4, 5], pad: 'sawtooth', padCut: 1200, bass: 'sawtooth', leadCut: 2800, drums: 0.8 },
+    hopeful: { bpm: 100, root: 246.9, scale: MAJ, prog: [0, 5, 3, 4], pad: 'triangle', padCut: 1100, bass: 'triangle', leadCut: 2600, drums: 0.55 },
+    skyward: { bpm: 104, root: 261.6, scale: LYD, prog: [0, 1, 4, 0], pad: 'triangle', padCut: 1250, bass: 'triangle', leadCut: 2900, drums: 0.6 },
+    serene: { bpm: 76, root: 220.0, scale: LYD, prog: [0, 4, 1, 0], pad: 'sine', padCut: 900, bass: 'sine', leadCut: 2200, drums: 0.2 },
+    nocturne: { bpm: 68, root: 174.6, scale: MIN, prog: [0, 5, 3, 4], pad: 'sine', padCut: 760, bass: 'sine', leadCut: 1700, drums: 0.3 },
+    wistful: { bpm: 80, root: 196.0, scale: DOR, prog: [0, 4, 5, 3], pad: 'triangle', padCut: 980, bass: 'triangle', leadCut: 2300, drums: 0.35 },
+    mystic: { bpm: 84, root: 174.6, scale: DOR, prog: [0, 2, 5, 4], pad: 'sawtooth', padCut: 860, bass: 'sine', leadCut: 2000, drums: 0.4 },
+    arcane: { bpm: 88, root: 185.0, scale: WHOLE, prog: [0, 2, 4, 2], pad: 'sine', padCut: 880, bass: 'sine', leadCut: 2100, drums: 0.35 },
+    glacial: { bpm: 62, root: 207.7, scale: MIN, prog: [0, 3, 5, 3], pad: 'sine', padCut: 1000, bass: 'sine', leadCut: 2400, drums: 0.2 },
+    lament: { bpm: 60, root: 164.8, scale: HARM, prog: [0, 4, 1, 4], pad: 'sine', padCut: 700, bass: 'sine', leadCut: 1600, drums: 0.25 },
+    somber: { bpm: 64, root: 146.8, scale: MIN, prog: [0, 5, 6, 4], pad: 'sawtooth', padCut: 680, bass: 'sine', leadCut: 1500, drums: 0.3 },
+    tense: { bpm: 96, root: 130.8, scale: HARM, prog: [0, 6, 4, 0], pad: 'sawtooth', padCut: 760, bass: 'sawtooth', leadCut: 1700, drums: 0.6 },
+    march: { bpm: 100, root: 146.8, scale: MIN, prog: [0, 6, 5, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1800, drums: 0.85 },
+    chase: { bpm: 138, root: 146.8, scale: PHR, prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 900, bass: 'sawtooth', leadCut: 1900, drums: 0.95 },
+    frantic: { bpm: 132, root: 130.8, scale: LOC, prog: [0, 4, 1, 5], pad: 'sawtooth', padCut: 840, bass: 'sawtooth', leadCut: 1800, drums: 0.95 },
+    abyss: { bpm: 56, root: 110.0, scale: PHR, prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 560, bass: 'sine', leadCut: 1300, drums: 0.3 },
+    void: { bpm: 52, root: 98.0, scale: LOC, prog: [0, 6, 1, 0], pad: 'sine', padCut: 500, bass: 'sine', leadCut: 1200, drums: 0.25 }
   };
   const BIOME = {
     verdant: 'verdant', garden: 'garden', village: 'verdant', warm: 'verdant', crown: 'verdant',
@@ -65,28 +86,37 @@
     const T = track, dur16 = 60 / T.bpm / 4, bar = (s >> 4) & 3, beat = s & 15;
     const ch = chord(T, T.prog[bar]);
     const root = T.root, boss = bossOn, inten = boss ? 1 : intensity;
-    // pad — once per bar, sustained
-    if (beat === 0) ch.forEach((semi, i) => voice(hz(root, semi - 12 + (i === 0 ? -12 : 0)), t0, dur16 * 15.5, { type: T.pad, cut: T.padCut, voices: 2, detune: 11, a: 0.4, d: 0.6, s: 0.7, r: 0.8, vol: 0.05, wet: true, fenv: false }));
-    // bass — root on the downbeats (+ a passing fifth)
-    if (beat === 0 || beat === 8) voice(hz(root, T.prog[bar] === 0 ? -24 : chord(T, T.prog[bar])[0] - 24), t0, dur16 * 3.5, { type: T.bass, cut: 520, voices: 1, sub: true, a: 0.01, d: 0.15, s: 0.5, r: 0.2, vol: 0.16 });
-    if (beat === 14 && inten > 0.3) voice(hz(root, ch[1] - 24), t0, dur16 * 1.5, { type: T.bass, cut: 520, voices: 1, a: 0.01, d: 0.1, s: 0.4, r: 0.15, vol: 0.12 });
-    // arpeggio — chord tones, denser/louder as it heats up
-    if (beat % 2 === 0) { const note = ch[(s >> 1) % 3]; voice(hz(root, note + 12), t0, dur16 * 1.4, { type: 'triangle', cut: T.leadCut, voices: 1, a: 0.005, d: 0.1, s: 0.25, r: 0.18, vol: 0.04 + inten * 0.05, wet: true }); }
-    // lead — stepwise melody on strong beats, fades in with intensity
+    const aggr = Math.max(0, (inten - 0.3) / 0.7);     // 0..1 — combat aggression (threat)
+    // pad — once per bar; darker & quieter under combat (yields to the rhythm)
+    if (beat === 0) ch.forEach((semi, i) => voice(hz(root, semi - 12 + (i === 0 ? -12 : 0)), t0, dur16 * 15.5, { type: T.pad, cut: T.padCut * (1 - aggr * 0.25), voices: 2, detune: 11, a: 0.4, d: 0.6, s: 0.7, r: 0.8, vol: 0.05 * (1 - aggr * 0.35), wet: true }));
+    // TENSION drone — a low tritone fades in with aggression: menace
+    if (beat === 0 && aggr > 0.05) voice(hz(root, -12 + 6), t0, dur16 * 15.5, { type: 'sawtooth', cut: 520, voices: 2, detune: 16, a: 0.3, d: 0.5, s: 0.85, r: 0.6, vol: 0.06 * aggr });
+    // bass — driving under combat (pumps on more beats, brighter cutoff)
+    if (beat === 0 || beat === 8) voice(hz(root, T.prog[bar] === 0 ? -24 : chord(T, T.prog[bar])[0] - 24), t0, dur16 * 3.5, { type: T.bass, cut: 520 + aggr * 320, voices: 1, sub: true, a: 0.01, d: 0.15, s: 0.5, r: 0.2, vol: 0.16 + aggr * 0.06 });
+    if (aggr > 0.3 && (beat === 4 || beat === 12)) voice(hz(root, ch[0] - 24), t0, dur16 * 1.8, { type: T.bass, cut: 620, voices: 1, a: 0.005, d: 0.1, s: 0.45, r: 0.15, vol: 0.1 + aggr * 0.05 });
+    // arpeggio — pretty when calm; pulls back under combat
+    if (beat % 2 === 0) { const note = ch[(s >> 1) % 3]; voice(hz(root, note + 12), t0, dur16 * 1.4, { type: 'triangle', cut: T.leadCut, voices: 1, a: 0.005, d: 0.1, s: 0.25, r: 0.18, vol: (0.045 + inten * 0.03) * (1 - aggr * 0.45), wet: true }); }
+    // lead — calm: a clean melody; combat: harsher, lower, staccato, with chromatic bite
     if ((beat === 0 || beat === 6 || beat === 10) && inten > 0.28) {
       const sc = T.scale;
-      if (beat === 0) lead = T.prog[bar] + 4;          // settle to a chord tone at the bar
+      if (beat === 0) lead = T.prog[bar] + 4;
       else lead += (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.7 ? 1 : 2);
       lead = Math.max(0, Math.min(sc.length * 2 - 1, lead));
-      const semi = sc[lead % sc.length] + 12 * Math.floor(lead / sc.length);
-      voice(hz(root, semi + 12), t0, dur16 * (beat === 0 ? 3 : 1.6), { type: boss ? 'sawtooth' : 'square', cut: T.leadCut, voices: 1, a: 0.008, d: 0.12, s: 0.35, r: 0.25, vol: 0.05 + inten * 0.06, wet: true, fenv: true });
+      let semi = sc[lead % sc.length] + 12 * Math.floor(lead / sc.length);
+      if (aggr > 0.5 && Math.random() < 0.3) semi += 1;   // chromatic tension
+      voice(hz(root, semi + (aggr > 0.4 ? 0 : 12)), t0, dur16 * (aggr > 0.4 ? 1.1 : (beat === 0 ? 3 : 1.6)), { type: aggr > 0.3 ? 'sawtooth' : 'square', cut: T.leadCut * (aggr > 0.3 ? 0.7 : 1), voices: aggr > 0.5 ? 2 : 1, detune: 10, a: 0.006, d: 0.1, s: 0.35, r: 0.2, vol: 0.05 + inten * 0.07, wet: true, fenv: true });
     }
-    // drums — kick on 1 & 3, hats on 8ths, snare on 2 & 4 once engaged
+    // dissonant offbeat stabs at high threat
+    if (aggr > 0.6 && (beat === 3 || beat === 7 || beat === 11 || beat === 15) && Math.random() < 0.55)
+      [ch[0], ch[1] + 1].forEach(semi => voice(hz(root, semi), t0, dur16 * 0.6, { type: 'sawtooth', cut: 1500, voices: 1, a: 0.004, d: 0.05, s: 0.18, r: 0.1, vol: 0.045 * aggr }));
+    // drums — light when calm; driving 4-on-the-floor + hard low snare + busy hats under combat
     const dv = T.drums;
     if (beat === 0 || beat === 8) kick(t0, 0.18 * dv * (0.5 + inten * 0.7));
-    if (beat % 2 === 0) perc(t0, (0.02 + inten * 0.045) * dv, 6500, 0.04);
-    if ((beat === 4 || beat === 12) && inten > 0.35) perc(t0, 0.06 * dv * inten, 1800, 0.12);
-    if (boss && (beat === 6 || beat === 14)) kick(t0, 0.16 * dv);
+    if (aggr > 0.35 && (beat === 4 || beat === 12)) kick(t0, 0.16 * dv * aggr);
+    if (beat % 2 === 0) perc(t0, (0.02 + inten * 0.05) * dv, 6500, 0.04);
+    if (aggr > 0.5 && beat % 2 === 1) perc(t0, 0.03 * dv * aggr, 7800, 0.03);
+    if ((beat === 4 || beat === 12) && inten > 0.35) perc(t0, (0.06 + aggr * 0.06) * dv * inten, 1700, 0.13);
+    if (boss && (beat === 2 || beat === 6 || beat === 10 || beat === 14)) kick(t0, 0.14 * dv);
   }
 
   M.start = (audioCtx, dry, wet) => {
@@ -95,7 +125,18 @@
     busWet = ctx.createGain(); busWet.gain.value = 0; if (wet) busWet.connect(wet);
     track = TRACKS[trackId] || TRACKS.gloom;
   };
-  M.setTrack = id => { if (id && TRACKS[id] && id !== trackId) { if (playing) pendingTrack = id; else { trackId = id; track = TRACKS[id]; } } };
+  M.setTrack = id => {                                 // quick crossfade so room changes swap promptly
+    if (!id || !TRACKS[id] || id === trackId) return;
+    if (!playing || !ctx) { trackId = id; track = TRACKS[id]; return; }
+    const now = ctx.currentTime;
+    busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
+    busDry.gain.setTargetAtTime(0.0001, now, 0.1); busWet.gain.setTargetAtTime(0.0001, now, 0.1);
+    setTimeout(() => {
+      if (!playing) return;
+      trackId = id; track = TRACKS[id]; step = 0; lead = 0; nextTime = ctx.currentTime + 0.05;
+      busDry.gain.setTargetAtTime(0.9, ctx.currentTime, 0.35); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.35);
+    }, 230);
+  };
   M.setIntensity = v => { intensity = Math.max(0, Math.min(1, v || 0)); };
   M.setBoss = on => { bossOn = !!on; };
   M.resume = () => {                                  // ramp the music in (called when Score style is active)
@@ -109,7 +150,6 @@
     while (nextTime < ctx.currentTime + LOOK) {
       schedStep(step, nextTime);
       step = (step + 1) & 63;
-      if (step === 0 && pendingTrack) { trackId = pendingTrack; track = TRACKS[trackId]; pendingTrack = null; }   // swap at the loop point
       nextTime += dur16;
     }
   };

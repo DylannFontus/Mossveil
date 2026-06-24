@@ -1074,6 +1074,7 @@
       } else G.Audio.setIntensity(0);
     }
     if (G.Quests && G.Quests.update && Main.state === 'play') G.Quests.update();
+    if (G.Audio.musicForState) G.Audio.musicForState(Main.state);
     G.Audio.update(rdt);
     if (G.Lights) G.Lights.update(rdt, G.time);
     if (G.EventGraph) G.EventGraph.update(rdt);

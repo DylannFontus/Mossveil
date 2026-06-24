@@ -1,5 +1,5 @@
-// Composed soundtrack: the Score engine starts + schedules, Score/Classic switch, per-track
-// selection, and intensity/boss all run without error.
+// Composed soundtrack: many tracks, style switch, crossfade track-change, aggressive combat,
+// state-silencing (prologue/cutscene), and the editor lists all tracks.
 const { spawn } = require('child_process');
 const puppeteer = require('puppeteer-core');
 const path = require('path');
@@ -24,25 +24,29 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await wait(300);
 
     const o = await game.evaluate(() => {
-      const A = G.Audio, o = { started: A.started, hasMusic: !!(G.Music && G.Music.start) };
+      const A = G.Audio, o = {};
       const call = f => { try { f(); return true; } catch (e) { return String(e); } };
-      o.tracks = (A.musicTracks ? A.musicTracks().length : 0);
-      o.style0 = A.musicStyle ? A.musicStyle() : '?';
-      o.setTrack = call(() => A.setMusicTrack('forge'));
-      o.runScore = call(() => { A.setIntensity(0.7); for (let i = 0; i < 60; i++) A.update(0.05); });
-      o.toClassic = call(() => A.setMusicStyle('classic'));
-      o.runClassic = call(() => { for (let i = 0; i < 40; i++) A.update(0.05); });
-      o.toScore = call(() => A.setMusicStyle('score'));
-      o.autoTrack = call(() => A.setMusicTrack('auto', 'city'));
-      o.boss = call(() => { A.setBoss(true); for (let i = 0; i < 30; i++) A.update(0.05); A.setBoss(false); });
-      o.styleNow = A.musicStyle();
+      o.tracks = A.musicTracks ? A.musicTracks().length : 0;
+      o.hasUpbeat = A.musicTracks().includes('radiant'); o.hasDark = A.musicTracks().includes('void');
+      o.crossfade = call(() => { A.setMusicTrack('radiant'); A.setMusicTrack('void'); });
+      o.aggressive = call(() => { A.setIntensity(0.95); for (let i = 0; i < 120; i++) A.update(0.04); });
+      o.silenceProl = call(() => { A.musicForState('prologue'); for (let i = 0; i < 20; i++) A.update(0.04); });
+      o.resumePlay = call(() => { A.musicForState('play'); for (let i = 0; i < 20; i++) A.update(0.04); });
+      o.classicSwitch = call(() => { A.setMusicStyle('classic'); for (let i = 0; i < 20; i++) A.update(0.04); A.setMusicStyle('score'); });
       return o;
     });
-    console.log('RESULT:', JSON.stringify(o));
+
+    // editor lists the tracks in the per-level Music dropdown
+    const ed = await browser.newPage();
+    ed.on('pageerror', e => errs.push('[editor] ' + e.message));
+    await ed.goto('http://localhost:7707/editor/editor.html', { waitUntil: 'load' });
+    await wait(2800);
+    const edTracks = await ed.evaluate(() => (G.Audio && G.Audio.musicTracks) ? G.Audio.musicTracks().length : -1);
+
+    console.log('GAME:', JSON.stringify(o), ' EDITOR tracks:', edTracks);
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
-    const ok = o.hasMusic && o.tracks >= 5 && o.style0 === 'score' && o.setTrack === true && o.runScore === true
-      && o.toClassic === true && o.runClassic === true && o.toScore === true && o.autoTrack === true
-      && o.boss === true && o.styleNow === 'score' && !errs.length;
+    const ok = o.tracks >= 20 && o.hasUpbeat && o.hasDark && o.crossfade === true && o.aggressive === true
+      && o.silenceProl === true && o.resumePlay === true && o.classicSwitch === true && edTracks >= 20 && !errs.length;
     console.log(ok ? 'MUSIC TEST: PASS' : 'MUSIC TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
   } catch (e) { console.error('FAILED', e); process.exitCode = 1; }

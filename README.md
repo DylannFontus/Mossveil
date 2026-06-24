@@ -166,13 +166,15 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   vignette, film grain and chromatic aberration**, plus a living camera (look-ahead +
   zoom-punch on impacts), squash-&-stretch juice, a lantern glow, and per-biome atmosphere
   (drifting haze, fireflies, wind). Visual quality is adjustable in **Settings** (Low/Med/High).
-- **Composed adaptive soundtrack** — a from-scratch synth **score** (6 per-mood themes:
-  verdant / gloom / city / forge / tomb / garden) where each biome's theme is a chord
+- **Composed adaptive soundtrack** — a from-scratch synth **score**: ~24 themes (6 biome
+  defaults + standalone moods from **radiant / triumph** to **abyss / void**), each a chord
   progression driving a pad, bassline, arpeggio, stepwise lead and drums. Exploration is
-  sparse; **as enemies that can see you crowd in, the same theme intensifies** — the lead
-  melody and full drums fade in (and a harder variant plays for bosses), then it relaxes when
-  the room clears. A **Classic** setting restores the original ambient drones, and each level
-  can pick its **Score track** (or Auto-by-biome) in the editor. All synthesised live — no files.
+  sparse; **as enemies that can see you crowd in, the theme turns aggressive** — a low tritone
+  drone, driving four-on-the-floor kick, hard snare and a harsher, chromatic lead make a fight
+  feel *threatening*, then it relaxes when the room clears (bosses drive harder still). It
+  hushes during the new-game prologue, and **crossfades quickly** when you change rooms. A
+  **Classic** setting restores the original ambient drones, and each level picks its **Score
+  track** (or Auto-by-biome) in the editor. All synthesised live — no files.
 - Reverb **changes per biome** (ringing stone halls vs dry forges) and per **reverb zone**;
   footsteps and impacts are **surface-aware** (wood / grass / stone / metal), positioned and
   panned by distance. Short **stingers** punctuate boss reveals, item pickups and quests.
