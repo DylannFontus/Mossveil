@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T16:32:15.460Z_
+_Last generated: 2026-06-24T20:06:19.258Z_
 
 ---
 
@@ -16095,3 +16095,235 @@ Let me verify the editor still loads after the Guide edits, then commit docs + r
 ---
 
 > 🔧 _Actions: PowerShell ×2_
+
+## 🤖 Claude
+
+Done — all eleven approved features are built, tested, and pushed across five commits.
+
+## What shipped
+
+**Weather & fire reactions** (automatic, driven by the weather you set per level)
+- **Steam where fire meets water** — rain/snow dousing a fire, or flames over reflective water, hiss white steam instead of grey smoke.
+- **Wet → can't burn** — after rain stops, the ground stays too wet to ignite for ~6s, then dries.
+- **Heat-haze** — warm wobbling wisps rise off flames (and lava).
+- **Deep snow** — accumulates on the ground during snow/blizzard (persists across rooms), you wade/slow through it and kick it up; melts near fire or when it clears.
+- **Frost edges** — a frosty vignette creeps in from the screen corners during snow/blizzard.
+- **Wind pushes the wanderer** — gentle on the ground, stronger midair.
+- **Dust on landing** (punchier now) and **leaves scattering** as you run on grass (ash on scorched ground).
+
+**Placeable blocks** (editor → Assets → **Dynamic**, all resizable with W/H)
+- **Mud / Quicksand / Ash drift** — soft ground that slows you (quicksand drags you down).
+- **Lava / Acid pool** — sears + bounces you out; lava radiates heat-haze, acid dissolves breakable walls.
+- **Poison gas** — drifting cloud, DOTs you, **disperses in strong wind**, and **ignites in a flash** if you hit it with an Ember Bolt.
+- **Glow flower / mushroom** (under **Lights**) — bioluminescent, brightens as you pass; the **"Destructible" checkbox** decides whether it dies (nail cuts it, fire withers it) or is permanent — exactly the toggle you asked for.
+
+**Bolt elements** (Soul well) — your Soul Bolt now **attunes to one element at a time**:
+- **Frost Bolt** — snuffs fire it flies through and **freezes foes solid** on hit.
+- **Gale Bolt** — **hurls foes back**, fans fire onward, and blows poison gas away.
+- (Ember stays as before.) Confirm a learned-but-inactive element in the soul well to switch to it.
+
+## Two scoping notes
+- **Frost Bolt + water:** I implemented "snuff fire + freeze foes." I did **not** make the bolt create walkable **ice bridges** over water (that's a bigger temporary-platform feature) — blizzards already freeze reflective water to a mirror-ice surface. Say the word if you want the ice-bridge mechanic.
+- **Heat-shimmer** is done as a particle haze, not a true screen-space refraction (which would need a post-processing shader). It reads as rising heat; I can do real refraction in `post.js` if you want the full distortion.
+
+## Verified
+New/extended headless tests all pass: `fire-test` (steam/wet/snow), `hazard-zone-test` (mud/quicksand/lava/gas/flora), `bolt-element-test` (attune + frost/gale effects), plus `smoke` and `editor-smoke` — no errors. README + editor Guide updated.
+
+Want me to capture a few screenshots of these in action, tune any values (slow amounts, damage, snow depth, wind strength), or pick up the deferred ice-bridge / true heat-refraction?
+
+---
+
+## 👤 You
+
+is it possible for you to create a mini ai tab that run locally on editor where I can ask a question to know how to do something in the editor by writing it in a sort of chat box and it would accurately tell me what to do with every detailed steps in editor and buttons to click to get to the point where I understand and know what to do to create what I want. To be precise I need a ai like system that everything and anything about the editor and the game and constantly knows what has been added and modified or deleted. The ultimate compagnion basically. im not asking for something that requires a api acces key or something, really something that actually is all offline. It's a huge task so let me know if it's feasible in a way that wont be cheap and dissapointing and actually up to standard with even some of the current llms on the market. The implementation can take as much time to implement as it needs if you need to know in the consideration of my question.
+
+---
+
+## 🤖 Claude
+
+Short answer: **yes, this is feasible to a genuinely high standard — but not by shipping a real neural LLM into the editor.** Let me be straight with you about why, because the obvious path is exactly the "cheap and disappointing" one you're worried about.
+
+## The trap: a literal offline LLM
+
+You *can* run a real model in the browser with no API key (WebLLM/transformers.js on WebGPU). But for *your* goal it's the worst option:
+
+- **It's heavy** — a model good enough to be useful is a **1–4 GB weight download** and needs **WebGPU** (a modern browser + decent GPU). That also breaks your core architecture (single vendored `three.min.js`, no build step, no asset files — model weights are the ultimate "asset files") and won't work on `file://`.
+- **It hallucinates the exact thing you need to be exact** — small local models confidently invent buttons and menus that don't exist ("click the *Effects* tab" when there is no Effects tab). For "tell me the precise steps and buttons," that's failure.
+- It has a **training cutoff**, so it can *never* truly "know what was just added/modified/deleted" without being re-fed your current state anyway.
+
+So a small local LLM is both the heaviest and the least accurate choice here. That's the disappointing version.
+
+## The version that's actually up to standard
+
+The winning insight: **your editor's knowledge is finite and machine-readable, and I already maintain it.** Every asset, every category, every inspector field, every shortcut, every Guide concept lives in real data structures in `editor.js` (the `ASSETS` list, the inspector `switch`, `CONCEPTS`/`TOOLS`, the keybinds). So instead of *generating* answers (and risking lies), build a **retrieval + recipe "Companion"** that *reads those structures and composes accurate, step-by-step answers from them.*
+
+Why this beats a general LLM for this specific job:
+
+- **It never hallucinates UI** — it only ever names tabs/fields/buttons that genuinely exist, because it derives them from the live editor.
+- **It's always current, for free** — when I add "Lava pool" or a new inspector field, the Companion knows immediately because it reads the same list the editor renders from. No retraining. This is the "constantly knows what's been added/modified/deleted" feature, and it's *real* here in a way an LLM can't match.
+- **It knows your actual scene** — it can read the current level (`lvl()`), so it answers "you've placed 3 levers and a lava pool in this room — to wire the lever to a door, do X" and "to edit the lava pool you just added, select it and set Kind/Width/Height."
+- **Fully offline, no weights, no WebGPU, works on `file://`** — pure JS, tens of KB, fits your no-asset/no-build rule.
+- It can be **actionable**, not just talky: a "Do it for me" button that switches to the right tab, arms placement, or highlights the exact inspector field — because it's the same app driving itself.
+
+```
+┌ Companion ───────────────────────────┐
+│  ▸ how do I make a door open with a   │
+│    lever?                             │
+│ ────────────────────────────────────  │
+│  Lever → Door (switch name):          │
+│  1. Assets ▸ Dynamic ▸ Lever, place   │
+│     it. In Inspector set Signal =     │
+│     "gate1".                  [Place] │
+│  2. Assets ▸ Dynamic ▸ Door, place    │
+│     it. Set Signal = "gate1".  [Place]│
+│  3. Pull the lever in play to open.   │
+│  Related: Pressure plate · Logic graph│
+│ ────────────────────────────────────  │
+│  In THIS room: levers(0) doors(0)     │
+│  [ ask something… ]                   │
+└───────────────────────────────────────┘
+```
+
+**Honest expectation-setting:** for "how do I do X in the editor," a well-built Companion can be *more* reliable than ChatGPT (exact, current, scene-aware). What it *won't* match is open-ended reasoning or deeply weird/vague phrasing — it understands questions via a strong synonym/intent layer, not true language understanding. That gap is closeable in tiers:
+
+- **Tier A — Retrieval + recipe Companion.** The reliable core above. Pure offline.
+- **Tier B — + a tiny embedding model (~25–90 MB, WASM, no WebGPU).** Better at "I phrased it weirdly" — semantic matching. Modest one-time download, cached.
+- **Tier C — + optional WebLLM "deep mode" (1–3 GB, WebGPU, opt-in).** Uses a small real model purely to *phrase* answers from retrieved facts (RAG, so it can't invent buttons). This is the closest to "a current LLM feel," gated behind a clear download/hardware warning — off by default.
+
+My recommendation: **build Tier A properly** (it's the part that's genuinely excellent and matches your constraints), architected so B and optionally C can bolt on later if you ever want the conversational gloss. The bulk of the work is authoring good "recipes" and a synonym map — and since I maintain the editor's data, I can keep it current as we add features.
+
+Before I start, two choices that change what I build:
+
+---
+
+> 🔧 _Actions: AskUserQuestion_
+
+## 🤖 Claude
+
+Both choices locked in: **Tier A + embeddings**, **explain + act**. This is a big build — I'll do it in working, committed stages. Let me start by understanding the editor's DOM layout, tab system, and the data I can auto-harvest for the knowledge base.
+
+---
+
+> 🔧 _Actions: Read_
+
+## 🤖 Claude
+
+I've got the editor layout. Before I write code, let me note your new constraints are answerable — and they actually sharpen the plan. Let me read the editor internals the Companion must hook into (tab switching, placement arming, the asset categories, the Guide data, keybinds):
+
+---
+
+> 🔧 _Actions: Grep, Read ×4_
+
+## 🤖 Claude
+
+I have what I need. Let me answer your two constraints directly, then build.
+
+## Your constraints — both resolved
+
+**1. "Only download if you open the editor, never as a player."** ✅ Fully satisfiable. The Companion (and anything it might load) lives **only in `editor.html`** — the game (`index.html`) never references it. A player who only opens the game downloads nothing extra, ever. So Tier B is allowed by your rule.
+
+**2. "No wifi / fully local."** This is the real fork. An embedding model's weights (~25–40 MB incl. the WASM runtime) can be **wifi-free only if I vendor them into your repo** so they load from local files. That works, but it's a one-time **~30 MB add to your git repo** — heavy and awkward to undo later.
+
+Here's the honest engineering call: your editor-help domain is **bounded and known** (a fixed set of assets, fields, concepts, shortcuts). For that, a **strong lexical engine — synonyms + concept expansion + typo/fuzzy matching — gets you ~90% of an embedding model's "understands what I meant," with zero download, zero wifi, zero repo bloat, and it works on `file://` too.** The embedding model mainly helps with phrasings I didn't anticipate.
+
+So my recommendation, which honors your "fully local, not a good idea?" clause:
+
+> **Build Tier A now as the strong, zero-download, fully-offline engine** — architected so a vendored local MiniLM can plug in later. Use it for real; if you hit questions it misreads, I'll vendor the ~30 MB model then (editor-only, no wifi), with your OK on the size. You likely won't need it.
+
+I'll proceed on that basis. Let me wire the editor hooks the Companion needs (list assets, read the Guide, switch tabs, arm placement):
+
+---
+
+> 🔧 _Actions: Read_
+
+## 🤖 Claude
+
+Let me add an `assetListFor` helper and the Companion API to the editor. First the helper:
+
+---
+
+> 🔧 _Actions: Edit, Read ×2, Grep_
+
+## 🤖 Claude
+
+Now add the Companion API to `G.__ed`:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now the Companion itself. Let me write `editor/companion.js` — the offline KB engine, retrieval, chat UI, and act-buttons:
+
+---
+
+> 🔧 _Actions: Write_
+
+## 🤖 Claude
+
+Now load it in the editor (after `editor.js`):
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+You've hit your session limit · resets 4pm (America/Toronto)
+
+---
+
+## 👤 You
+
+Continue what you were doing
+
+---
+
+## 🤖 Claude
+
+Now let me add a small test API to the companion and write a test. First the hooks:
+
+---
+
+> 🔧 _Actions: Edit, Write_
+
+## 🤖 Claude
+
+I left a stray invalid line in the test. Let me fix it:
+
+---
+
+> 🔧 _Actions: Edit, PowerShell_
+
+## 🤖 Claude
+
+The Companion works end-to-end, fully offline (**0 network calls**), with 219 KB entries, correct intent matching, typo tolerance ("mushrooom"→flora), rendered steps, and working act-buttons. Let me capture a screenshot to check the look:
+
+---
+
+> 🔧 _Actions: Write, PowerShell, Read_
+
+## 🤖 Claude
+
+The Companion panel renders cleanly in the bottom-right with the question, step-by-step answer, and green "Place" act-buttons. Let me add a Guide concept (so it's self-documenting) + a README note, then commit. First the concept:
+
+---
+
+> 🔧 _Actions: Read ×3, Edit_
+
+## 🤖 Claude
+
+Now a README note in the editor section:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Let me confirm the editor still boots cleanly after the Guide edit, then commit:
+
+---
+
+> 🔧 _Actions: PowerShell ×3, Write_
