@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T15:10:30.108Z_
+_Last generated: 2026-06-24T15:22:44.111Z_
 
 ---
 
@@ -15289,3 +15289,142 @@ Now regenerate the conversation log and push:
 ---
 
 > 🔧 _Actions: PowerShell_
+
+## 🤖 Claude
+
+Pushed (`2828eef..34095ac`). Fixed and verified.
+
+## The problem
+The model rotated about its origin (`p.x,p.y`), but the editor's box is centered at an **offset** from that origin (the lever's box sits 0.7 above it). The box was being drawn at that fixed offset without rotating it *around the origin* — so a rotated lever's box drifted off to the side, exactly as your screenshot showed.
+
+## What I changed
+- **Editor selection box** — now drawn as a polygon whose corners are rotated around the model's origin, so the outline tracks any rotated prop precisely (label follows too). The screenshot above shows a 45°-rotated lever with its box correctly tilted around it.
+- **Editor click-to-select** — clicks are inverse-rotated into the prop's local frame before the box test, so you grab a rotated object where it actually appears (not at the old position).
+- **In-game collision** — static solid props (**door, breakable wall, fall-floor, gate**) now run their collider through a `rotCollider()`: the collider center spins about the origin and the box grows to the rotated footprint, so a rotated solid blocks where it looks.
+
+## Notes on the interactables you mentioned
+- **Levers, pressure plates, soul wells** already worked in-game — their "press to use" zone is a symmetric circle/box centered on the origin, which rotation doesn't move. The only thing wrong for them was the editor box, which is now fixed.
+- **Moving platforms / crushers / conveyors** keep an axis-aligned collider — their collider is repositioned every frame to follow their motion, so a one-time OBB rotation wouldn't track it. Visual still rotates.
+- For **non-90° angles**, solid collision uses the axis-aligned *bounding box* of the rotated shape (a slight over-approximation); at 90°/180° it's exact. True per-pixel OBB physics would be a much larger change to the platformer's AABB solver — say the word if you want that.
+
+**Verified:** `rotation-test` now also checks the rotated door collider (became 5×1.2 at the rotated center) and the rotated-lever hit-test (hits the new position, misses the old box) — all pass, no page errors. README + editor Guide updated.
+
+---
+
+## 👤 You
+
+adding the option to the editor where I can change the collision box width and height of any asset ( prop, decor, furniture, my model, build, dynamic, lights, enemies, bosses, markers, prefabs ) in the editor
+
+---
+
+## 🤖 Claude
+
+The user wants a generic, editable collision box on any placed object. Let me understand the solids lifecycle (how they're reset on room load and managed by the active/inactive system) before designing this:
+
+---
+
+> 🔧 _Actions: Grep ×2_
+
+## 🤖 Claude
+
+`e._solid` is the established convention — `setEntityActive` adds/removes it from physics. Let me read that and how solids reset on room load:
+
+---
+
+> 🔧 _Actions: Read_
+
+## 🤖 Claude
+
+`e._solid` is the convention `setEntityActive` already manages, and solids are cleared on room load. Let me confirm where solids reset and look at the dispatch where I'll add the generic collider:
+
+---
+
+> 🔧 _Actions: Grep, Read_
+
+## 🤖 Claude
+
+`P.setRoom` rebuilds solids per room, and `e._solid`/`setEntityActive` is the established pattern. The feature is cleanly **opt-in** (`obj.col = {w,h,ox,oy}`), so it can't affect existing content. Let me implement. First, the world side — a helper + dispatch hooks + active/removal handling:
+
+---
+
+> 🔧 _Actions: Edit ×3_
+
+## 🤖 Claude
+
+Now extend `setEntityActive` to toggle `_colSolid`, and free it on entity death:
+
+---
+
+> 🔧 _Actions: Edit ×2, Read ×2_
+
+## 🤖 Claude
+
+Now the editor inspector. Let me view the X/Y/Rotation block to add a Collision section after it:
+
+---
+
+> 🔧 _Actions: Read_
+
+## 🤖 Claude
+
+I'll add a `collisionFields` helper, call it for props/enemies, and draw the collision box in the overlay. First the helper (after `colorField`):
+
+---
+
+> 🔧 _Actions: Read ×2, Edit_
+
+## 🤖 Claude
+
+Now call it for props/enemies in the inspector:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now draw the collision box in the overlay. Let me add it before the `globalAlpha` reset in the pickables loop:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now a test for the custom collision box (game-side collider behavior + editor renders without error):
+
+---
+
+> 🔧 _Actions: Write, PowerShell_
+
+## 🤖 Claude
+
+All pass. Let me capture an editor screenshot to verify the red collision box renders (and rotates):
+
+---
+
+> 🔧 _Actions: Write, PowerShell, Read_
+
+## 🤖 Claude
+
+The red dashed collision box renders and rotates with the lamp (distinct from the gold selection box). Let me run editor-smoke and rotation-test to confirm no regressions from the inspector/dispatch changes:
+
+---
+
+> 🔧 _Actions: PowerShell_
+
+## 🤖 Claude
+
+Both pass, no regressions. Let me document the feature. First the README (after the rotation bullet):
+
+---
+
+> 🔧 _Actions: Edit ×2_
+
+## 🤖 Claude
+
+Now commit and push:
+
+---
+
+> 🔧 _Actions: Write, PowerShell ×2_
