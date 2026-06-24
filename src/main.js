@@ -139,6 +139,7 @@
   const SETTINGS_DEFS = [
     { key: 'controls', label: 'Controls / key bindings', type: 'action' },
     { key: 'volume', label: 'Sound volume', type: 'slider' },
+    { key: 'soundtrack', label: 'Soundtrack', type: 'cycle', opts: ['Score', 'Classic'] },
     { key: 'shake', label: 'Screen shake', type: 'toggle' },
     { key: 'rumble', label: 'Controller rumble', type: 'toggle' },
     { key: 'quality', label: 'Visual quality', type: 'cycle', opts: ['low', 'medium', 'high'] },
@@ -152,7 +153,7 @@
     { key: 'motionblur', label: 'Motion blur', type: 'toggle' },
     { key: 'vignette', label: 'Vignette', type: 'toggle' }
   ];
-  G.settings = { volume: 0.8, shake: true, rumble: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
+  G.settings = { volume: 0.8, soundtrack: 'Score', shake: true, rumble: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
   const fmtSetting = d => {
     if (d.type === 'action') return '▶';
     const v = G.settings[d.key];
@@ -165,6 +166,7 @@
   function applySettings() {
     const s = G.settings;
     if (G.Audio && G.Audio.setVolume) G.Audio.setVolume(s.volume);
+    if (G.Audio && G.Audio.setMusicStyle) G.Audio.setMusicStyle(s.soundtrack === 'Classic' ? 'classic' : 'score');
     if (G.Post) {
       G.Post.quality = s.quality;
       G.Post.tonemap = s.tonemap === 'AgX' ? 2 : (s.tonemap === 'Off' ? 0 : 1);

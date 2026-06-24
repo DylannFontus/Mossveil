@@ -13,6 +13,8 @@
   let pendingReverb = null, reverbWet = 0.4;
   // tone()/noiseHit() connect here; sfxAt() temporarily redirects it through a panner for positional one-shots
   let sfxTarget = null;
+  // 'score' = the composed G.Music engine; 'classic' = the original drones + generative plucks
+  let musicStyle = 'score', musicTrack = 'gloom';
 
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
@@ -39,7 +41,17 @@
     ambBus = ctx.createGain(); ambBus.gain.value = 0.05;   // gentler ambient bed (less invasive)
     ambBus.connect(master); ambBus.connect(verb);
     startAmbience();
+    if (G.Music && G.Music.start) { G.Music.start(ctx, master, verb); G.Music.setTrack(musicTrack); }
+    applyMusicStyle();
     if (pendingReverb) { G.Audio.setReverb(pendingReverb.wet, pendingReverb.dur, pendingReverb.decay); pendingReverb = null; }
+  }
+
+  // switch between the composed score and the classic drones: fade the drones, start/stop G.Music
+  function applyMusicStyle() {
+    if (!started) return;
+    const classic = musicStyle === 'classic';
+    droneNodes.forEach(n => n.g.gain.setTargetAtTime(classic ? (bossOn ? n.baseVol * 2 : n.baseVol) : 0.0001, ctx.currentTime, 1.2));
+    if (G.Music) { if (classic) G.Music.pause(); else { G.Music.setBoss(bossOn); G.Music.setIntensity(intensity); G.Music.resume(); } }
   }
 
   function startAmbience() {
@@ -258,9 +270,19 @@
     setArea(root) { areaRoot = root; if (started) retune(); },
     setBoss(on) {
       bossOn = on;
+      if (G.Music) G.Music.setBoss(on);
       if (!started) return;
-      droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
+      if (musicStyle === 'classic') droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
       if (windGain) windGain.gain.setTargetAtTime(on ? 0.16 : 0.10, ctx.currentTime, 1.5);
+    },
+    // soundtrack style: 'score' (composed adaptive music) or 'classic' (the original drones)
+    setMusicStyle(style) { musicStyle = (style === 'classic') ? 'classic' : 'score'; applyMusicStyle(); },
+    musicStyle: () => musicStyle,
+    musicTracks: () => (G.Music ? G.Music.TRACK_IDS : []),
+    // choose the score track for the current room ('auto' => by biome). No effect in classic style.
+    setMusicTrack(track, biome) {
+      const id = (!track || track === 'auto') ? (G.Music ? G.Music.trackForBiome(biome) : 'gloom') : track;
+      musicTrack = id; if (G.Music) G.Music.setTrack(id);
     },
     // adaptive music: 0 = calm exploration, 1 = full combat tension (driven by on-screen danger)
     setIntensity(v) { targetIntensity = Math.max(0, Math.min(1, v || 0)); },
@@ -368,8 +390,14 @@
     },
     update(dt) {
       if (!started) return;
-      // smooth the combat-tension layer toward its target and drive the bus gain
+      // smooth the danger level toward its target
       intensity += (targetIntensity - intensity) * Math.min(1, dt * 2.2);
+      if (musicStyle === 'score') {                    // the composed engine drives the music
+        if (G.Music) { G.Music.setIntensity(intensity); G.Music.update(dt); }
+        dripT -= dt; if (dripT <= 0) { dripT = 3 + Math.random() * 8; SFX.drop(); }   // keep sparse water drips
+        return;
+      }
+      // ---- classic style: drones + generative plucks + a combat groove ----
       if (combatGain) combatGain.gain.value = intensity * 0.22;
       dripT -= dt;
       if (dripT <= 0) { dripT = 2.5 + Math.random() * 7; SFX.drop(); }

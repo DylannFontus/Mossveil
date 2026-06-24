@@ -2156,6 +2156,7 @@
 
     G.scene.add(group);
     G.Audio.setArea(pal.root);
+    if (G.Audio.setMusicTrack) G.Audio.setMusicTrack(def.music || 'auto', biome);
     applyRoomReverb();
 
     // visited tracking for the world map

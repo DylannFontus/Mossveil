@@ -971,6 +971,8 @@
       textField(body, 'Title', () => L.title, v => { L.title = v; });
       textField(body, 'Area text', () => L.area, v => { L.area = v || null; });
       selectField(body, 'Biome', G.World.BIOMES.map(b2 => ({ v: b2, t: G.World.PAL[b2].label })), () => L.biome, v => { L.biome = v; });
+      const musicOpts = [{ v: '', t: 'Auto (by biome)' }].concat((G.Audio.musicTracks ? G.Audio.musicTracks() : []).map(t => ({ v: t, t: t.charAt(0).toUpperCase() + t.slice(1) })));
+      selectField(body, 'Music (Score)', musicOpts, () => L.music || '', v => { if (v) L.music = v; else delete L.music; });
       numField(body, 'Width', () => L.w, v => resizeLevel(Math.max(20, Math.round(v)), L.h), 1);
       numField(body, 'Height', () => L.h, v => resizeLevel(L.w, Math.max(12, Math.round(v))), 1);
       numField(body, 'Map X', () => (L.mapPos || { mx: 0 }).mx, v => { L.mapPos = L.mapPos || { mx: 0, my: 0 }; L.mapPos.mx = v; }, 1);
