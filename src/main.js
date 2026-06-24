@@ -566,8 +566,7 @@
     const hp = G.player.hp, soul = G.player.soul;
     transitioning = true;
     Main.state = 'transition';
-    const c = U.toScreen(G.player.body.x, G.player.body.y);   // iris closes on the player
-    G.UI.setFade(1, 6, () => {
+    G.UI.setFade(1, 9, () => {
       const sp = G.World.load(to, spawn);
       G.player.reset(sp.x, sp.y);
       G.player.hp = hp;
@@ -578,9 +577,8 @@
       showAreaTitle();
       Main.state = 'play';
       transitioning = false;
-      const c2 = U.toScreen(G.player.body.x, G.player.body.y);  // ...and opens on the arrival
-      G.UI.setFade(0, 4.5, null, { iris: true, x: c2.x, y: c2.y });
-    }, { iris: true, x: c.x, y: c.y });
+      G.UI.setFade(0, 5);
+    });
   };
 
   // instant room change (debug / testing)
