@@ -57,6 +57,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       // follow-up: "more" yields a Related list
       C.ask('how do I add lava'); const m1 = log.textContent.length; C.ask('more');
       out.followup = /Related/.test(log.textContent.slice(m1));
+      // proactive badge reflects the broken door we pushed
+      out.issueCount = C.issueCount();
+      out.badge = C.refreshBadge();
+      // field walkthrough: select a prop so the inspector populates, then walk it
+      G.__ed.companion.focusSel({ kind: 'prop', i: 0 });
+      out.walk = C.walkFields();
+      // a paraphrase the token index alone might miss (semantic trigram nudge)
+      out.para = top('how can i set a foe on fire');
       out.kb2 = C.kbSize();
       return out;
     });
@@ -71,6 +79,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.charm === 'rec:charm-pickup' && o.prefab === 'rec:prefab' && o.water === 'rec:water' && o.nail === 'rec:nailsmith'
       && o.rendered === true && o.armed === true && o.focus === true
       && o.diag === true && o.followup === true
+      && o.issueCount >= 1 && o.badge === 'block' && o.walk > 0
       && netHits === 0 && !errs.length;
     console.log(ok ? 'COMPANION TEST: PASS' : 'COMPANION TEST: FAIL');
     process.exitCode = ok ? 0 : 2;

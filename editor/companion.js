@@ -60,8 +60,14 @@
     return edits + (la - i) + (lb - j) <= 1;
   }
 
+  // character-trigram "semantic" vectors — a tiny offline stand-in for embeddings that catches
+  // paraphrases / word-order the token index misses (no model, no download, no network).
+  function grams(s) { s = ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ') + ' '; const g = new Map(); for (let i = 0; i < s.length - 2; i++) { const k = s.substr(i, 3); g.set(k, (g.get(k) || 0) + 1); } return g; }
+  function gnorm(g) { let n = 0; for (const v of g.values()) n += v * v; return Math.sqrt(n) || 1; }
+  function gcos(a, an, b, bn) { let dot = 0; const s = a.size < b.size ? a : b, l = a.size < b.size ? b : a; for (const [k, v] of s) { const w = l.get(k); if (w) dot += v * w; } return dot / (an * bn); }
+
   // ---------------- knowledge base ----------------
-  function entry(e) { e.tokens = tokenize(e.text + ' ' + e.title); e.tset = new Set(e.tokens); kb.push(e); }
+  function entry(e) { e.tokens = tokenize(e.text + ' ' + e.title); e.tset = new Set(e.tokens); e.g = grams(e.title + ' ' + (e.syn || '')); e.gn = gnorm(e.g); kb.push(e); }
 
   const ASSET_DESC = {
     bench: 'a bench — sit to rest and save (a checkpoint).', sign: 'a tutorial/lore sign that shows text when you stand near it.',
@@ -104,7 +110,7 @@
           steps: [
             { text: 'Be on the **Scene** tab. In the **Asset browser** (bottom), open the **' + group.label + '** tab.', action: { kind: 'assetCat', cat: group.cat } },
             { text: 'Click **' + it.label + '**, then click in the scene to place it (hold **Shift** to place several).', action: { kind: 'place', cat: group.cat, id: it.id, akind, label: it.label } },
-            { text: 'With it selected, tune it in the **Inspector** on the right.' }
+            { text: 'With it selected, tune it in the **Inspector** on the right — I can walk you through each field.', action: { kind: 'walk' } }
           ], weight: 1.0
         });
       }
@@ -135,6 +141,7 @@
     if (!built) buildKB();
     const qraw = tokenize(query); if (!qraw.length) return [];
     const q = expand(qraw);
+    const qg = grams(query), qn = gnorm(qg);
     const scored = [];
     for (const e of kb) {
       let s = 0;
@@ -143,9 +150,10 @@
         if (e.tset.has(t)) s += base * 2.2;
         else { for (const et of e.tset) { if (et.length > 3 && (et.startsWith(t) || t.startsWith(et) || lev1(et, t))) { s += base * 0.9; break; } } }
       }
-      // title-hit boost
+      // title-hit boost + a small semantic (trigram-cosine) nudge for paraphrases
       const tl = e.title.toLowerCase(); let tb = 0; for (const t of qraw) if (tl.includes(t)) tb += 1.4;
-      s = (s + tb) * (e.weight || 1);
+      const sem = gcos(qg, qn, e.g, e.gn) * 1.6;
+      s = (s + tb + sem) * (e.weight || 1);
       if (s > 0) scored.push({ e, s });
     }
     scored.sort((a, b) => b.s - a.s);
@@ -185,6 +193,16 @@
     // pull in the world validator's findings for THIS room
     const v = ed.lint(); for (const w of (v.warns || [])) if (w.id === id) out.push({ sev: w.sev, msg: w.msg.replace(id + ':', '').replace(id + ' →', '→').trim(), sel: w.sel });
     return out;
+  }
+  // a cheap wiring-issue count for the proactive badge (no full world validation)
+  function quickIssueCount() {
+    const ed = G.__ed && G.__ed.companion; if (!ed) return 0; const L = ed.level(); if (!L) return 0;
+    const props = L.props || []; let n = 0;
+    const emit = p => p.signal || ((p.type === 'lever' ? 'lever' : 'plate') + (p.oid || ''));
+    const emitted = new Set(props.filter(p => p.type === 'lever' || p.type === 'plate').map(emit));
+    for (const d of props.filter(p => p.type === 'door')) if (!d.signal || !emitted.has(d.signal)) n++;
+    if (props.some(p => p.type === 'bossTrigger') && !props.some(p => p.type === 'gate')) n++;
+    return n;
   }
   function answerDiagnostics() {
     const ed = G.__ed && G.__ed.companion; const id = ed ? ed.currentId() : '';
@@ -249,6 +267,22 @@
     else if (a.kind === 'lint') { if (c.openLint) c.openLint(); flash('Opened the Lint panel (left).'); }
     else if (a.kind === 'focus') { if (c.focusSel) c.focusSel(a.sel); setOpen(false); flash('Selected it in the scene.'); }
     else if (a.kind === 'highlight') { highlightUI(a); }
+    else if (a.kind === 'walk') { walkFields(); }
+  }
+  // step through the selected object's Inspector fields, flashing each in turn
+  let walkT = null;
+  function walkFields() {
+    const rows = [].slice.call(document.querySelectorAll('#insBody .frow'));
+    if (!rows.length) { addMsg('bot', '<div class="cpBody">Select an object in the scene first — then I’ll walk you through each of its Inspector fields.</div>'); return 0; }
+    clearTimeout(walkT); rows.forEach(r => r.classList.remove('cpFlash')); let i = 0;
+    const step = () => {
+      rows.forEach(r => r.classList.remove('cpFlash'));
+      if (i >= rows.length) { flash('That’s every field on this object.'); return; }
+      const r = rows[i++]; r.classList.add('cpFlash'); if (r.scrollIntoView) r.scrollIntoView({ block: 'nearest' });
+      const lab = r.querySelector('label'); flash('Field ' + i + '/' + rows.length + (lab ? ': ' + lab.textContent : ''));
+      walkT = setTimeout(step, 1150);
+    };
+    step(); return rows.length;
   }
   function highlightUI(a) {
     let t = null;
@@ -265,6 +299,7 @@
     if (a.kind === 'lint') return '▶ Lint';
     if (a.kind === 'highlight') return '▶ Show field';
     if (a.kind === 'focus') return '▶ Show';
+    if (a.kind === 'walk') return '▶ Walk fields';
     return '▶ Do';
   }
   function actBtn(parent, label, action) {
@@ -313,7 +348,12 @@
   }
   function savePos() { try { localStorage.setItem('mossveil-cp-pos', JSON.stringify({ l: panel.style.left, t: panel.style.top })); } catch (e) { } }
   function restorePos() { try { const p = JSON.parse(localStorage.getItem('mossveil-cp-pos') || 'null'); if (p && p.l && p.t) { panel.style.right = 'auto'; panel.style.bottom = 'auto'; panel.style.left = p.l; panel.style.top = p.t; } } catch (e) { } }
-  let btn;
+  let btn, badge;
+  function updateBadge() {                               // proactive: show a wiring-issue count on the Ask button
+    if (!badge) return; let n = 0; try { n = quickIssueCount(); } catch (e) { n = 0; }
+    badge.textContent = n; badge.style.display = n > 0 ? 'block' : 'none';
+    badge.title = n + ' possible wiring issue' + (n > 1 ? 's' : '') + ' in this room — ask me to “check this room”.';
+  }
   function injectStyle() {
     el('style', {}, document.head).textContent = `
     #cpBtn.on{background:var(--acc);color:#0c1014;border-color:var(--acc);}
@@ -338,17 +378,20 @@
     #cpInput:focus{border-color:#5fd6a8;} #cpSend{background:#2f7d4f;color:#eafff0;border:1px solid #2f7d4f;border-radius:8px;padding:0 12px;cursor:pointer;font-weight:600;}
     #cpSend:hover{background:#379159;}
     #cpHead{cursor:grab;} #cpHead.drag{cursor:grabbing;}
+    #cpBtn{position:relative;} #cpBadge{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;border-radius:9px;background:#e0a020;color:#1b1300;font:700 10px/16px "Segoe UI";text-align:center;padding:0 3px;display:none;box-shadow:0 1px 3px rgba(0,0,0,.5);}
     .cpFlash{outline:2px solid #5fd6a8 !important;outline-offset:1px;background:rgba(95,214,168,.12) !important;transition:background .2s;}
     @media (pointer:coarse){#cpPanel{width:92vw;height:70vh;}}
     `;
   }
   function build() {
     injectStyle();
-    btn = el('button', { class: 'tbtn', id: 'cpBtn', title: 'Editor Companion — ask how to do anything (offline)' }, $tb(), '🤖 Ask');
+    btn = el('button', { class: 'tbtn', id: 'cpBtn', title: 'Editor Companion — ask how to do anything (offline). Press ? to toggle.' }, $tb(), '🤖 Ask');
     btn.addEventListener('click', () => setOpen(!openState));
+    badge = el('span', { id: 'cpBadge', title: 'Possible wiring issues in this room — ask me to “check”.' }, btn);
     panel = el('div', { id: 'cpPanel' }, document.body);
     const head = el('div', { id: 'cpHead' }, panel);
     el('div', { class: 't' }, head, '🤖 Companion');
+    const wf = el('button', { title: 'Walk me through the selected object’s Inspector fields' }, head, '🚶'); wf.addEventListener('click', walkFields);
     const clr = el('button', { title: 'Clear' }, head, '⟲'); clr.addEventListener('click', () => { logEl.innerHTML = ''; greet(); });
     const cls = el('button', { title: 'Close' }, head, '✕'); cls.addEventListener('click', () => setOpen(false));
     logEl = el('div', { id: 'cpLog' }, panel);
@@ -381,6 +424,7 @@
     }, true);
     greet();
     try { if (localStorage.getItem('mossveil-cp-open') === '1') setOpen(true); } catch (e) { }
+    updateBadge(); setInterval(updateBadge, 2500);       // keep the proactive issue badge current
   }
   function $tb() { return document.getElementById('toolbar') || document.body; }
   function greet() {
@@ -601,6 +645,9 @@
   C.kbSize = () => { if (!built) buildKB(); return kb.length; };
   C.open = v => setOpen(v !== false);
   C.ask = q => { if (!logEl) build(); answer(q); };
+  C.issueCount = () => quickIssueCount();
+  C.walkFields = () => walkFields();
+  C.refreshBadge = () => { updateBadge(); return badge ? badge.style.display : 'none'; };
   // editor.js boots synchronously before us; init now (DOM + #toolbar already exist)
   if (document.readyState !== 'loading') C.init(); else document.addEventListener('DOMContentLoaded', C.init);
 })();
