@@ -466,7 +466,7 @@
   };
 
   // ============================ SPAWN & UPDATE ============================
-  B.spawn = (typeId, x, y, gates, saveKey) => {
+  B.spawn = (typeId, x, y, gates, saveKey, hurtBox) => {
     const cfg = CFG[typeId] || CFG.mossSovereign;
     const rig = RIGS[cfg.rig](cfg.colors, cfg.scale);
     const fly = cfg.mode === 'fly';
@@ -475,6 +475,7 @@
       hp: cfg.hp, maxHp: cfg.hp, fly,
       gibColor: cfg.colors.accent,
       body: { x, y: y + (fly ? 2 : 0.5), w: 2.7 * cfg.scale, h: 2.5 * cfg.scale, vx: 0, vy: 0 },
+      hurtBox: hurtBox || null,                         // editor-authored attack hit area (resizes how easily it's struck)
       halfH: 1.25 * cfg.scale,
       cfg, rig, gates, typeId, saveKey: saveKey || (G.room.id + ':' + typeId),
       group: rig.group,

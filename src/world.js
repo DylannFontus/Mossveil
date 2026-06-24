@@ -1077,7 +1077,7 @@
         this.done = true;
         const gates = G.room.entities.filter(e => e.type === 'gate');
         gates.forEach(g2 => g2.close());
-        G.Enemies.spawnBoss(this.boss, p.x, p.y, gates, key);
+        G.Enemies.spawnBoss(this.boss, p.x, p.y, gates, key, p.hurtBox);
       }
     }
   });
@@ -2170,6 +2170,7 @@
       ent.oid = e.oid;
       if (e.rot != null && ent.group) ent.group.rotation.z = e.rot;   // editor-authored rotation
       applyColBox(ent, e, on);                          // optional custom collision box
+      if (e.hurtBox) ent.hurtBox = e.hurtBox;           // editor-authored attack hit area
       room.entities.push(ent);
       if (!on) {
         if (G.EDITOR) ent.editorInactive = true;

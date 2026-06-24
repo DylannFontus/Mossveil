@@ -1076,5 +1076,5 @@
   };
 
   // bosses live in bosses.js
-  E.spawnBoss = (typeId, x, y, gates, saveKey) => G.Bosses.spawn(typeId, x, y, gates, saveKey);
+  E.spawnBoss = (typeId, x, y, gates, saveKey, hurtBox) => G.Bosses.spawn(typeId, x, y, gates, saveKey, hurtBox);
 })();

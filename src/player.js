@@ -247,6 +247,14 @@
     if (p.atkDir === 'down') return { x: b.x, y: b.y - 1.45, w: 1.55, h: 1.6 };
     return { x: b.x + p.facing * 1.2, y: b.y + 0.1, w: 2.05, h: 1.45 };
   }
+  // the area an attack must overlap to land on a foe. Defaults to its physics body, but an
+  // editor-authored hurtBox { w, h, ox, oy } resizes it (tracking the body) without touching
+  // the body's physics/contact — so a boss can be made easier to hit than it is to walk into.
+  function hurtRect(e) {
+    const h = e.hurtBox;
+    if (!h) return e.body;
+    return { x: e.body.x + (h.ox || 0), y: e.body.y + (h.oy || 0), w: h.w, h: h.h };
+  }
 
   function resolveAttack(p, dt) {
     if (p.atkT <= 0) return;
@@ -258,7 +266,7 @@
     const hb = attackHitbox(p);
     let landed = false, pogo = false;
     for (const e of G.room.entities) {
-      if (e.isEnemy && e.alive && !p.atkHit.has(e) && U.overlap(hb, e.body)) {
+      if (e.isEnemy && e.alive && !p.atkHit.has(e) && U.overlap(hb, hurtRect(e))) {
         p.atkHit.add(e);
         const kdir = p.atkDir === 'side' ? p.facing : (e.body.x >= p.body.x ? 1 : -1);
         const dmg = p.isArt ? (p.nailDmg || 1) * 2 + 1 : (p.nailDmg || 1);
@@ -600,7 +608,7 @@
   function castScream(p, lvl) {                          // Howling Wraiths — burst upward
     const b = p.body, dmg = lvl >= 2 ? 6 : 4, range = lvl >= 2 ? 5.2 : 4;
     const hb = { x: b.x, y: b.y + range / 2 + 0.4, w: range * 1.5, h: range };
-    for (const e of G.room.entities) if (e.isEnemy && e.alive && U.overlap(hb, e.body)) e.hurt(dmg, e.body.x >= b.x ? 1 : -1, 'up');
+    for (const e of G.room.entities) if (e.isEnemy && e.alive && U.overlap(hb, hurtRect(e))) e.hurt(dmg, e.body.x >= b.x ? 1 : -1, 'up');
     G.FX.burst('soul', b.x, b.y + 1, { n: 18, color: lvl >= 2 ? 0xc9a0ff : 0xc9d8ff });
     G.FX.ring(b.x, b.y + 1.5, { r1: range, life: 0.32, color: lvl >= 2 ? 0xc9a0ff : 0xc9d8ff, alpha: 0.6 });
     G.FX.shake(0.18, 0.2); if (G.Input.rumble) G.Input.rumble(0.4, 0.4, 160);
@@ -792,5 +800,5 @@
     });
   }
 
-  G.Player = { create, MAX_HP, SOUL_MAX, FOCUS_COST, cinePose, cineClip };
+  G.Player = { create, MAX_HP, SOUL_MAX, FOCUS_COST, cinePose, cineClip, hurtRect };
 })();

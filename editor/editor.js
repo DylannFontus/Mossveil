@@ -809,13 +809,20 @@
       octx.font = '10px Segoe UI';
       octx.fillStyle = isSel ? '#ffd887' : col;
       octx.fillText(name, p1.x + 2, p1.y - 3);
-      // custom collision box (red, dashed) — the solid the player actually hits
-      if (it.ref.col && (it.kind === 'prop' || it.kind === 'enemy')) {
+      // custom collision box (red, dashed) — the solid the player actually hits (props)
+      if (it.ref.col && it.kind === 'prop') {
         const cb = it.ref.col, ccx = it.ref.x + (cb.ox || 0), ccy = it.ref.y + (cb.oy || 0);
         const kc = (dx, dy) => { const lx = (ccx + dx) - _ox, ly = (ccy + dy) - _oy; return U.toScreen(_ox + lx * _cs - ly * _sn, _oy + lx * _sn + ly * _cs); };
         const k0 = kc(-cb.w / 2, cb.h / 2), k1 = kc(cb.w / 2, cb.h / 2), k2 = kc(cb.w / 2, -cb.h / 2), k3 = kc(-cb.w / 2, -cb.h / 2);
         octx.strokeStyle = isSel ? '#ff6a5a' : 'rgba(255,106,90,0.5)'; octx.lineWidth = isSel ? 2 : 1.1; octx.setLineDash([3, 3]);
         octx.beginPath(); octx.moveTo(k0.x, k0.y); octx.lineTo(k1.x, k1.y); octx.lineTo(k2.x, k2.y); octx.lineTo(k3.x, k3.y); octx.closePath(); octx.stroke(); octx.setLineDash([]);
+      }
+      // attack hit area / hurtbox (green, dashed) — axis-aligned, tracks the foe in-game (enemies + boss triggers)
+      if (it.ref.hurtBox && (it.kind === 'enemy' || it.ref.type === 'bossTrigger')) {
+        const hbx = it.ref.hurtBox, hx = it.ref.x + (hbx.ox || 0), hy = it.ref.y + (hbx.oy || 0);
+        const ha = U.toScreen(hx - hbx.w / 2, hy + hbx.h / 2), hb2 = U.toScreen(hx + hbx.w / 2, hy - hbx.h / 2);
+        octx.strokeStyle = isSel ? '#7cff9a' : 'rgba(124,255,154,0.5)'; octx.lineWidth = isSel ? 2 : 1.1; octx.setLineDash([3, 3]);
+        octx.strokeRect(ha.x, ha.y, hb2.x - ha.x, hb2.y - ha.y); octx.setLineDash([]);
       }
       octx.globalAlpha = 1;
     }
@@ -891,6 +898,24 @@
       numField(parent, 'Col off X', () => p.col.ox || 0, v => { p.col.ox = +(+v).toFixed(2); }, 0.5);
       numField(parent, 'Col off Y', () => p.col.oy || 0, v => { p.col.oy = +(+v).toFixed(2); }, 0.5);
       el('div', { class: 'insNote', style: 'opacity:.55' }, parent, 'A solid box (red outline) that blocks the player and rotates with the object. Doors / breakables / platforms already collide via their Width/Height.');
+    }
+  }
+  // resizable attack hit area (hurtbox) for a foe / boss — the area your attacks must touch to land
+  function hurtboxFields(parent, p, kind) {
+    el('div', { class: 'hgroup' }, parent, kind === 'boss' ? 'Boss hit area' : 'Hit area (hurtbox)');
+    checkField(parent, 'Custom hit area', () => !!p.hurtBox, v => {
+      if (v) p.hurtBox = kind === 'boss' ? { w: 3.4, h: 3.2, ox: 0, oy: 0 } : { w: 1.6, h: 1.6, ox: 0, oy: 0 };
+      else delete p.hurtBox;
+      refreshInspector();
+    });
+    if (p.hurtBox) {
+      numField(parent, 'Hit W', () => p.hurtBox.w, v => { p.hurtBox.w = Math.max(0.1, v); }, 0.5);
+      numField(parent, 'Hit H', () => p.hurtBox.h, v => { p.hurtBox.h = Math.max(0.1, v); }, 0.5);
+      numField(parent, 'Hit off X', () => p.hurtBox.ox || 0, v => { p.hurtBox.ox = +(+v).toFixed(2); }, 0.5);
+      numField(parent, 'Hit off Y', () => p.hurtBox.oy || 0, v => { p.hurtBox.oy = +(+v).toFixed(2); }, 0.5);
+      el('div', { class: 'insNote', style: 'opacity:.55' }, parent, kind === 'boss'
+        ? 'The area your attacks must overlap to hit the boss (green outline). It tracks the boss body in-game; offset is relative to the boss.'
+        : 'The area your attacks must overlap to hit this foe (green outline). It tracks the foe in-game.');
     }
   }
 
@@ -1091,7 +1116,10 @@
           v => { const r = v * Math.PI / 180; if (Math.abs(r) < 1e-4) delete p.rot; else p.rot = +r.toFixed(4); }, 15);
       }
     }
-    if (it.kind === 'prop' || it.kind === 'enemy') collisionFields(body, p, it.kind);   // custom collision box on any object
+    // enemies / bosses: resize the attack hit area (hurtbox); other props: a solid collision box
+    if (it.kind === 'enemy') hurtboxFields(body, p, 'enemy');
+    else if (it.kind === 'prop' && p.type === 'bossTrigger') hurtboxFields(body, p, 'boss');
+    else if (it.kind === 'prop') collisionFields(body, p, 'prop');
     if (it.kind === 'zone') {
       selectField(body, 'Edge', [{ v: 'rect', t: 'free rect (portal)' }, { v: 'L', t: 'left edge' }, { v: 'R', t: 'right edge' }, { v: 'T', t: 'top edge' }, { v: 'B', t: 'bottom edge' }],
         () => p.rect ? 'rect' : p.side,
@@ -2025,7 +2053,8 @@
     ['Custom enemies', 'Enemies → Custom (behavior): author a creature from a spec (health/speed/sight/size/colour, flies or walks, idle pattern, on-sight reaction, attack type) — data-driven AI with no code.'],
     ['Soundtrack', 'A composed adaptive “Score” (per-biome themes that intensify with on-screen danger) plays by default; in-game Settings → Soundtrack switches to the original “Classic” drones. Per level, the “Music (Score)” field picks a specific theme or Auto-by-biome. Boss fights are automatic: the biome theme full-stops, a dedicated boss theme plays the fight, and the biome fades back in on the boss’s death.'],
     ['Rotate objects', 'Every placed object/asset/prop has a Rotation° field in the Inspector (degrees, snaps by 15°). In the viewport, [ and ] rotate the selection by 15° (Shift = fine 1°), multi-selection aware. The selection box and click hit-test rotate to match the model, and static solid props (door, breakable, fall-floor, gate) carry their collision through the rotation. Moving platforms/crushers keep an axis-aligned collider.'],
-    ['Collision box', 'Any prop or enemy can carry a custom Solid box: tick “Solid box” in the Inspector, then set its W / H and offset X/Y. It blocks the player, rotates with the object, toggles with the active/inactive system, and shows as a red dashed outline in the viewport. Use it to make decorative pieces solid or tune a hitbox. Doors / breakables / platforms already collide via their own Width/Height, so they don’t need it.'],
+    ['Collision box', 'Any prop can carry a custom Solid box: tick “Solid box” in the Inspector, then set its W / H and offset X/Y. It blocks the player, rotates with the object, toggles with the active/inactive system, and shows as a red dashed outline. Use it to make decorative pieces solid. Doors / breakables / platforms already collide via their own Width/Height.'],
+    ['Hit area (hurtbox)', 'Enemies and bosses get a Hit area instead of a solid box: tick “Custom hit area”, then set W / H + offset. It’s the region your attacks must overlap to land a hit (green dashed outline), separate from the body — so you change how easily a foe is struck without altering its physics or contact damage. Enlarge it when a foe feels like it should have been hit but wasn’t. Boss hit areas are set on the boss trigger that spawns them.'],
     ['Dynamic environment', 'Grass is flammable: an Ember Bolt (Soul well → Ember Bolt) sets it alight in the thrown direction. Fire burns ~10s with flame/ember/smoke then leaves scorched grass for ~2h of gameplay. Weather rules it: rain/snow/blizzard douse it instantly, embers make it burn ~20s, wind spreads it downwind. Reflective water (Level settings) freezes to mirror-ice with frost during snow/blizzards.']
   ];
   const TOOLS = [

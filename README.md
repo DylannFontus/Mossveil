@@ -229,12 +229,16 @@ the world map (the same map shown in-game on `M`).
   applied live in both the editor and the game. The **selection box rotates to match** the
   model, clicks **hit-test against the rotated box**, and **static solid props** (doors,
   breakable walls, fall-floors, gates) carry their **collision** through the rotation too.
-- **Custom collision box** — any object (prop, decor, furniture, model, build, dynamic, light,
-  enemy…) can be given a **Solid box** in the Inspector with its own **W / H and offset X/Y**.
-  It blocks the player, **rotates with the object**, toggles with the active/inactive system,
-  and is drawn as a **red dashed outline** in the viewport. Great for making decorative pieces
-  solid or fine-tuning a hitbox. (Doors / breakables / platforms already collide via their own
-  Width/Height.)
+- **Custom collision box** — any **prop** (decor, furniture, model, build, dynamic, light…) can be
+  given a **Solid box** in the Inspector with its own **W / H and offset X/Y**. It blocks the
+  player, **rotates with the object**, toggles with the active/inactive system, and is drawn as a
+  **red dashed outline** in the viewport — great for making decorative pieces solid. (Doors /
+  breakables / platforms already collide via their own Width/Height.)
+- **Resizable hit area (hurtbox)** — **enemies and bosses** instead get a **Hit area** in the
+  Inspector (**W / H + offset**, **green dashed outline**): the region your attacks must overlap
+  to land a hit. Enlarge it when a foe *feels* like it should have been struck but wasn't. It's
+  separate from the body, so it changes how easily something is **hit** without changing its
+  physics or contact damage. (Boss hit areas are set on the **boss trigger** that spawns them.)
 - **Assets** — click an asset, then click in the scene to place it (hold `Shift` to place
   many). Categories:
   - *Props*: bench (rest & save), tutorial sign, **lore readable** (tablet / effigy / totem
