@@ -36,24 +36,42 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       out.weather = top('change the rain and snow');
       out.flora = top('glowing mushrooom that can die');          // typo 'mushrooom'
       out.rotate = top('rotate an objects collision box');
+      out.charm = top('place a charm to find');                  // -> rec:charm-pickup
+      out.prefab = top('save a group of objects as a prefab');   // -> rec:prefab
+      out.water = top('add reflective water to my level');       // -> rec:water
+      out.nail = top('upgrade my nail');                         // -> rec:nailsmith
       // answer() renders steps + act buttons into the log
       C.ask('how do I make a door open with a lever?');
       const log = document.getElementById('cpLog');
       out.rendered = !!log && /Signal/i.test(log.textContent) && log.querySelectorAll('.cpAct').length > 0;
-      // an act-button: arm placement of a lever
+      // an act-button: arm placement of a lever; focus an object
       out.armed = G.__ed.companion.armPlace('dynamic', 'lever');
       out.openedCat = (() => { G.__ed.companion.openAssetCat('dynamic'); return true; })();
+      out.focus = (() => { try { G.__ed.companion.focusSel({ kind: 'prop', i: 0 }); return true; } catch (e) { return false; } })();
+      // diagnostics: a door wired to a signal nobody emits should be flagged
+      const id = G.__ed.companion.currentId(); const L = G.LEVELS[id]; L.props = L.props || [];
+      L.props.push({ type: 'door', x: 6, y: 6, signal: 'gate9' });
+      const before = log.textContent.length;
+      C.ask('check this room for problems');
+      out.diag = /gate9|listens for|to check|⚠|⛔/.test(log.textContent.slice(before));
+      // follow-up: "more" yields a Related list
+      C.ask('how do I add lava'); const m1 = log.textContent.length; C.ask('more');
+      out.followup = /Related/.test(log.textContent.slice(m1));
+      out.kb2 = C.kbSize();
       return out;
     });
 
     console.log('COMPANION:', JSON.stringify(o));
     console.log('outbound network blocked-hits:', netHits);
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
-    const ok = o.exists && o.kb > 40
+    const ok = o.exists && o.kb > 200
       && o.lever === 'rec:lever-door' && o.connect === 'rec:portal' && o.boss === 'rec:boss'
       && o.weather === 'rec:weather' && /flora/.test(String(o.flora)) && o.rotate === 'rec:rotate'
       && /lava|hazard/.test(String(o.lava))
-      && o.rendered === true && o.armed === true && netHits === 0 && !errs.length;
+      && o.charm === 'rec:charm-pickup' && o.prefab === 'rec:prefab' && o.water === 'rec:water' && o.nail === 'rec:nailsmith'
+      && o.rendered === true && o.armed === true && o.focus === true
+      && o.diag === true && o.followup === true
+      && netHits === 0 && !errs.length;
     console.log(ok ? 'COMPANION TEST: PASS' : 'COMPANION TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
   } catch (e) { console.error('FAILED', e); process.exitCode = 1; }

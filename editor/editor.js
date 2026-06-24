@@ -3486,7 +3486,10 @@
       currentId: () => currentId,
       openAssetCat: cat => { setTab('scene'); setLeftTab('H'); assetCat = cat; refreshAssets(); },
       openGuide: () => { setLeftTab('G'); },
+      openLint: () => { setLeftTab('Lint'); },
+      lint: () => { try { return validateWorld(); } catch (e) { return { warns: [] }; } },
       gotoTab: t => setTab(t),
+      focusSel: s => { try { sel = s; multi = []; const it = selectedItem(); if (it && it.ref) { if (it.ref.x != null) { camX = it.ref.x; camY = it.ref.y; } else if (it.ref.rect) { camX = it.ref.rect.x; camY = it.ref.rect.y; } } setTab('scene'); refreshInspector(); refreshHierarchy(); } catch (e) { } },
       armPlace: (cat, id, kind) => {
         const a = assetListFor(cat).find(x => x.id === id && (kind == null || x.kind === kind || x.boss === kind || x.model === kind || x.label === kind));
         if (!a) return false;

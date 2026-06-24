@@ -165,10 +165,50 @@
     return { id: ed.currentId(), w: L.w, h: L.h, biome: L.biome, parts };
   }
 
+  // ---------------- scene diagnostics ("check this room") ----------------
+  function diagnose() {
+    const ed = G.__ed && G.__ed.companion; if (!ed) return [];
+    const L = ed.level(), id = ed.currentId(); if (!L) return [];
+    const props = L.props || [], out = [];
+    const idxOf = p => ({ kind: 'prop', i: props.indexOf(p) });
+    const emit = p => p.signal || ((p.type === 'lever' ? 'lever' : 'plate') + (p.oid || ''));
+    const emitters = props.filter(p => p.type === 'lever' || p.type === 'plate');
+    const emitted = new Set(emitters.map(emit));
+    const doors = props.filter(p => p.type === 'door');
+    for (const d of doors) {
+      if (!d.signal) out.push({ sev: 'warn', msg: 'A **door** has no **Signal** set — it will never open.', sel: idxOf(d) });
+      else if (!emitted.has(d.signal)) out.push({ sev: 'warn', msg: 'A door listens for signal `' + d.signal + '`, but no lever/plate emits it.', sel: idxOf(d) });
+    }
+    const doorSignals = new Set(doors.map(d => d.signal).filter(Boolean));
+    for (const e of emitters) { const s = e.signal; if (s && !doorSignals.has(s)) out.push({ sev: 'info', msg: 'A ' + e.type + ' emits `' + s + '`, but no door listens for it.', sel: idxOf(e) }); }
+    if (props.some(p => p.type === 'bossTrigger') && !props.some(p => p.type === 'gate')) out.push({ sev: 'warn', msg: 'A **boss trigger** has no **boss gates** — the arena won’t seal.', sel: null });
+    // pull in the world validator's findings for THIS room
+    const v = ed.lint(); for (const w of (v.warns || [])) if (w.id === id) out.push({ sev: w.sev, msg: w.msg.replace(id + ':', '').replace(id + ' →', '→').trim(), sel: w.sel });
+    return out;
+  }
+  function answerDiagnostics() {
+    const ed = G.__ed && G.__ed.companion; const id = ed ? ed.currentId() : '';
+    const issues = diagnose();
+    if (!issues.length) { addAnswer({ title: 'This room looks wired up', body: 'I didn’t spot any wiring problems in **' + id + '**. For full world validation (links, reachability), open the **Lint** tab.', actions: [{ label: 'Open Lint', action: { kind: 'lint' } }] }); return; }
+    const b = addMsg('bot', '');
+    el('div', { class: 'cpTitle' }, b).textContent = 'Found ' + issues.length + ' thing' + (issues.length > 1 ? 's' : '') + ' to check in ' + id + ':';
+    const ul = el('ul', { class: 'cpSteps' }, b);
+    for (const is of issues) { const li = el('li', {}, ul); el('span', {}, li).innerHTML = fmt((is.sev === 'error' ? '⛔ ' : is.sev === 'info' ? 'ℹ ' : '⚠ ') + is.msg); if (is.sel) actBtn(li, '▶ Show', { kind: 'focus', sel: is.sel }); }
+    const row = el('div', { class: 'cpRow' }, b); actBtn(row, 'Open Lint tab', { kind: 'lint' });
+  }
+
   // ---------------- answering ----------------
+  let lastEntry = null;
   function answer(query) {
     addMsg('user', null, query);
-    const ql = query.toLowerCase();
+    const ql = query.toLowerCase().trim();
+    // diagnostics intent
+    if (/\b(check|lint|problem|issue|wrong|broken|mistake|error|validate|diagnos|why (isn'?t|won'?t|doesn'?t))\b/.test(ql)) { answerDiagnostics(); return; }
+    // follow-up ("more", "related", "what else") -> related of the last topic
+    if (lastEntry && /^(more|related|what else|anything else|else|others?|next|continue|go on)\b/.test(ql)) {
+      const rel = search(lastEntry.title).slice(1, 6).map(r => r.e).filter(e => e.title);
+      if (rel.length) { addRelated(rel); return; }
+    }
     // scene questions
     if (/\b(this room|this level|this scene|my scene|my level|my room|what('?s| is| do i have| have i)|how many)\b/.test(ql) && /\b(room|level|scene|place|object|have|here)\b/.test(ql)) {
       const sc = sceneSummary();
@@ -181,17 +221,51 @@
       return;
     }
     addAnswer(res[0].e);
+    maybeSceneTip(res[0].e.id);
     const related = res.slice(1, 4).map(r => r.e).filter(e => e.title);
     if (related.length) addRelated(related);
+  }
+  // weave in live-scene context for a few recipes
+  function maybeSceneTip(id) {
+    const ed = G.__ed && G.__ed.companion; if (!ed) return; const L = ed.level(); if (!L) return; const props = L.props || [];
+    if (id === 'rec:lever-door' || id === 'rec:plate-door') {
+      const sigs = [...new Set(props.filter(p => p.type === 'lever' || p.type === 'plate').map(p => p.signal).filter(Boolean))];
+      if (sigs.length) addMsg('bot', '<div class="cpBody">💡 This room already has switch signal' + (sigs.length > 1 ? 's' : '') + ': <b>' + sigs.join('</b>, <b>') + '</b>. Reuse one as the door’s <b>Signal</b> to link them.</div>');
+    } else if (id === 'rec:portal') {
+      const others = Object.keys(G.LEVELS || {}).filter(k => k !== ed.currentId());
+      if (others.length) addMsg('bot', '<div class="cpBody">💡 Rooms you can link to: <b>' + others.slice(0, 8).join('</b>, <b>') + '</b>' + (others.length > 8 ? '…' : '') + '.</div>');
+    } else if (id === 'rec:boss' && !props.some(p => p.type === 'gate')) {
+      addMsg('bot', '<div class="cpBody">💡 This room has no <b>boss gates</b> yet — add some so the arena seals during the fight.</div>');
+    }
   }
 
   // ---------------- UI ----------------
   function dispatch(a, label) {
     const c = G.__ed && G.__ed.companion; if (!c || !a) return;
-    if (a.kind === 'place') { if (c.armPlace(a.cat, a.id, a.akind)) { setOpen(false); flash('Armed — click in the scene to place ' + (a.label || 'it') + '.'); } }
-    else if (a.kind === 'assetCat') { c.openAssetCat(a.cat); flash('Opened the ' + a.cat + ' assets.'); }
+    if (a.kind === 'place') { if (c.armPlace(a.cat, a.id, a.akind || a.kind2)) { setOpen(false); flash('Armed — click in the scene to place ' + (a.label || 'it') + '.'); } }
+    else if (a.kind === 'assetCat') { c.openAssetCat(a.cat); flash('Opened the ' + a.cat + ' assets (bottom).'); }
     else if (a.kind === 'tab') { c.gotoTab(a.tab); }
     else if (a.kind === 'guide') { c.openGuide(); flash('Opened the Guide (left panel).'); }
+    else if (a.kind === 'lint') { if (c.openLint) c.openLint(); flash('Opened the Lint panel (left).'); }
+    else if (a.kind === 'focus') { if (c.focusSel) c.focusSel(a.sel); setOpen(false); flash('Selected it in the scene.'); }
+    else if (a.kind === 'highlight') { highlightUI(a); }
+  }
+  function highlightUI(a) {
+    let t = null;
+    if (a.sel) t = document.querySelector(a.sel);
+    else if (a.field) { for (const r of document.querySelectorAll('#insBody .frow')) { const lab = r.querySelector('label'); if (lab && lab.textContent.toLowerCase().includes(String(a.field).toLowerCase())) { t = r; break; } } if (!t) t = document.getElementById('inspector'); }
+    if (t) { t.classList.add('cpFlash'); if (t.scrollIntoView) t.scrollIntoView({ block: 'nearest' }); setTimeout(() => t.classList.remove('cpFlash'), 1700); }
+    else flash('Select the object first — then I can point to its “' + (a.field || '') + '” field.');
+  }
+  function actLabel(a) {
+    if (a.kind === 'place') return '▶ ' + (a.label ? 'Place ' + a.label : 'Place');
+    if (a.kind === 'assetCat') return '▶ Open assets';
+    if (a.kind === 'tab') return '▶ Go to ' + a.tab;
+    if (a.kind === 'guide') return '▶ Open Guide';
+    if (a.kind === 'lint') return '▶ Lint';
+    if (a.kind === 'highlight') return '▶ Show field';
+    if (a.kind === 'focus') return '▶ Show';
+    return '▶ Do';
   }
   function actBtn(parent, label, action) {
     const b = el('button', { class: 'cpAct' }, parent, label);
@@ -205,6 +279,7 @@
     logEl.scrollTop = logEl.scrollHeight; return b;
   }
   function addAnswer(e) {
+    if (e && e.title) lastEntry = e;                     // remember for "more / related" follow-ups
     const b = addMsg('bot', '');
     if (e.title) el('div', { class: 'cpTitle' }, b).innerHTML = fmt(e.title);
     if (e.body) { const bd = el('div', { class: 'cpBody' }, b); bd.innerHTML = fmt(e.body).replace(/\n/g, '<br>'); }
@@ -212,7 +287,7 @@
       const ol = el('ol', { class: 'cpSteps' }, b);
       for (const st of e.steps) {
         const li = el('li', {}, ol); el('span', {}, li).innerHTML = fmt(st.text);
-        if (st.action) actBtn(li, st.action.kind === 'place' ? '▶ ' + (st.action.label ? 'Place ' + st.action.label : 'Place') : st.action.kind === 'assetCat' ? '▶ Open assets' : st.action.kind === 'tab' ? '▶ Go' : '▶ Do', st.action);
+        if (st.action) actBtn(li, actLabel(st.action), st.action);
       }
     }
     if (e.actions) { const row = el('div', { class: 'cpRow' }, b); for (const a of e.actions) actBtn(row, a.label, a.action); }
@@ -231,7 +306,13 @@
   let flashT;
   function flash(text) { const h = G.$ ? null : document.getElementById('viewportHint'); if (h) { h.textContent = text; clearTimeout(flashT); flashT = setTimeout(() => { if (h.textContent === text) h.textContent = ''; }, 3500); } }
 
-  function setOpen(v) { openState = v; panel.style.display = v ? 'flex' : 'none'; btn.classList.toggle('on', v); if (v) { if (!built) buildKB(); inputEl.focus(); } }
+  function setOpen(v) {
+    openState = v; panel.style.display = v ? 'flex' : 'none'; btn.classList.toggle('on', v);
+    try { localStorage.setItem('mossveil-cp-open', v ? '1' : '0'); } catch (e) { }
+    if (v) { if (!built) buildKB(); inputEl.focus(); }
+  }
+  function savePos() { try { localStorage.setItem('mossveil-cp-pos', JSON.stringify({ l: panel.style.left, t: panel.style.top })); } catch (e) { } }
+  function restorePos() { try { const p = JSON.parse(localStorage.getItem('mossveil-cp-pos') || 'null'); if (p && p.l && p.t) { panel.style.right = 'auto'; panel.style.bottom = 'auto'; panel.style.left = p.l; panel.style.top = p.t; } } catch (e) { } }
   let btn;
   function injectStyle() {
     el('style', {}, document.head).textContent = `
@@ -256,6 +337,8 @@
     #cpInput{flex:1;background:#0b1117;border:1px solid rgba(120,200,180,.3);border-radius:8px;color:#dfeee8;font-size:13px;padding:8px 10px;outline:none;}
     #cpInput:focus{border-color:#5fd6a8;} #cpSend{background:#2f7d4f;color:#eafff0;border:1px solid #2f7d4f;border-radius:8px;padding:0 12px;cursor:pointer;font-weight:600;}
     #cpSend:hover{background:#379159;}
+    #cpHead{cursor:grab;} #cpHead.drag{cursor:grabbing;}
+    .cpFlash{outline:2px solid #5fd6a8 !important;outline-offset:1px;background:rgba(95,214,168,.12) !important;transition:background .2s;}
     @media (pointer:coarse){#cpPanel{width:92vw;height:70vh;}}
     `;
   }
@@ -275,14 +358,36 @@
     const go = () => { const q = inputEl.value.trim(); if (!q) return; inputEl.value = ''; answer(q); };
     send.addEventListener('click', go);
     inputEl.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') go(); else if (e.key === 'Escape') setOpen(false); });
+    // drag the panel by its header; remember where you put it
+    let drag = null;
+    head.addEventListener('pointerdown', e => {
+      if (e.target.tagName === 'BUTTON') return;
+      const r = panel.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      panel.style.right = 'auto'; panel.style.bottom = 'auto'; panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
+      head.classList.add('drag'); try { head.setPointerCapture(e.pointerId); } catch (_) { }
+    });
+    head.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const x = Math.max(4, Math.min(innerWidth - 90, e.clientX - drag.dx)), y = Math.max(4, Math.min(innerHeight - 44, e.clientY - drag.dy));
+      panel.style.left = x + 'px'; panel.style.top = y + 'px';
+    });
+    head.addEventListener('pointerup', () => { if (drag) { drag = null; head.classList.remove('drag'); savePos(); } });
+    restorePos();
+    // open with "?" (anywhere but a text field); the panel's own input is exempt
+    window.addEventListener('keydown', e => {
+      if (/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) return;
+      if (e.key === '?') { e.preventDefault(); setOpen(!openState); }
+    }, true);
     greet();
+    try { if (localStorage.getItem('mossveil-cp-open') === '1') setOpen(true); } catch (e) { }
   }
   function $tb() { return document.getElementById('toolbar') || document.body; }
   function greet() {
-    addMsg('bot', '<div class="cpTitle">🤖 Editor Companion</div><div class="cpBody">Ask me how to do anything in the editor and I’ll give exact, current steps — with buttons that do them for you. Try one:</div>');
+    addMsg('bot', '<div class="cpTitle">🤖 Editor Companion</div><div class="cpBody">Ask me how to do anything in the editor and I’ll give exact, current steps — with buttons that do them for you. Drag my header to move me; press <b>?</b> anytime to toggle. Try one:</div>');
     const b = logEl.lastChild.querySelector('.cpBub');
     const row = el('div', { class: 'cpRel' }, b);
-    for (const s of ['Make a door open with a lever', 'Add a lava pool', 'Connect two rooms', 'Set up a boss fight', 'Change the weather', 'What’s in this room?'])
+    for (const s of ['Make a door open with a lever', 'Add a lava pool', 'Connect two rooms', 'Set up a boss fight', 'Change the weather', 'What’s in this room?', 'Check this room for problems'])
       { const c = el('span', { class: 'cpChip' }, row, s); c.addEventListener('click', () => answer(s)); }
   }
 
@@ -399,6 +504,94 @@
       steps: [
         { text: 'Open the **Logic** tab; drag from the palette to add **event / condition / action** nodes and link them.', action: { kind: 'tab', tab: 'logic' } },
         { text: 'Reference an object by its **id** (Inspector shows it) in a Set-active action or trigger. See the **Guide** for every node.', action: { kind: 'guide' } }
+      ] },
+    { id: 'rec:charm-pickup', title: 'Place a charm to find', syn: 'charm pickup equip notch collect',
+      body: 'Drop a **charm pickup** the player can collect, then equip at a bench.',
+      steps: [
+        { text: 'Props → place a **Charm pickup**.', action: { kind: 'place', cat: 'props', id: 'charmPickup', label: 'Charm pickup' } },
+        { text: 'In the Inspector choose **which charm** it grants.', action: { kind: 'highlight', field: 'charm' } }
+      ] },
+    { id: 'rec:vendor', title: 'Add a charm shop (vendor)', syn: 'shop buy glimmer merchant charm',
+      body: 'A **vendor** sells charms for Glimmer.',
+      steps: [{ text: 'Props → place a **Vendor (charm shop)**.', action: { kind: 'place', cat: 'props', id: 'vendor', label: 'Vendor' } }] },
+    { id: 'rec:nailsmith', title: 'Upgrade the nail (nailsmith)', syn: 'forge damage glimmer weapon stronger smith',
+      body: 'A **nailsmith** forges a stronger nail for Glimmer.',
+      steps: [{ text: 'Props → place a **Nailsmith (forge)**.', action: { kind: 'place', cat: 'props', id: 'smith', label: 'Nailsmith' } }] },
+    { id: 'rec:spellwell', title: 'Add a soul well (learn / attune spells)', syn: 'spell tree ember frost gale bolt upgrade learn well soul',
+      body: 'A **soul well** opens the spell tree — learn/empower spells and **attune** the bolt to Ember / Frost / Gale.',
+      steps: [
+        { text: 'Props → place a **Soul well**.', action: { kind: 'place', cat: 'props', id: 'spellwell', label: 'Soul well' } },
+        { text: 'In play, commune at it: confirm a learned element (Ember/Frost/Gale) to switch the bolt to it.' }
+      ] },
+    { id: 'rec:setactive', title: 'Turn objects on/off with a trigger', syn: 'set active enable disable hide show appear toggle id',
+      body: 'A **set-active trigger** flips chosen objects on/off when entered (referenced by their **id**).',
+      steps: [
+        { text: 'Markers → place a **Set-active trigger** zone.', action: { kind: 'place', cat: 'markers', id: 'setActiveTrigger', label: 'Set-active trigger' } },
+        { text: 'In the Inspector add **targets** (pick objects by id with the ⌖ button) and set each to on/off. Inactive objects start hidden until flipped.' }
+      ] },
+    { id: 'rec:texttrigger', title: 'Pop up a message when the player walks by', syn: 'text trigger zone hint lore tutorial note',
+      body: 'A **text trigger** is an invisible zone that shows text when entered.',
+      steps: [
+        { text: 'Props/Markers → place a **Text trigger zone**.', action: { kind: 'place', cat: 'props', id: 'textTrigger', label: 'Text trigger' } },
+        { text: 'Set its **Text** and size, and **Only once** if it should fire a single time.', action: { kind: 'highlight', field: 'Text' } }
+      ] },
+    { id: 'rec:audio', title: 'Add ambient sound / reverb / a music mood', syn: 'audio zone sound reverb music emitter ambient sfx mood',
+      body: 'An **Audio zone** can be an ambient emitter, a reverb zone, or a music-mood trigger.',
+      steps: [
+        { text: 'Markers → place an **Audio zone**.', action: { kind: 'place', cat: 'markers', id: 'audio', label: 'Audio zone' } },
+        { text: 'Pick the **mode** (emitter / reverb / music) and its settings in the Inspector.', action: { kind: 'highlight', field: 'mode' } }
+      ] },
+    { id: 'rec:water', title: 'Add reflective water', syn: 'water reflection mirror wet pool surface ice freeze',
+      body: 'Reflective water is a **per-level** surface that mirrors the scene (and freezes to ice in snow/blizzard).',
+      steps: [
+        { text: 'Deselect to show **Level settings**; enable **Water** and set its **Y** (surface height), strength and ripple.', action: { kind: 'highlight', field: 'Water' } },
+        { text: 'Tip: in a snow/blizzard weather it becomes mirror-ice automatically.' }
+      ] },
+    { id: 'rec:building', title: 'Generate a building / house', syn: 'building house manor tower procedural generate walls floors furniture',
+      body: 'The **Build** category stamps a procedural multi-storey building (walls + floors + furniture).',
+      steps: [
+        { text: 'Asset browser → **Build** → pick a size (House / Manor) and click to stamp it.', action: { kind: 'assetCat', cat: 'build' } },
+        { text: 'Also here: tileable **wall backdrop** panels.' }
+      ] },
+    { id: 'rec:model', title: 'Build & place a custom model', syn: 'model rig animate primitives parts character mymodels',
+      body: 'Build characters/props from primitives in the **Models** tab, then place them.',
+      steps: [
+        { text: 'Open the **Models** tab; add parts, parent them into a rig, and author idle/walk clips (🦴 Auto-rig builds a humanoid skeleton).', action: { kind: 'tab', tab: 'models' } },
+        { text: 'Back in Scene, place it from **Props → Model** (it appears under the **My Models** asset tab).', action: { kind: 'assetCat', cat: 'mymodels' } }
+      ] },
+    { id: 'rec:prefab', title: 'Save & reuse a group of objects (prefab)', syn: 'prefab group cluster reuse stamp nest template',
+      body: 'Select several objects and save them as a **prefab** to stamp again later.',
+      steps: [
+        { text: 'Marquee-drag (or Shift-click) to select multiple objects, then press **Ctrl+G** to save a prefab.' },
+        { text: 'Find it in the **Prefabs** asset tab and click to stamp. ⊕ on a prefab card nests another inside it.', action: { kind: 'assetCat', cat: 'prefabs' } }
+      ] },
+    { id: 'rec:scatter', title: 'Scatter lots of decor quickly', syn: 'scatter brush decor cluster random trees plants foliage',
+      body: 'The **⁂ Scatter** toolbar toggle stamps a randomized cluster when you place decor.',
+      steps: [
+        { text: 'Turn on **⁂ Scatter** in the toolbar, open the **Decor** assets, pick a piece, and click to drop a randomized cluster.', action: { kind: 'assetCat', cat: 'decor' } }
+      ] },
+    { id: 'rec:trap', title: 'Add a trap (spikes, crusher, conveyor, wind, collapsing floor)', syn: 'trap spikes crusher conveyor wind current collapsing floor fall hazard moving',
+      body: 'The **Dynamic** category has timed/interactive traps and movers.',
+      steps: [
+        { text: 'Asset browser → **Dynamic**: Timed spikes, Crusher, Conveyor belt, Wind current, Collapsing floor.', action: { kind: 'assetCat', cat: 'dynamic' } },
+        { text: 'Place one, then set its timing/size/force in the Inspector.' }
+      ] },
+    { id: 'rec:play', title: 'Test / play your level', syn: 'play test run preview hot reload start debug',
+      body: 'Play right inside the editor and hot-reload edits.',
+      steps: [
+        { text: 'Click **▶ Play here** (top toolbar) to play this room; **▶ From Start** plays from the title.' },
+        { text: 'In the play overlay, **↻ Reload** applies your latest edits in place; **F4** opens a live entity inspector.' }
+      ] },
+    { id: 'rec:savework', title: 'Save your work', syn: 'save export write github local persist',
+      body: 'Save all levels to local files or GitHub.',
+      steps: [
+        { text: 'Press **Ctrl+S** or **💾 Save**. Use **→ …** to choose where Save writes (local files vs GitHub).' }
+      ] },
+    { id: 'rec:newlevel', title: 'Create / open / duplicate a level', syn: 'new level room create scene biome size duplicate delete open',
+      body: 'Manage rooms in the **Levels** left-panel tab.',
+      steps: [
+        { text: 'Left panel → **Levels** tab → New (pick a size + biome), or open/duplicate/delete an existing room.' },
+        { text: 'Arrange the world layout by dragging rooms in the **Map** tab.', action: { kind: 'tab', tab: 'map' } }
       ] }
   ];
 
