@@ -130,7 +130,8 @@ its current key/button; select one and press a new key **or gamepad button** to 
 
 **Spells** — cast with `F`/`L`. Aim it: hold `↑` for an upward **Wraith Cry**, hold `↓` in the
 air for an **Abyss Dive** slam, or neither for a forward **Soul Bolt**. Learn and empower spells
-(two tiers each) at a **soul well**.
+(two tiers each) at a **soul well** — including **Ember Bolt**, which makes your Soul Bolt **set
+grass alight in the direction you throw it** and **sear foes over time** (fire damage-over-time).
 
 **Progression** — spend **Glimmer** at a **nailsmith** to forge a stronger nail, and at a soul
 well to grow your spells. **Charms** can **synergise** in pairs for bonus effects, and you can
@@ -171,16 +172,25 @@ are hidden on desktop/keyboard. (Menus respond to taps directly.)
   progression driving a pad, bassline, arpeggio, stepwise lead and drums. Exploration is
   sparse; **the instant an enemy that can see you engages, the theme turns menacing** — a low
   tritone drone, driving four-on-the-floor kick, hard snare and a harsher, chromatic lead make
-  a fight feel *threatening* from the start, then it relaxes when the room clears. When a **boss
-  fight begins the biome music does a full stop**; after a beat of silence a dedicated **boss
-  theme** (harmonic-minor, sawtooth lead, relentless drums) drives the fight, then the **biome
-  music fades back in once the boss is beaten**. It hushes during the new-game prologue, and the
-  old theme **fades out under a second** when you change rooms. A
+  a fight feel *threatening* from the start, then it relaxes when the room clears — combat swaps
+  the pretty pad/melody for a **dread battle-bed** (low root+tritone pedal, a pounding ostinato,
+  dissonant brass stabs and industrial war drums). When a **boss fight begins the biome music
+  does a full stop**; after a beat of silence a dedicated **boss theme** (harmonic-minor,
+  sawtooth lead, relentless drums) drives the fight, then the **biome music fades back in once
+  the boss is beaten**. It hushes during the new-game prologue, and the old theme **fades out
+  under a second** when you change rooms (each track on its own bus, so themes never bleed
+  together). A
   **Classic** setting restores the original ambient drones, and each level picks its **Score
   track** (or Auto-by-biome) in the editor. All synthesised live — no files.
 - Reverb **changes per biome** (ringing stone halls vs dry forges) and per **reverb zone**;
   footsteps and impacts are **surface-aware** (wood / grass / stone / metal), positioned and
   panned by distance. Short **stingers** punctuate boss reveals, item pickups and quests.
+- **Dynamic environment** — grass **catches fire** (e.g. from an Ember Bolt): a layered,
+  additive **flame + ember + smoke** effect burns for ~10s, leaving **scorched ash** that
+  lingers for two hours of gameplay before recovering. **Weather rewrites the rules** — rain,
+  snow and blizzards **douse it on contact** (with a puff of smoke), **embers** make it burn
+  longer (~20s), and **wind spreads** it downwind to fresh grass. **Reflective water freezes to
+  mirror-ice** with drifting frost during snow/blizzards. All procedural — no asset files.
 - **Bosses** get a named **health bar** with **phase pips**, a cinematic **name-card + epithet**
   intro, a phase-transition, attack telegraphs, and a **slow-motion final blow**.
 - **Charms** — equip up to your **notch** budget (which grows as you fell bosses) for effects
@@ -214,6 +224,9 @@ game's actual engine, so what you see is exactly what plays), **Inspector** (rig
 the world map (the same map shown in-game on `M`).
 
 - **Terrain** — paint Solid / One-way / Spikes / Erase tiles straight into the viewport.
+- **Rotate anything** — every placed object/asset/prop has a **Rotation°** field in the
+  Inspector (and `[` / `]` rotate the selection by 15° in the viewport, `Shift` for fine 1°),
+  applied live in both the editor and the game.
 - **Assets** — click an asset, then click in the scene to place it (hold `Shift` to place
   many). Categories:
   - *Props*: bench (rest & save), tutorial sign, **lore readable** (tablet / effigy / totem

@@ -698,7 +698,8 @@
   Main.SPELL_TREE = [
     { id: 'bolt', name: 'Soul Bolt', cast: 'Cast', tiers: ['', 'A bolt of soul flung forward.', 'Shade Soul — a greater, faster bolt.'], cost: [0, 0, 130] },
     { id: 'scream', name: 'Wraith Cry', cast: 'Hold ↑ + Cast', tiers: ['Not yet learned.', 'Howling Wraiths — spirits burst upward.', 'Abyss Shriek — a greater, wider cry.'], cost: [0, 80, 170] },
-    { id: 'dive', name: 'Abyss Dive', cast: 'Hold ↓ + Cast (airborne)', tiers: ['Not yet learned.', 'Desolate Dive — slam down with a shockwave.', 'Descending Dark — a darker, wider dive.'], cost: [0, 110, 190] }
+    { id: 'dive', name: 'Abyss Dive', cast: 'Hold ↓ + Cast (airborne)', tiers: ['Not yet learned.', 'Desolate Dive — slam down with a shockwave.', 'Descending Dark — a darker, wider dive.'], cost: [0, 110, 190] },
+    { id: 'ember', name: 'Ember Bolt', cast: 'augments Soul Bolt', tiers: ['Soul Bolt carries no flame.', 'Ember Bolt — bolts set grass alight and sear foes over time.', 'Cinder Bolt — hotter still: bigger flames, longer burn & sear.'], cost: [0, 90, 160] }
   ];
   Main.spellIndex = 0;
   Main.spellLevel = id => { const s = G.save && G.save.spells; return s && s[id] != null ? s[id] : (id === 'bolt' ? 1 : 0); };

@@ -846,7 +846,7 @@
     const ent = {
       type: 'projectile', friendly: !!o.friendly, alive: true, dead: false,
       body: { x: o.x, y: o.y, w: o.r * 2, h: o.r * 2, vx: o.vx, vy: o.vy },
-      group: grp, life: o.life || 3, dmg: o.dmg || 1, homing: o.homing || 0,
+      group: grp, life: o.life || 3, dmg: o.dmg || 1, homing: o.homing || 0, fire: o.fire || 0,
       pop() {
         if (this.dead) return;
         this.dead = true;
@@ -871,17 +871,21 @@
           if (sp > max) { b.vx = b.vx / sp * max; b.vy = b.vy / sp * max; }
         }
         b.x += b.vx * dt; b.y += b.vy * dt;
+        // Ember Bolt: set the grass it flies over alight, in the direction it was thrown
+        if (this.fire && G.Fire && G.Fire.igniteAt) G.Fire.igniteAt(b.x, b.y, Math.sign(b.vx) || 1);
         if (G.Physics.rectVsSolids(b)) { this.pop(); return; }
         if (this.friendly) {
           for (const e of G.room.entities) {
             if (e.isEnemy && e.alive && U.overlap(b, e.body)) {
               e.hurt(this.dmg, Math.sign(b.vx) || 1, 'spell');
+              if (this.fire && G.Fire && G.Fire.burnEnemy) G.Fire.burnEnemy(e, this.fire >= 2 ? 5 : 3.5, this.fire >= 2 ? 3 : 2);   // fire DOT
               this.pop();
               G.FX.shake(0.08, 0.1);
               break;
             }
           }
-          if (U.chance(dt * 60)) G.FX.p(true, { x: b.x, y: b.y, vx: -b.vx * 0.08, vy: U.rand(-1, 1), life: 0.35, size: U.rand(0.15, 0.3), color: 0xbfe8ff });
+          if (this.fire && U.chance(dt * 50)) G.FX.p(true, { x: b.x, y: b.y, vx: -b.vx * 0.1, vy: U.rand(0, 2), life: 0.4, size: U.rand(0.12, 0.26), color: 0xff8a3a });
+          else if (U.chance(dt * 60)) G.FX.p(true, { x: b.x, y: b.y, vx: -b.vx * 0.08, vy: U.rand(-1, 1), life: 0.35, size: U.rand(0.15, 0.3), color: 0xbfe8ff });
         } else {
           const p = G.player;
           if (p && !p.dead && p.invulnT <= 0 && U.overlap(b, p.body)) {
@@ -900,7 +904,7 @@
 
   E.fireBolt = (x, y, dir, o) => {
     o = o || {};
-    spawnProjectile({ x, y, vx: dir * (o.speed || 17), vy: 0, r: o.r || 0.32, color: o.color || 0xcfeaff, friendly: true, life: 1.1, dmg: o.dmg || 3 });
+    spawnProjectile({ x, y, vx: dir * (o.speed || 17), vy: 0, r: o.r || 0.32, color: o.color || 0xcfeaff, friendly: true, life: 1.1, dmg: o.dmg || 3, fire: o.fire || 0 });
   };
 
   // =========================== SHOCKWAVE ===========================

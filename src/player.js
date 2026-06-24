@@ -591,7 +591,9 @@
   }
   function castBolt(p, lvl) {
     const big = lvl >= 2, b = p.body;
-    G.Enemies.fireBolt(b.x + p.facing * 0.7, b.y + 0.35, p.facing, { dmg: big ? 5 : 3, speed: big ? 22 : 17, r: big ? 0.5 : 0.32, color: big ? 0xc9a0ff : 0xcfeaff });
+    const fire = (G.Main && G.Main.spellLevel) ? G.Main.spellLevel('ember') : 0;   // Ember Bolt upgrade
+    const color = fire ? (fire >= 2 ? 0xff7a2a : 0xff9d4a) : (big ? 0xc9a0ff : 0xcfeaff);
+    G.Enemies.fireBolt(b.x + p.facing * 0.7, b.y + 0.35, p.facing, { dmg: big ? 5 : 3, speed: big ? 22 : 17, r: big ? 0.5 : 0.32, color, fire });
     b.vx -= p.facing * 3; G.FX.shake(big ? 0.15 : 0.1, 0.12);
     G.FX.burst('soul', b.x + p.facing * 0.8, b.y + 0.35, { n: big ? 10 : 6 });
   }

@@ -600,12 +600,13 @@
 
   // ============================ FOLIAGE BATCH (sway shader) ============================
   function FoliageBatch(z) {
-    const pos = [], col = [], sway = [];
+    const pos = [], col = [], sway = [], burn = [];
     const c = new THREE.Color();
     function vert(x, y, color, phase, amp) {
-      pos.push(x, y, z); c.setHex(color); col.push(c.r, c.g, c.b); sway.push(phase, amp);
+      pos.push(x, y, z); c.setHex(color); col.push(c.r, c.g, c.b); sway.push(phase, amp); burn.push(0);
     }
     return {
+      vcount() { return pos.length / 3; },          // for the fire system: track each grass cell's vertex range
       tri(p1, p2, p3, color, phase, amps) {
         vert(p1[0], p1[1], color, phase, amps[0]);
         vert(p2[0], p2[1], color, phase, amps[1]);
@@ -628,14 +629,19 @@
         geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
         geo.setAttribute('aColor', new THREE.BufferAttribute(new Float32Array(col), 3));
         geo.setAttribute('aSway', new THREE.BufferAttribute(new Float32Array(sway), 2));
+        const burnAttr = new THREE.BufferAttribute(new Float32Array(burn), 1); burnAttr.setUsage(THREE.DynamicDrawUsage);
+        geo.setAttribute('aBurn', burnAttr);          // 0 = lush, →1 = scorched/burnt (driven by the fire system)
         const mat = new THREE.ShaderMaterial({
           uniforms: { uT: { value: 0 } },
           vertexShader: `
-            attribute vec3 aColor; attribute vec2 aSway; uniform float uT; varying vec3 vCol;
-            void main(){ vCol = aColor; vec3 p = position;
-              p.x += sin(uT * 1.7 + aSway.x) * aSway.y;
+            attribute vec3 aColor; attribute vec2 aSway; attribute float aBurn; uniform float uT; varying vec3 vCol; varying float vBurn;
+            void main(){ vCol = aColor; vBurn = aBurn; vec3 p = position;
+              p.x += sin(uT * 1.7 + aSway.x) * aSway.y * (1.0 - aBurn * 0.7);   // burnt blades stop swaying
               gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-          fragmentShader: `varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol, 1.0); }`,
+          fragmentShader: `varying vec3 vCol; varying float vBurn;
+            void main(){ vec3 ash = vec3(0.055, 0.045, 0.038);
+              vec3 col = mix(vCol, ash, clamp(vBurn, 0.0, 1.0));
+              gl_FragColor = vec4(col, 1.0); }`,
           side: THREE.DoubleSide
         });
         const mesh = new THREE.Mesh(geo, mat);
@@ -2014,9 +2020,11 @@
 
     // ---- gameplay-layer foliage ----
     const fol = FoliageBatch(-0.3);
+    const grassCells = [];                            // burnable grass: { x, y, vs, ve } vertex range per tile
     const tileRng = U.mulberry32(def.w * 977 + 13);
     for (const t of parsed.tops) {
       if (!(TERRAIN_MATS[t.mat] || TERRAIN_MATS['#']).foliage) continue;   // dirt/rock/etc. get no grass
+      const vs = fol.vcount();
       const jit = tileRng() * 0.07;
       const mossC = U.colLerp(pal.mossDark, pal.moss, 0.3 + tileRng() * 0.7);
       fol.quad(t.x - 0.5, t.y - 0.05, t.x + 0.5, t.y + 0.16 + jit, mossC, tileRng() * 9, 0.02, 0);
@@ -2029,6 +2037,7 @@
         const bc = U.colLerp(pal.moss, pal.glow, tileRng() * 0.55);
         fol.blade(bx, t.y + 0.1, bh, 0.1 + tileRng() * 0.09, (tileRng() - 0.5) * 0.5, bc, tileRng() * 9, 0.05 + tileRng() * 0.1);
       }
+      grassCells.push({ x: t.x, y: t.y + 0.12, vs, ve: fol.vcount() });
     }
     for (const o of parsed.oneWays) {
       fol.quad(o.x - o.w / 2, o.y + 0.1, o.x + o.w / 2, o.y + 0.24, U.colLerp(pal.mossDark, pal.moss, 0.6), 0, 0.02, 0);
@@ -2058,7 +2067,10 @@
       }
     }
     const folBuilt = fol.build();
-    if (folBuilt) { group.add(folBuilt.mesh); room.shaderMats.push(folBuilt.mat); }
+    if (folBuilt) {
+      group.add(folBuilt.mesh); room.shaderMats.push(folBuilt.mat);
+      if (G.Fire && G.Fire.setRoom) G.Fire.setRoom(room, grassCells, folBuilt.mesh);   // burnable grass + fire/smoke layer
+    }
 
     // glow flowers
     let flowerCount = 0;
@@ -2183,6 +2195,7 @@
       if (m.uniforms.uPx) m.uniforms.uPx.value = G.pxScale || 600;
     }
     for (const fn of room.anims) fn(G.time);
+    if (G.Fire && G.Fire.update) G.Fire.update(dt);   // grass fire / smoke / ice-water (dynamic environment)
     if (!G.EDITOR) {
       for (let i = room.entities.length - 1; i >= 0; i--) {
         const e = room.entities[i];

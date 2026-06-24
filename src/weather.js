@@ -46,6 +46,7 @@
 
   // current wind value with slow gusts (screen-fractions / sec, signed)
   function wind() { return (P.wind || 0) * (0.55 + 0.45 * Math.sin(t * 0.7) + 0.25 * Math.sin(t * 2.3 + 1.7)); }
+  W.windVec = function () { return wind(); };         // signed gusty wind (used by the fire system to drift flames & spread fire)
 
   W.update = function (dt) {
     t += dt;
