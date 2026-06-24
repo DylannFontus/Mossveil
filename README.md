@@ -234,6 +234,14 @@ game's actual engine, so what you see is exactly what plays), **Inspector** (rig
 **Asset browser** (bottom), and a **Map** tab where you drag rooms around to arrange
 the world map (the same map shown in-game on `M`).
 
+- **Companion (🤖 Ask)** — an **offline** assistant built into the toolbar. Ask in plain language
+  ("how do I make a door open with a lever?", "add lava", "connect two rooms", "set up a boss
+  fight") and it answers with **exact, current step-by-step instructions** and **buttons that do
+  them for you** (switch to the right tab, open the asset category, arm placement). It builds its
+  knowledge from the editor's **own live data** (every asset, this Guide, your current scene) plus
+  authored recipes, ranked by a synonym/typo-tolerant search — so it never invents UI that doesn't
+  exist and is always up to date. **No account, no API key, no network** — and it loads only in the
+  editor, so players who open the game download nothing.
 - **Terrain** — paint Solid / One-way / Spikes / Erase tiles straight into the viewport.
 - **Rotate anything** — every placed object/asset/prop has a **Rotation°** field in the
   Inspector (and `[` / `]` rotate the selection by 15° in the viewport, `Shift` for fine 1°),

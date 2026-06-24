@@ -1695,6 +1695,11 @@
     { id: 'prefabs', label: 'Prefabs' }
   ];
   let assetCat = 'props';
+  function assetListFor(cat) {   // the asset list for ANY category, without disturbing the open tab (Companion KB)
+    const s = assetCat; assetCat = cat;
+    let r = []; try { r = assetList() || []; } catch (e) { r = []; } finally { assetCat = s; }
+    return r;
+  }
   function assetList() {
     switch (assetCat) {
       case 'props': return [
@@ -2075,6 +2080,7 @@
     log: 'Print a message to the browser console (debugging).'
   };
   const CONCEPTS = [
+    ['Companion (🤖 Ask)', 'An offline assistant in the toolbar: ask in plain language ("how do I make a door open with a lever?", "add lava", "connect two rooms") and it gives exact, current steps with buttons that switch tabs and arm placement for you. It reads the editor live (every asset, this Guide, your scene), so its answers always match the current UI. Fully offline — no account, no network.'],
     ['Object id', 'Every placed prop, enemy and portal gets an automatic numeric id (shown in its inspector). Reference it from the Logic graph or triggers; the ⌖ scope button searches and inserts ids.'],
     ['Flag', 'A saved on/off switch the game remembers (e.g. “door1_opened”). Set it with Set Flag; branch on it with If Flag / If Not Flag.'],
     ['Signal', 'A one-off message inside the running graph. Emit Signal broadcasts a name; On Signal nodes with the same name fire. Good for fanning one event out to many actions.'],
@@ -3469,7 +3475,24 @@
     modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; },
     modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
     modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); },
-    modelAutoRig: () => autoRigHumanoid()
+    modelAutoRig: () => autoRigHumanoid(),
+    // ---- Companion (offline editor assistant) API ----
+    companion: {
+      assetCats: () => ASSET_CATS.slice(),
+      assets: cat => assetListFor(cat),
+      allAssets: () => ASSET_CATS.map(c => ({ cat: c.id, label: c.label, items: assetListFor(c.id) })),
+      guide: () => ({ concepts: CONCEPTS, tools: TOOLS, nodes: (G.EventGraph && G.EventGraph.TYPES) || {}, nodeDesc: NODE_DESC }),
+      level: () => { try { return lvl(); } catch (e) { return null; } },
+      currentId: () => currentId,
+      openAssetCat: cat => { setTab('scene'); setLeftTab('H'); assetCat = cat; refreshAssets(); },
+      openGuide: () => { setLeftTab('G'); },
+      gotoTab: t => setTab(t),
+      armPlace: (cat, id, kind) => {
+        const a = assetListFor(cat).find(x => x.id === id && (kind == null || x.kind === kind || x.boss === kind || x.model === kind || x.label === kind));
+        if (!a) return false;
+        setTab('scene'); assetCat = cat; setPlacing(a); return true;
+      }
+    }
   };
 
   boot();
