@@ -226,7 +226,9 @@ the world map (the same map shown in-game on `M`).
 - **Terrain** — paint Solid / One-way / Spikes / Erase tiles straight into the viewport.
 - **Rotate anything** — every placed object/asset/prop has a **Rotation°** field in the
   Inspector (and `[` / `]` rotate the selection by 15° in the viewport, `Shift` for fine 1°),
-  applied live in both the editor and the game.
+  applied live in both the editor and the game. The **selection box rotates to match** the
+  model, clicks **hit-test against the rotated box**, and **static solid props** (doors,
+  breakable walls, fall-floors, gates) carry their **collision** through the rotation too.
 - **Assets** — click an asset, then click in the scene to place it (hold `Shift` to place
   many). Categories:
   - *Props*: bench (rest & save), tutorial sign, **lore readable** (tablet / effigy / totem

@@ -294,7 +294,13 @@
     let best = null, bestArea = 1e9;
     for (const it of pickables()) {
       const r = it.rect;
-      if (Math.abs(wx - r.x) * 2 <= r.w && Math.abs(wy - r.y) * 2 <= r.h) {
+      let qx = wx, qy = wy;
+      const rot = (it.kind === 'prop' || it.kind === 'enemy') ? (it.ref.rot || 0) : 0;
+      if (rot && it.ref.x != null) {                  // inverse-rotate the click into the prop's unrotated frame
+        const ox = it.ref.x, oy = it.ref.y, cs = Math.cos(-rot), sn = Math.sin(-rot), lx = wx - ox, ly = wy - oy;
+        qx = ox + lx * cs - ly * sn; qy = oy + lx * sn + ly * cs;
+      }
+      if (Math.abs(qx - r.x) * 2 <= r.w && Math.abs(qy - r.y) * 2 <= r.h) {
         const a = r.w * r.h;
         if (a < bestArea) { bestArea = a; best = it; }
       }
@@ -754,8 +760,13 @@
     const item = selectedItem();
     for (const it of pickables()) {
       const r = it.rect;
-      const p1 = U.toScreen(r.x - r.w / 2, r.y + r.h / 2);
-      const p2 = U.toScreen(r.x + r.w / 2, r.y - r.h / 2);
+      // box corners, rotated about the model's origin so the outline tracks a rotated prop
+      const rot = (it.kind === 'prop' || it.kind === 'enemy') ? (it.ref.rot || 0) : 0;
+      const _ox = (rot && it.ref.x != null) ? it.ref.x : r.x, _oy = (rot && it.ref.y != null) ? it.ref.y : r.y;
+      const _cs = Math.cos(rot), _sn = Math.sin(rot);
+      const corner = (dx, dy) => { const lx = (r.x + dx) - _ox, ly = (r.y + dy) - _oy; return U.toScreen(_ox + lx * _cs - ly * _sn, _oy + lx * _sn + ly * _cs); };
+      const c0 = corner(-r.w / 2, r.h / 2), c1 = corner(r.w / 2, r.h / 2), c2 = corner(r.w / 2, -r.h / 2), c3 = corner(-r.w / 2, -r.h / 2);
+      const p1 = c3;   // top-left corner — label anchor (matches the old axis-aligned anchor when unrotated)
       const isSel = item && it.kind === item.kind && (it.kind === 'spawn' ? it.key === item.key : it.i === item.i);
       const inMulti = multi.some(m => sameSel(m, it.kind === 'spawn' ? { kind: 'spawn', key: it.key } : { kind: it.kind, i: it.i }));
       let col = '#7fb2e8';
@@ -788,7 +799,7 @@
       octx.strokeStyle = isSel ? '#ffd887' : (inMulti ? '#7fe8ff' : col + 'aa');
       octx.lineWidth = (isSel || inMulti) ? 2.5 : 1.2;
       if (inactive || it.kind === 'zone' || it.ref.type === 'textTrigger' || it.ref.type === 'bossTrigger' || it.ref.type === 'cutsceneTrigger' || it.ref.type === 'setActiveTrigger' || it.ref.type === 'lookTrigger' || it.ref.type === 'audio' || it.ref.type === 'windzone') octx.setLineDash([4, 4]);
-      octx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+      octx.beginPath(); octx.moveTo(c0.x, c0.y); octx.lineTo(c1.x, c1.y); octx.lineTo(c2.x, c2.y); octx.lineTo(c3.x, c3.y); octx.closePath(); octx.stroke();
       octx.setLineDash([]);
       // label
       const name = (it.kind === 'enemy' ? it.ref.type
@@ -1988,7 +1999,7 @@
     ['Progression', 'Glimmer sinks: a Nailsmith forges the nail (+damage), and a Soul well learns/empowers spells. Charms can pair into synergies, and the player can overcharm (one over notches) for double damage taken.'],
     ['Custom enemies', 'Enemies → Custom (behavior): author a creature from a spec (health/speed/sight/size/colour, flies or walks, idle pattern, on-sight reaction, attack type) — data-driven AI with no code.'],
     ['Soundtrack', 'A composed adaptive “Score” (per-biome themes that intensify with on-screen danger) plays by default; in-game Settings → Soundtrack switches to the original “Classic” drones. Per level, the “Music (Score)” field picks a specific theme or Auto-by-biome. Boss fights are automatic: the biome theme full-stops, a dedicated boss theme plays the fight, and the biome fades back in on the boss’s death.'],
-    ['Rotate objects', 'Every placed object/asset/prop has a Rotation° field in the Inspector (degrees, snaps by 15°). In the viewport, [ and ] rotate the selection by 15° (Shift = fine 1°), multi-selection aware. Rotation shows live here and in the game.'],
+    ['Rotate objects', 'Every placed object/asset/prop has a Rotation° field in the Inspector (degrees, snaps by 15°). In the viewport, [ and ] rotate the selection by 15° (Shift = fine 1°), multi-selection aware. The selection box and click hit-test rotate to match the model, and static solid props (door, breakable, fall-floor, gate) carry their collision through the rotation. Moving platforms/crushers keep an axis-aligned collider.'],
     ['Dynamic environment', 'Grass is flammable: an Ember Bolt (Soul well → Ember Bolt) sets it alight in the thrown direction. Fire burns ~10s with flame/ember/smoke then leaves scorched grass for ~2h of gameplay. Weather rules it: rain/snow/blizzard douse it instantly, embers make it burn ~20s, wind spreads it downwind. Reflective water (Level settings) freezes to mirror-ice with frost during snow/blizzards.']
   ];
   const TOOLS = [
@@ -3348,6 +3359,7 @@
     nestPrefab: (parent, child, dx, dy) => nestPrefab(parent, child, dx, dy), stampPrefab: (n, x, y) => stampPrefab(n, x, y),
     savePrefabAs: (n) => savePrefab(n), playUrl: () => playUrl(),
     openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
+    pickAt: (x, y) => pickAt(x, y),
     retileAll: () => retileWholeLevel(),
     logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },

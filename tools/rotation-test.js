@@ -28,6 +28,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       L.props.push({ type: 'bench', x: 8, y: 8, rot: rotBench });
       L.props.push({ type: 'ray', x: 12, y: 10, rot: 0 });   // explicit 0 must beat the -0.15 default
       L.props.push({ type: 'ray', x: 16, y: 10 });           // no rot -> keeps the -0.15 default tilt
+      L.props.push({ type: 'door', x: 30, y: 4, rot: Math.PI / 2 });   // 1.2x5 -> rotated collider ~5x1.2 at (27.5,4)
       G.World.load(id, 'P');
       const ents = G.room.entities;
       const bench = ents.find(e => e.type === 'bench');
@@ -35,16 +36,33 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       // identify rays by position (no `type` field on the ray entity)
       const rayAt = x => ents.map(e => e.group).filter(Boolean).find(g => Math.abs(g.position.x - x) < 0.01 && Math.abs(g.position.z + 5.5) < 0.01);
       const r0 = rayAt(12), rDef = rayAt(16);
+      const dc = (G.Physics.solids || []).find(c => Math.abs(c.w - 5) < 0.02 && Math.abs(c.h - 1.2) < 0.02 && Math.abs(c.x - 27.5) < 0.1 && Math.abs(c.y - 4) < 0.1);
       return {
         benchRot: bench && bench.group ? +bench.group.rotation.z.toFixed(4) : null,
         rayZero: r0 ? +r0.rotation.z.toFixed(4) : null,
-        rayDefault: rDef ? +rDef.rotation.z.toFixed(4) : null
+        rayDefault: rDef ? +rDef.rotation.z.toFixed(4) : null,
+        doorCollider: !!dc                              // door's AABB collider followed the 90° rotation
       };
     });
 
-    console.log('ROTATION:', JSON.stringify(o));
+    // editor: clicking a rotated prop must hit it at its rotated position, not the old axis-aligned box
+    const ed = await browser.newPage();
+    ed.on('pageerror', e => errs.push('[editor] ' + e.message));
+    await ed.goto('http://localhost:7707/editor/editor.html', { waitUntil: 'load' });
+    await wait(2800);
+    const eo = await ed.evaluate(() => {
+      const L = G.LEVELS[G.__ed.currentId()];
+      L.props = L.props || [];
+      L.props.push({ type: 'lever', x: 20, y: 10, rot: Math.PI / 2 });   // box centre (20,10.7) -> rotates to (19.3,10)
+      const hit = G.__ed.pickAt(19.3, 10), miss = G.__ed.pickAt(20, 10.7);
+      const isLever = it => !!(it && it.ref && it.ref.type === 'lever' && it.ref.x === 20);
+      return { rotHit: isLever(hit), oldMiss: !isLever(miss) };
+    });
+
+    console.log('ROTATION:', JSON.stringify(o), 'EDITOR:', JSON.stringify(eo));
     console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'NO PAGE ERRORS');
-    const ok = o.benchRot === 0.5236 && o.rayZero === 0 && o.rayDefault === -0.15 && !errs.length;
+    const ok = o.benchRot === 0.5236 && o.rayZero === 0 && o.rayDefault === -0.15 && o.doorCollider
+      && eo.rotHit && eo.oldMiss && !errs.length;
     console.log(ok ? 'ROTATION TEST: PASS' : 'ROTATION TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
   } catch (e) { console.error('FAILED', e); process.exitCode = 1; }

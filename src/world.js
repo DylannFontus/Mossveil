@@ -1035,7 +1035,7 @@
       inner.add(U.flat(U.poly([[-0.65, ty], [0.65, ty + 0.18], [0.55, ty + 0.34], [-0.55, ty + 0.16]]), 0x1a2326, { z: 0.02 }));
     }
     inner.scale.y = 0.02;
-    const collider = { x: p.x, y: p.y + 2.5, w: 1.0, h: 5 };
+    const collider = rotCollider({ x: p.x, y: p.y + 2.5, w: 1.0, h: 5 }, p.rot, p.x, p.y);
     return {
       type: 'gate', x: p.x, y: p.y, group: grp, closed: false, anim: 0, target: 0,
       close() {
@@ -1333,6 +1333,17 @@
   }
   const addSolid = c => { if (!G.EDITOR && G.Physics.solids.indexOf(c) < 0) G.Physics.solids.push(c); };
   const rmSolid = c => { const i = G.Physics.solids.indexOf(c); if (i >= 0) G.Physics.solids.splice(i, 1); };
+  // editor rotation -> follow it on the AABB collider: spin the collider's centre about the prop
+  // origin and grow the box to the rotated footprint, so a rotated solid blocks where it looks.
+  function rotCollider(c, rot, ox, oy) {
+    if (!rot) return c;
+    const cs = Math.cos(rot), sn = Math.sin(rot), dx = c.x - ox, dy = c.y - oy;
+    c.x = ox + dx * cs - dy * sn; c.y = oy + dx * sn + dy * cs;
+    const w = c.w, h = c.h;
+    c.w = Math.abs(w * cs) + Math.abs(h * sn);
+    c.h = Math.abs(w * sn) + Math.abs(h * cs);
+    return c;
+  }
 
   // a platform that travels (x,y)->(x+dx,y+dy) and carries the player riding on it
   mkProp.platform = (p) => {
@@ -1412,7 +1423,7 @@
   mkProp.fallfloor = (p) => {
     const w = p.w || 3, h = p.h || 0.7, delay = p.delay !== undefined ? p.delay : 0.55, respawn = p.respawn || 3;
     const grp = new THREE.Group(); grp.add(rectMesh(w, h, 0x453524, 0x68543a)); grp.position.set(p.x, p.y, 0);
-    const collider = { x: p.x, y: p.y, w, h }; addSolid(collider);
+    const collider = rotCollider({ x: p.x, y: p.y, w, h }, p.rot, p.x, p.y); addSolid(collider);
     let state = 'solid', t = 0, vy = 0;
     return {
       type: 'fallfloor', x: p.x, y: p.y, group: grp,
@@ -1455,7 +1466,7 @@
     grp.add(U.flat(U.poly([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]]), col, {}));
     const cracks = U.flat(U.poly([[-0.12, -h / 2], [0.12, -h / 2], [0.04, 0.1], [0.22, 0.3], [-0.04, h / 2], [-0.24, 0.1], [-0.1, 0]]), 0x0c1016, { z: 0.02, opacity: 0 });
     grp.add(cracks);
-    const collider = { x: p.x, y: p.y, w, h };
+    const collider = rotCollider({ x: p.x, y: p.y, w, h }, p.rot, p.x, p.y);
     const already = !!(p.flag && G.save && G.save.flags && G.save.flags[p.flag]);
     if (!already) addSolid(collider);
     let hp = hpMax;
@@ -1528,7 +1539,7 @@
     const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z !== undefined ? p.z : -0.1);
     const panel = U.flat(U.poly([[-w / 2, 0], [w / 2, 0], [w / 2, h], [-w / 2, h]]), 0x161b20, {});
     grp.add(panel);
-    const collider = { x: p.x, y: p.y + h / 2, w, h }; addSolid(collider);
+    const collider = rotCollider({ x: p.x, y: p.y + h / 2, w, h }, p.rot, p.x, p.y); addSolid(collider);
     const name = p.signal; let open = false;
     const isOn = () => { let v = (name && G.room.switches) ? !!G.room.switches[name] : false; if (p.flag && G.save.flags && G.save.flags[p.flag]) v = true; return p.invert ? !v : v; };
     return {
