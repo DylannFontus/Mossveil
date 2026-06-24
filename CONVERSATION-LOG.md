@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T15:22:44.111Z_
+_Last generated: 2026-06-24T15:38:41.700Z_
 
 ---
 
@@ -15416,6 +15416,175 @@ The red dashed collision box renders and rotates with the lamp (distinct from th
 ## 🤖 Claude
 
 Both pass, no regressions. Let me document the feature. First the README (after the rotation bullet):
+
+---
+
+> 🔧 _Actions: Edit ×2_
+
+## 🤖 Claude
+
+Now commit and push:
+
+---
+
+> 🔧 _Actions: Write, PowerShell ×2_
+
+## 🤖 Claude
+
+Pushed (`34095ac..3c97dae`). Done.
+
+## Custom collision box — any asset, editable W/H
+
+Every prop and enemy now gets a **Collision box** section in the Inspector:
+
+- Tick **Solid box** to enable it (it seeds W/H from the object's visual size), then edit **Col W**, **Col H**, and **Col off X / Col off Y** (offset from the object's position).
+- It becomes a **real solid the player collides with**, it **rotates with the object** (uses the same `rotCollider` as the rotation work), and it shows in the viewport as a **red dashed outline** — distinct from the gold selection box (you can see both around the lamp in the screenshot above).
+
+This covers everything you listed — prop, decor, furniture, my model, build, dynamic, lights, enemies, bosses, prefabs — since they're all placed as props or enemies. Use it to make a decorative rock/statue solid, give a piece of furniture a footprint, or fine-tune a hitbox.
+
+### How it's built
+- **Data:** `obj.col = { w, h, ox, oy }` — fully **opt-in**, so nothing changes for existing objects until you add a box.
+- **Physics:** a shared `applyColBox()` registers it as a solid, rides the existing `_solid`/active-toggle convention (so it turns on/off with the Set-Active system and is freed when the object dies).
+- **Editor:** the section appears for any selected prop/enemy; the red box is drawn rotated, brighter when selected.
+
+### Notes
+- **Doors, breakables, fall-floors, platforms, gates** already have collision from their own **Width/Height** fields, so they don't need this (the Inspector note says so). Adding a box to them would stack a second collider.
+- **Markers** (spawn points / transition zones) are triggers, not solids, so they don't get the box.
+- For **non-90° rotations**, the solid uses the axis-aligned bounds of the rotated box (exact at 0/90/180°, a slight over-approximation in between) — same trade-off as the rotated-collision work, since the player physics is AABB-based.
+
+**Verified:** new `collision-box-test.js` passes (solid registered at the right place/size, follows a 90° rotation, toggles with active state), plus `editor-smoke` and `rotation-test` still green — no regressions. README + editor Guide updated.
+
+---
+
+## 👤 You
+
+What I meant by collision box for the bosses, it's more so that I want to resize the area that when gets touched by my attack, it does damage to the boss. Right now it sometimes feels like I should have touched him but didnt hence the request
+
+---
+
+## 🤖 Claude
+
+Got it — for bosses/enemies you want to resize the **hurtbox** (the area your attack has to overlap to land a hit), not a solid box. Let me find how the player's nail hit-tests enemies and how enemy/boss bodies are sized:
+
+---
+
+> 🔧 _Actions: Grep_
+
+## 🤖 Claude
+
+The attack tests `U.overlap(hb, e.body)`. Let me read that block and how the enemy `body` is otherwise used (physics/contact), to decide between resizing `body` vs. a dedicated hurtbox:
+
+---
+
+> 🔧 _Actions: Read_
+
+## 🤖 Claude
+
+For bosses/enemies that's a **hurtbox** (the attack-registration area), which `U.overlap(hb, e.body)` currently uses `e.body` for. Resizing `body` would also change physics/contact, so a dedicated hurtbox override is cleaner. Let me check how enemies/bosses are built and how the boss spawns:
+
+---
+
+> 🔧 _Actions: Grep ×2_
+
+## 🤖 Claude
+
+Bosses are `isEnemy: true, type: 'boss'` with a `body`, spawned via `Bosses.spawn` from a bossTrigger. Let me read the boss-spawn chain and `E.make` to thread a hurtbox through:
+
+---
+
+> 🔧 _Actions: Read ×3_
+
+## 🤖 Claude
+
+Now I understand the full picture. For enemies/bosses I'll add a dedicated **hurtbox** (the attack-registration rect), separate from `body` (which stays the physics/contact box). Let me check the player module's structure to place the helper:
+
+---
+
+> 🔧 _Actions: Read, Grep_
+
+## 🤖 Claude
+
+Now let me implement. First, add the `hurtRect` helper in player.js and use it in the attack + scream hit-tests:
+
+---
+
+> 🔧 _Actions: Edit ×3, Read_
+
+## 🤖 Claude
+
+Now expose `hurtRect` for tests:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now thread the hurtbox data. First the enemy dispatch (attach `hurtBox` to the built entity):
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now thread the boss hurtbox through the spawn chain:
+
+---
+
+> 🔧 _Actions: Edit ×4_
+
+## 🤖 Claude
+
+Now the editor side. Update the inspector routing — enemies and boss triggers get a **hurtbox** (hit area), other props keep the solid box:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now add the `hurtboxFields` helper after `collisionFields`:
+
+---
+
+> 🔧 _Actions: Edit ×2, Read ×2_
+
+## 🤖 Claude
+
+Now the overlay — restrict the red collision box to props, and draw the green hurtbox for enemies/boss triggers:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now let me write a test for the hurtbox (helper geometry, enemy threading, boss threading, and that a near-miss now lands):
+
+---
+
+> 🔧 _Actions: Write, PowerShell_
+
+## 🤖 Claude
+
+All pass — a near-miss that wouldn't touch the body now lands on the enlarged hurtbox. Let me confirm no regressions in editor-smoke + the collision-box test:
+
+---
+
+> 🔧 _Actions: PowerShell_
+
+## 🤖 Claude
+
+Both green. Let me capture the green hurtbox visual on an enemy to confirm it renders:
+
+---
+
+> 🔧 _Actions: Write, PowerShell, Read_
+
+## 🤖 Claude
+
+The green hurtbox renders around the enemy (distinct from the gold selection box). Let me fix the docs — the README bullet I added last time said enemies get a *Solid box*, but now they get a hit-area:
 
 ---
 
