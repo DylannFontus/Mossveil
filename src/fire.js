@@ -163,6 +163,11 @@
     if (best >= 0) return igniteCell(best, 0);
     return false;
   };
+  F.burningNear = function (x, y, r) {                 // is there active fire within r of (x,y)? (flora withering, etc.)
+    r = r || 1.6;
+    for (let i = 0; i < state.length; i++) if (state[i].st === 'burning') { const c = cells[i]; if (Math.abs(c.x - x) < r && Math.abs(c.y - y) < r) return true; }
+    return false;
+  };
   F.burnEnemy = function (e, dur, dps) {
     if (!e || !e.isEnemy) return;
     const ex = burningEnemies.find(b => b.e === e);

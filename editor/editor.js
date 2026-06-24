@@ -275,6 +275,7 @@
     if (p.type === 'platform' || p.type === 'crusher' || p.type === 'conveyor' || p.type === 'fallfloor') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 1 };
     if (p.type === 'mire' || p.type === 'pool') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 1.5 };
     if (p.type === 'gas') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 4 };
+    if (p.type === 'bioflora') return { x: p.x, y: p.y + 0.55, w: 0.95, h: 1.4 };
     if (p.type === 'breakable') return { x: p.x, y: p.y, w: p.w || 2, h: p.h || 4 };
     if (p.type === 'door') return { x: p.x, y: p.y + (p.h || 5) / 2, w: p.w || 1.2, h: p.h || 5 };
     if (p.type === 'npc') return { x: p.x, y: p.y + 1, w: 1.1 * (p.scale || 1), h: 2.1 * (p.scale || 1) };
@@ -791,6 +792,7 @@
       if (it.ref.type === 'mire') col = '#a07850';
       if (it.ref.type === 'pool') col = it.ref.kind === 'acid' ? '#9fe060' : '#ff7040';
       if (it.ref.type === 'gas') col = '#9fd070';
+      if (it.ref.type === 'bioflora') col = '#ff9ad8';
       if (it.ref.type === 'door') col = '#a0b0c0';
       if (it.ref.type === 'npc') col = '#9fe8c0';
       // moving-platform travel path
@@ -1356,6 +1358,13 @@
           el('div', { class: 'insNote' }, body, 'Hazard pool: sears on contact and bounces you out. Lava radiates heat; acid dissolves breakable walls.');
           break;
         }
+        case 'gas': {
+          numField(body, 'Width', () => p.w || 6, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 4, v => { p.h = Math.max(1, v); }, 0.5);
+          numField(body, 'Damage', () => p.dmg || 1, v => { p.dmg = Math.max(1, Math.round(v)); }, 1);
+          el('div', { class: 'insNote' }, body, 'A drifting poison cloud: damages you over time, disperses in strong wind, and ignites in a flash when hit by an Ember Bolt.');
+          break;
+        }
         case 'breakable': {
           numField(body, 'Width', () => p.w || 2, v => { p.w = Math.max(0.5, v); }, 0.5);
           numField(body, 'Height', () => p.h || 4, v => { p.h = Math.max(0.5, v); }, 0.5);
@@ -1485,6 +1494,12 @@
           numField(body, 'W', () => p.w || 5, v => { p.w = v; });
           numField(body, 'H', () => p.h || 18, v => { p.h = v; });
           numField(body, 'Intensity', () => p.opacity || 0.1, v => { p.opacity = U.clamp(v, 0, 1); }, 0.02);
+          break;
+        case 'bioflora':
+          selectField(body, 'Kind', [{ v: 'flower', t: 'Flower' }, { v: 'mushroom', t: 'Mushroom' }], () => p.kind || 'flower', v => { p.kind = v; });
+          colorField(body, 'Glow colour', () => p.color || (p.kind === 'mushroom' ? '#7ce0ff' : '#ff7ad0'), v => { p.color = v || undefined; });
+          checkField(body, 'Destructible (can die)', () => !!p.mortal, v => { if (v) p.mortal = true; else delete p.mortal; });
+          el('div', { class: 'insNote' }, body, 'Bioluminescent flora — brightens as you pass. Destructible: the nail can cut it down and nearby fire withers it. Otherwise it’s permanent.');
           break;
         case 'gate':
           numField(body, 'Gate id', () => p.id || 0, v => { p.id = Math.round(v); }, 1);
@@ -1726,6 +1741,7 @@
         { cat: 'prop', id: 'mire', kind: 'ash', label: 'Ash drift', ico: '🌫️', defaults: { w: 6, h: 1.2 } },
         { cat: 'prop', id: 'pool', kind: 'lava', label: 'Lava pool', ico: '🌋', defaults: { w: 6, h: 1.8, dmg: 1 } },
         { cat: 'prop', id: 'pool', kind: 'acid', label: 'Acid pool', ico: '🧪', defaults: { w: 6, h: 1.6, dmg: 1 } },
+        { cat: 'prop', id: 'gas', label: 'Poison gas', ico: '☣️', defaults: { w: 6, h: 4, dmg: 1 } },
         { cat: 'prop', id: 'breakable', label: 'Breakable wall', ico: '🧱', defaults: { w: 2, h: 4, hp: 3 } },
         { cat: 'prop', id: 'lever', label: 'Lever', ico: '🎚️', defaults: { signal: '' } },
         { cat: 'prop', id: 'plate', label: 'Pressure plate', ico: '⏺️', defaults: { w: 1.8, signal: '', latch: false } },
@@ -1734,7 +1750,9 @@
       case 'lights': return [
         { cat: 'prop', id: 'light', label: 'Glow light', ico: '✨', defaults: { color: '#ffeecc', scale: 8, opacity: 0.3, flicker: false } },
         { cat: 'prop', id: 'light', label: 'Flickering light', ico: '🔥', defaults: { color: '#ffc878', scale: 7, opacity: 0.35, flicker: true } },
-        { cat: 'prop', id: 'ray', label: 'God ray', ico: '🌤', defaults: { w: 5, h: 18, rot: -0.15, opacity: 0.1 } }
+        { cat: 'prop', id: 'ray', label: 'God ray', ico: '🌤', defaults: { w: 5, h: 18, rot: -0.15, opacity: 0.1 } },
+        { cat: 'prop', id: 'bioflora', kind: 'flower', label: 'Glow flower', ico: '🌸', defaults: { color: '#ff7ad0' } },
+        { cat: 'prop', id: 'bioflora', kind: 'mushroom', label: 'Glow mushroom', ico: '🍄', defaults: { color: '#7ce0ff' } }
       ];
       case 'enemies': return G.Enemies.TYPES.map(t => ({ cat: 'enemy', id: t.id, label: t.label, ico: '🐛' }))
         .concat([{ cat: 'enemy', id: 'custom', label: 'Custom (behavior)', ico: '🧠', defaults: { spec: { hp: 3, speed: 2, sight: 9, fly: false, color: '#8a5a7a', size: 0.8, idle: 'patrol', onSight: 'chase', attack: 'contact', shootCd: 2 } } }]);

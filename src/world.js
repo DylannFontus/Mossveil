@@ -1487,6 +1487,83 @@
     };
   };
 
+  // poison / miasma gas — a placeable drifting cloud: DOTs you, disperses in wind, ignitable
+  mkProp.gas = (p) => {
+    const w = p.w || 6, h = p.h || 4, dmg = p.dmg || 1;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, 0.05);
+    const blobs = [], n = Math.max(4, Math.round(w * h / 6));
+    for (let i = 0; i < n; i++) {
+      const m = U.flat(U.ellipse(0.9 + Math.random() * 0.8, 0.7 + Math.random() * 0.6), 0x6abf48, { opacity: 0.15 });
+      m.material.transparent = true; m.position.set(U.rand(-w / 2, w / 2), U.rand(-h / 2, h / 2), U.rand(-0.1, 0.1));
+      blobs.push({ m, ph: Math.random() * 9, bx: m.position.x, by: m.position.y }); grp.add(m);
+    }
+    const rect = { x: p.x, y: p.y, w, h };
+    let cd = 0, cleared = 0;
+    return {
+      type: 'gas', x: p.x, y: p.y, group: grp, flammableGas: true, body: rect,
+      ignite() {                                                          // an Ember Bolt sets the cloud alight
+        if (cleared > 0) return; cleared = 8;
+        G.FX.burst('ember', p.x, p.y, { n: 24, color: 0xff8a30 });
+        G.FX.ring(p.x, p.y, { r1: Math.max(w, h) * 0.6, life: 0.4, color: 0xffa040, alpha: 0.7 });
+        if (G.Audio) G.Audio.sfx('spellHit');
+        for (const e of G.room.entities) if (e.isEnemy && e.alive && U.overlap(rect, e.body)) e.hurt(2, 0, 'fire');
+        if (G.Fire && G.Fire.haze) for (let i = 0; i < 10; i++) G.Fire.haze(p.x + U.rand(-w / 2, w / 2), p.y);
+      },
+      update(dt) {
+        const wind = (G.Weather && G.Weather.windVec) ? G.Weather.windVec() : 0, windy = Math.abs(wind) > 0.5;
+        cd -= dt;
+        if (cleared > 0) { cleared -= dt; grp.visible = false; return; }
+        grp.visible = true;
+        const thin = windy ? 0.5 : 1;
+        for (const b of blobs) {
+          b.ph += dt;
+          b.m.position.x = b.bx + Math.sin(b.ph * 0.7) * 0.4 + wind * 0.6;
+          b.m.position.y = b.by + Math.sin(b.ph * 0.5 + 1) * 0.3;
+          b.m.material.opacity = (0.1 + 0.08 * Math.sin(b.ph * 1.3)) * thin;
+        }
+        if (U.chance(dt * 3)) G.FX.p(true, { x: p.x + U.rand(-w / 2, w / 2), y: p.y + U.rand(-h / 2, h / 2), vx: wind * 1.5, vy: U.rand(0.3, 0.8), life: 1.2, size: U.rand(0.2, 0.4), color: 0x7ac850, alpha: 0.3 });
+        const pl = G.player;
+        if (pl && !pl.dead && pl.invulnT <= 0 && cd <= 0 && !windy && U.overlap(rect, pl.body)) { pl.damage(dmg, pl.body.x); cd = 1.0; }
+      }
+    };
+  };
+
+  // bioluminescent reactive flora — brightens as the player passes; optionally destructible
+  mkProp.bioflora = (p) => {
+    const kind = p.kind || 'flower', mortal = !!p.mortal;
+    const col = p.color ? parseInt(p.color.replace('#', ''), 16) : (kind === 'mushroom' ? 0x7ce0ff : 0xff7ad0);
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z != null ? p.z : -0.05);
+    grp.add(U.flat(U.poly([[-0.06, 0], [0.06, 0], [0.04, 0.7], [-0.04, 0.7]]), 0x1c3322, { z: -0.02 }));
+    const bulb = kind === 'mushroom'
+      ? U.flat(U.ellipse(0.4, 0.26), col, { y: 0.72, opacity: 0.92 })
+      : U.flat(U.ellipse(0.26, 0.32), col, { y: 0.82, opacity: 0.92 });
+    grp.add(bulb);
+    const glow = U.glowSprite ? U.glowSprite(col, 2.4, 0.0) : null;
+    if (glow) { glow.position.set(0, kind === 'mushroom' ? 0.72 : 0.82, 0.05); grp.add(glow); }
+    const collider = { x: p.x, y: p.y + 0.6, w: 0.85, h: 1.1 };
+    let lit = 0, alive = true;
+    const ent = {
+      type: 'bioflora', x: p.x, y: p.y, group: grp, breakable: mortal, alive: true, dead: false, body: collider,
+      hurt() { if (mortal) die(); },                                     // the nail cuts down a destructible one
+      update(dt) {
+        if (!alive) return;
+        const pl = G.player;
+        const near = pl && !pl.dead && Math.hypot(pl.body.x - p.x, pl.body.y - (p.y + 0.7)) < 3.2;
+        lit = U.damp(lit, near ? 1 : 0, 6, dt);
+        if (glow) glow.material.opacity = 0.12 + lit * 0.5 + Math.sin(G.time * 2.4 + p.x) * 0.04 * lit;
+        bulb.material.opacity = 0.7 + lit * 0.3;
+        if (lit > 0.4 && U.chance(dt * 4 * lit)) G.FX.p(true, { x: p.x + U.rand(-0.3, 0.3), y: p.y + 0.9, vx: 0, vy: U.rand(0.4, 1.0), life: 1.0, size: U.rand(0.08, 0.16), color: col, alpha: 0.6 });
+        if (mortal && G.Fire && G.Fire.burningNear && G.Fire.burningNear(p.x, p.y, 1.6)) die();   // fire withers it
+      }
+    };
+    function die() {
+      if (!alive) return; alive = false; ent.alive = false; ent.dead = true;
+      G.FX.burst('spore', p.x, p.y + 0.7, { n: 12, color: col });
+      if (G.Audio) G.Audio.sfx('clink');
+    }
+    return ent;
+  };
+
   // a floor that shakes then drops when you stand on it, and respawns
   mkProp.fallfloor = (p) => {
     const w = p.w || 3, h = p.h || 0.7, delay = p.delay !== undefined ? p.delay : 0.55, respawn = p.respawn || 3;

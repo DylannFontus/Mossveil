@@ -873,6 +873,7 @@
         b.x += b.vx * dt; b.y += b.vy * dt;
         // Ember Bolt: set the grass it flies over alight, in the direction it was thrown
         if (this.fire && G.Fire && G.Fire.igniteAt) G.Fire.igniteAt(b.x, b.y, Math.sign(b.vx) || 1);
+        if (this.fire) for (const e of G.room.entities) { if (e.flammableGas && e.ignite && U.overlap(b, e.body)) { e.ignite(); break; } }   // ignite poison gas
         if (G.Physics.rectVsSolids(b)) { this.pop(); return; }
         if (this.friendly) {
           for (const e of G.room.entities) {
