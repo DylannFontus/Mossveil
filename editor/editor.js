@@ -1051,6 +1051,9 @@
       } else {
         numField(body, 'X', () => p.x, v => { p.x = v; });
         numField(body, 'Y', () => p.y, v => { p.y = v; });
+        // rotation for any placed object/asset/prop (radians stored; shown in degrees, snaps by 15°)
+        numField(body, 'Rotation°', () => +(((p.rot || 0) * 180 / Math.PI).toFixed(1)),
+          v => { const r = v * Math.PI / 180; if (Math.abs(r) < 1e-4) delete p.rot; else p.rot = +r.toFixed(4); }, 15);
       }
     }
     if (it.kind === 'zone') {
@@ -1396,7 +1399,6 @@
         case 'ray':
           numField(body, 'W', () => p.w || 5, v => { p.w = v; });
           numField(body, 'H', () => p.h || 18, v => { p.h = v; });
-          numField(body, 'Tilt', () => p.rot || -0.15, v => { p.rot = v; }, 0.05);
           numField(body, 'Intensity', () => p.opacity || 0.1, v => { p.opacity = U.clamp(v, 0, 1); }, 0.02);
           break;
         case 'gate':
@@ -3213,6 +3215,17 @@
     if (e.code === 'Escape') { setPlacing(null); sel = null; multi = []; marquee = null; refreshInspector(); refreshHierarchy(); return; }
     if (e.code === 'KeyG' && !e.ctrlKey) { gizmos = !gizmos; refreshToolbar(); return; }
     if (e.code === 'KeyL') { alignSelected(); return; }
+    // [ / ] rotate the selected object(s) by 15° (Shift = fine 1°); about the screen-facing axis
+    if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+      const refs = selAll().map(s => s.kind === 'prop' ? lvl().props[s.i] : s.kind === 'enemy' ? lvl().enemies[s.i] : null).filter(r => r && r.x !== undefined);
+      if (refs.length) {
+        const d = (e.code === 'BracketRight' ? 1 : -1) * (e.shiftKey ? 1 : 15) * Math.PI / 180;
+        pushUndo();
+        refs.forEach(r => { const nr = (r.rot || 0) + d; if (Math.abs(nr) < 1e-4) delete r.rot; else r.rot = +nr.toFixed(4); });
+        queueRebuild(); refreshInspector();
+      }
+      return;
+    }
     if (e.code === 'KeyF') {
       const it = selectedItem();
       if (it && it.ref) { camX = it.ref.x !== undefined ? it.ref.x : camX; camY = it.ref.y !== undefined ? it.ref.y : camY; }

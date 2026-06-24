@@ -1637,7 +1637,7 @@
     );
     grp.add(rm);
     grp.position.set(p.x, p.y, -5.5);
-    grp.rotation.z = p.rot || -0.15;
+    grp.rotation.z = p.rot != null ? p.rot : -0.15;   // explicit 0 must stay 0 (the editor's Rotation field)
     let t = U.rand(0, 9);
     const base = rm.material.opacity;
     return {
@@ -2118,6 +2118,7 @@
       if (!on && !G.EDITOR && p.oid == null) continue;   // truly gone — no trigger can ever revive it
       const ent = mk(p, pal);
       ent.oid = p.oid;
+      if (p.rot != null && ent.group) ent.group.rotation.z = p.rot;   // editor-authored rotation (radians, about screen Z)
       room.entities.push(ent);
       if (!on) {
         if (G.EDITOR) ent.editorInactive = true;          // editor keeps it visible (dimmed) so you can re-enable it
@@ -2130,6 +2131,7 @@
       const ent = G.Enemies.make(e.type, e.x, e.y, e);
       if (!ent) continue;
       ent.oid = e.oid;
+      if (e.rot != null && ent.group) ent.group.rotation.z = e.rot;   // editor-authored rotation
       room.entities.push(ent);
       if (!on) {
         if (G.EDITOR) ent.editorInactive = true;
