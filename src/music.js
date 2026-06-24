@@ -9,6 +9,7 @@
   let playing = false, intensity = 0, bossOn = false;
   let trackId = 'verdant', track = null, bossReturn = 'gloom';
   let nextTime = 0, step = 0;
+  let gen = null;                                     // current track's voice bus — per-track crossfades live here, NOT on the master
   const LOOK = 0.14;                                  // schedule this far ahead (s)
 
   const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10], DOR = [0, 2, 3, 5, 7, 9, 10], PHR = [0, 1, 3, 5, 7, 8, 10],
@@ -71,7 +72,7 @@
     for (let i = 0; i < nv; i++) { const osc = ctx.createOscillator(); osc.type = o.type || 'sawtooth'; osc.frequency.value = freq; osc.detune.value = (i - (nv - 1) / 2) * (o.detune || 9); osc.connect(f); oscs.push(osc); }
     if (o.sub) { const s = ctx.createOscillator(); s.type = 'sine'; s.frequency.value = freq / 2; s.connect(f); oscs.push(s); }
     f.connect(g);
-    g.connect(busDry); if (o.wet) g.connect(busWet);
+    g.connect(gen ? gen.d : busDry); if (o.wet) g.connect(gen ? gen.w : busWet);
     const a = o.a || 0.012, d = o.d || 0.12, sus = o.s != null ? o.s : 0.55, rel = o.r || 0.25, vol = o.vol || 0.18;
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(vol, t0 + a);
@@ -80,66 +81,96 @@
     if (o.fenv) { f.frequency.setValueAtTime(o.cut || 1400, t0); f.frequency.exponentialRampToValueAtTime(Math.max(90, (o.cut || 1400) * 0.45), t0 + dur); }
     oscs.forEach(osc => { osc.start(t0); osc.stop(t0 + dur + rel + 0.1); });
   }
-  function kick(t0, vol) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(125, t0); o.frequency.exponentialRampToValueAtTime(45, t0 + 0.12); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2); o.connect(g); g.connect(busDry); o.start(t0); o.stop(t0 + 0.22); }
-  function perc(t0, vol, hp, dur) { const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); s.connect(f); f.connect(g); g.connect(busDry); s.start(t0); s.stop(t0 + dur + 0.02); }
+  function kick(t0, vol) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(125, t0); o.frequency.exponentialRampToValueAtTime(45, t0 + 0.12); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2); o.connect(g); g.connect(gen ? gen.d : busDry); o.start(t0); o.stop(t0 + 0.22); }
+  function perc(t0, vol, hp, dur) { const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); s.connect(f); f.connect(g); g.connect(gen ? gen.d : busDry); s.start(t0); s.stop(t0 + dur + 0.02); }
+
+  // a "generation" is one track's voice bus: voices connect here, never straight to the master.
+  // Swapping tracks fades the OLD generation out and frees it, so its long pads can't bleed back
+  // through when the master returns — the cause of the ~2s clash heard when changing rooms.
+  function makeGen() { const d = ctx.createGain(), w = ctx.createGain(); d.gain.value = 1; w.gain.value = 1; d.connect(busDry); w.connect(busWet); return { d, w }; }
+  function retireGen(fade) {
+    const o = gen; if (!o) return; const now = ctx.currentTime;
+    o.d.gain.cancelScheduledValues(now); o.w.gain.cancelScheduledValues(now);
+    o.d.gain.setValueAtTime(Math.max(0.0001, o.d.gain.value), now); o.d.gain.linearRampToValueAtTime(0.0001, now + fade);
+    o.w.gain.setValueAtTime(Math.max(0.0001, o.w.gain.value), now); o.w.gain.linearRampToValueAtTime(0.0001, now + fade);
+    setTimeout(() => { try { o.d.disconnect(); o.w.disconnect(); } catch (_) { } }, (fade + 5) * 1000);
+  }
+  function swapGen(fadeOut, fadeIn) {                 // old voices out & freed, a fresh bus fades in — master untouched
+    retireGen(fadeOut); gen = makeGen(); const now = ctx.currentTime;
+    gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + fadeIn);
+    gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + fadeIn);
+  }
 
   let lead = 0;                                       // last lead scale-index (stepwise walk)
   function schedStep(s, t0) {
     const T = track, dur16 = 60 / T.bpm / 4, bar = (s >> 4) & 3, beat = s & 15;
     const ch = chord(T, T.prog[bar]);
     const root = T.root, boss = bossOn, inten = boss ? 1 : intensity;
-    const combat = inten > 0.12;                        // the moment an enemy engages -> menacing
+    const combat = inten > 0.12;                        // the moment an enemy engages -> the battle bed takes over
     const aggr = combat ? Math.min(1, (inten - 0.12) / 0.55) : 0;   // scales the menace's loudness/density
-    // pad — once per bar; darker & quieter the moment combat starts (yields to the rhythm)
-    if (beat === 0) ch.forEach((semi, i) => voice(hz(root, semi - 12 + (i === 0 ? -12 : 0)), t0, dur16 * 15.5, { type: T.pad, cut: T.padCut * (combat ? 0.7 : 1), voices: 2, detune: 11, a: 0.4, d: 0.6, s: 0.7, r: 0.8, vol: 0.05 * (combat ? 0.6 : 1), wet: true }));
-    // TENSION drone — a low tritone the instant combat begins: dread
-    if (beat === 0 && combat) voice(hz(root, -12 + 6), t0, dur16 * 15.5, { type: 'sawtooth', cut: 520, voices: 2, detune: 16, a: 0.25, d: 0.5, s: 0.85, r: 0.6, vol: 0.05 + inten * 0.05 });
-    // bass — driving from the start of combat (pumps on more beats, brighter cutoff)
-    if (beat === 0 || beat === 8) voice(hz(root, T.prog[bar] === 0 ? -24 : chord(T, T.prog[bar])[0] - 24), t0, dur16 * 3.5, { type: T.bass, cut: 520 + aggr * 320, voices: 1, sub: true, a: 0.01, d: 0.15, s: 0.5, r: 0.2, vol: 0.16 + aggr * 0.06 });
-    if (combat && (beat === 4 || beat === 12)) voice(hz(root, ch[0] - 24), t0, dur16 * 1.8, { type: T.bass, cut: 620, voices: 1, a: 0.005, d: 0.1, s: 0.45, r: 0.15, vol: 0.09 + aggr * 0.06 });
-    // arpeggio — pretty when calm; pulls right back under combat
-    if (beat % 2 === 0) { const note = ch[(s >> 1) % 3]; voice(hz(root, note + 12), t0, dur16 * 1.4, { type: 'triangle', cut: T.leadCut, voices: 1, a: 0.005, d: 0.1, s: 0.25, r: 0.18, vol: (0.045 + inten * 0.03) * (combat ? 0.4 : 1), wet: true }); }
-    // lead — calm: a clean melody; combat: harsher, lower, staccato, with chromatic bite from the start
-    if ((beat === 0 || beat === 6 || beat === 10) && (combat || inten > 0.28)) {
-      const sc = T.scale;
-      if (beat === 0) lead = T.prog[bar] + 4;
-      else lead += (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.7 ? 1 : 2);
-      lead = Math.max(0, Math.min(sc.length * 2 - 1, lead));
-      let semi = sc[lead % sc.length] + 12 * Math.floor(lead / sc.length);
-      if (combat && Math.random() < 0.2 + aggr * 0.25) semi += 1;   // chromatic tension
-      voice(hz(root, semi + (combat ? 0 : 12)), t0, dur16 * (combat ? 1.1 : (beat === 0 ? 3 : 1.6)), { type: combat ? 'sawtooth' : 'square', cut: T.leadCut * (combat ? 0.7 : 1), voices: aggr > 0.5 ? 2 : 1, detune: 10, a: 0.006, d: 0.1, s: 0.35, r: 0.2, vol: 0.05 + inten * 0.07, wet: true, fenv: true });
+
+    if (!combat) {
+      // ---------------- EXPLORATION : spacious, melodic, pretty ----------------
+      if (beat === 0) ch.forEach((semi, i) => voice(hz(root, semi - 12 + (i === 0 ? -12 : 0)), t0, dur16 * 15.5, { type: T.pad, cut: T.padCut, voices: 2, detune: 11, a: 0.4, d: 0.6, s: 0.7, r: 0.8, vol: 0.05, wet: true }));
+      if (beat === 0 || beat === 8) voice(hz(root, T.prog[bar] === 0 ? -24 : ch[0] - 24), t0, dur16 * 3.5, { type: T.bass, cut: 520, voices: 1, sub: true, a: 0.01, d: 0.15, s: 0.5, r: 0.2, vol: 0.16 });
+      if (beat % 2 === 0) { const note = ch[(s >> 1) % 3]; voice(hz(root, note + 12), t0, dur16 * 1.4, { type: 'triangle', cut: T.leadCut, voices: 1, a: 0.005, d: 0.1, s: 0.25, r: 0.18, vol: 0.045 + inten * 0.03, wet: true }); }
+      if ((beat === 0 || beat === 6 || beat === 10) && inten > 0.28) {
+        const sc = T.scale;
+        if (beat === 0) lead = T.prog[bar] + 4; else lead += (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.7 ? 1 : 2);
+        lead = Math.max(0, Math.min(sc.length * 2 - 1, lead));
+        const semi = sc[lead % sc.length] + 12 * Math.floor(lead / sc.length);
+        voice(hz(root, semi + 12), t0, dur16 * (beat === 0 ? 3 : 1.6), { type: 'square', cut: T.leadCut, voices: 1, a: 0.006, d: 0.1, s: 0.35, r: 0.2, vol: 0.05 + inten * 0.05, wet: true, fenv: true });
+      }
+      const dv = T.drums;
+      if (beat === 0 || beat === 8) kick(t0, 0.18 * dv * (0.5 + inten * 0.5));
+      if (beat % 2 === 0) perc(t0, (0.02 + inten * 0.03) * dv, 6500, 0.04);
+      return;
     }
-    // dissonant offbeat stabs as the threat mounts
-    if (aggr > 0.45 && (beat === 3 || beat === 7 || beat === 11 || beat === 15) && Math.random() < 0.4 + aggr * 0.3)
-      [ch[0], ch[1] + 1].forEach(semi => voice(hz(root, semi), t0, dur16 * 0.6, { type: 'sawtooth', cut: 1500, voices: 1, a: 0.004, d: 0.05, s: 0.18, r: 0.1, vol: 0.04 * aggr }));
-    // drums — light when calm; driving 4-on-the-floor + hard low snare + busy hats from combat start
-    const dv = T.drums;
-    if (beat === 0 || beat === 8) kick(t0, 0.18 * dv * (0.5 + inten * 0.7));
-    if (combat && (beat === 4 || beat === 12)) kick(t0, 0.15 * dv * (0.5 + aggr * 0.6));
-    if (beat % 2 === 0) perc(t0, (0.02 + inten * 0.05) * dv, 6500, 0.04);
-    if (combat && beat % 2 === 1) perc(t0, (0.02 + aggr * 0.03) * dv, 7800, 0.03);
-    if (combat && (beat === 4 || beat === 12)) perc(t0, (0.05 + aggr * 0.06) * dv, 1700, 0.13);
-    if (boss && (beat === 2 || beat === 6 || beat === 10 || beat === 14)) kick(t0, 0.14 * dv);
+
+    // ---------------- COMBAT : a relentless dread battle-engine (a wholly different vibe) ----------------
+    // No "pretty" pad or melody — instead a low pedal + tritone dread, a pounding ostinato, dissonant
+    // brass-ish stabs, an air-raid tremolo at high aggression, and industrial war drums.
+    const A = 0.55 + aggr;                              // overall menace multiplier
+    // dread pedal: sustained root + tritone, very low, refreshed each bar
+    if (beat === 0) {
+      voice(hz(root, -24), t0, dur16 * 16.5, { type: 'sawtooth', cut: 320 + aggr * 260, voices: 2, detune: 7, a: 0.15, d: 0.5, s: 0.92, r: 0.7, vol: 0.075 + aggr * 0.05 });
+      voice(hz(root, -12 + 6), t0, dur16 * 16.5, { type: 'sawtooth', cut: 460, voices: 2, detune: 15, a: 0.25, d: 0.5, s: 0.82, r: 0.6, vol: 0.032 + aggr * 0.04, wet: true });   // tritone
+    }
+    // pounding 8th-note ostinato on the root — the propulsion that drives the fight
+    if (beat % 2 === 0) {
+      const oct = (beat % 8 === 0) ? -24 : -12;
+      voice(hz(root, oct), t0, dur16 * 1.5, { type: 'sawtooth', cut: 640 + aggr * 540, voices: 1, sub: true, a: 0.004, d: 0.07, s: 0.42, r: 0.1, vol: 0.1 + aggr * 0.06, fenv: true });
+    }
+    // off-beat 16th ghost pulses as aggression climbs — relentlessness
+    if (aggr > 0.3 && beat % 2 === 1 && Math.random() < 0.4 + aggr * 0.4)
+      voice(hz(root, -12), t0, dur16 * 0.7, { type: 'sawtooth', cut: 900, voices: 1, a: 0.003, d: 0.04, s: 0.3, r: 0.06, vol: 0.05 * A });
+    // dissonant minor-2nd brass stab on accents — the threat striking
+    if ((beat === 4 || beat === 10 || beat === 14) && Math.random() < 0.55 + aggr * 0.35)
+      [ch[0], ch[0] + 1, ch[1]].forEach(semi => voice(hz(root, semi - 12), t0, dur16 * 1.1, { type: 'sawtooth', cut: 1100 + aggr * 700, voices: 2, detune: 12, a: 0.004, d: 0.08, s: 0.25, r: 0.12, vol: 0.028 * A, wet: true }));
+    // air-raid high tremolo at high aggression — dread screaming overhead
+    if (aggr > 0.45 && Math.random() < 0.35)
+      voice(hz(root, 12 + T.scale[(Math.random() * T.scale.length) | 0]), t0, dur16 * 0.5, { type: 'sawtooth', cut: 2800, voices: 1, a: 0.002, d: 0.03, s: 0.12, r: 0.05, vol: 0.02 * aggr, wet: true });
+    // ---- industrial war drums ----
+    const dv = Math.max(0.7, T.drums);
+    if (beat % 4 === 0) kick(t0, 0.2 * dv * (0.7 + aggr * 0.5));                              // pounding 4-on-the-floor
+    if (beat === 8 || (aggr > 0.4 && beat === 14)) perc(t0, (0.06 + aggr * 0.06) * dv, 1500, 0.16);   // hard taiko/snare
+    perc(t0, (0.024 + aggr * 0.04) * dv, 7600, 0.03);                                          // driving 16th hats
+    if (aggr > 0.5 && (beat === 13 || beat === 15)) kick(t0, 0.13 * dv);                       // tom fill into the bar
+    if (boss && (beat === 2 || beat === 6 || beat === 10 || beat === 14)) kick(t0, 0.13 * dv); // boss double-kick
   }
 
   M.start = (audioCtx, dry, wet) => {
     ctx = audioCtx; noiseBuf = makeNoise();
     busDry = ctx.createGain(); busDry.gain.value = 0; busDry.connect(dry);
     busWet = ctx.createGain(); busWet.gain.value = 0; if (wet) busWet.connect(wet);
+    gen = makeGen();
     track = TRACKS[trackId] || TRACKS.gloom;
   };
-  M.setTrack = id => {                                 // swap themes promptly: old fades out < 1s, new fades in
+  M.setTrack = id => {                                 // swap themes cleanly: old voices fade out & are freed, new fade in
     if (!id || !TRACKS[id] || id === trackId) return;
     if (!playing || !ctx) { trackId = id; track = TRACKS[id]; return; }
-    const now = ctx.currentTime;
-    busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
-    busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + 0.35);   // old theme fully out in 0.35s
-    busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.35);
-    setTimeout(() => {
-      if (!playing) return;
-      trackId = id; track = TRACKS[id]; step = 0; lead = 0; nextTime = ctx.currentTime + 0.04;
-      busDry.gain.setTargetAtTime(0.9, ctx.currentTime, 0.12); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.12);
-    }, 370);
+    swapGen(0.32, 0.28);                               // old theme out < 0.35s; master untouched so it can't bleed back
+    trackId = id; track = TRACKS[id]; step = 0; lead = 0; nextTime = ctx.currentTime + 0.04;
   };
   M.setIntensity = v => { intensity = Math.max(0, Math.min(1, v || 0)); };
   M.setBoss = on => { bossOn = !!on; };
@@ -147,33 +178,40 @@
   M.startBoss = () => {
     if (!ctx) return;
     bossOn = true; bossReturn = trackId; playing = false;
-    const now = ctx.currentTime;
-    busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
-    busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + 0.15);
-    busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.15);
-    setTimeout(() => {                                  // ~0.85s of silence (the boss roar/stinger swells), then the theme
+    retireGen(0.16);                                   // the biome theme hard-stops -> a beat of dread (master stays put)
+    setTimeout(() => {                                 // ~0.85s of silence (the boss roar/stinger swells), then the theme
       if (!bossOn || !ctx) return;
       trackId = 'boss'; track = TRACKS.boss; step = 0; lead = 0; nextTime = ctx.currentTime + 0.05; playing = true;
-      busDry.gain.cancelScheduledValues(ctx.currentTime);
-      busDry.gain.setTargetAtTime(0.95, ctx.currentTime, 0.18); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.18);
+      gen = makeGen(); const now = ctx.currentTime;
+      gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + 0.18);
+      gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + 0.18);
+      busDry.gain.cancelScheduledValues(now); busDry.gain.setTargetAtTime(0.95, now, 0.1); busWet.gain.setTargetAtTime(0.6, now, 0.1);
     }, 850);
   };
   // boss beaten: fade the boss theme out, bring the biome theme back in
   M.endBoss = (biomeId) => {
     bossOn = false; const id = biomeId || bossReturn || 'gloom';
     if (!ctx) { trackId = id; track = TRACKS[id] || track; return; }
-    const swap = () => { trackId = id; track = TRACKS[id] || track; step = 0; lead = 0; nextTime = ctx.currentTime + 0.05; playing = true; busDry.gain.cancelScheduledValues(ctx.currentTime); busDry.gain.setTargetAtTime(0.9, ctx.currentTime, 0.9); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.9); };
-    if (!playing) { swap(); return; }                  // boss died during the dramatic silence
     const now = ctx.currentTime;
-    busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
-    busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + 0.3);
-    busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.3);
-    setTimeout(swap, 330);
+    busDry.gain.cancelScheduledValues(now); busDry.gain.setTargetAtTime(0.9, now, 0.4); busWet.gain.setTargetAtTime(0.6, now, 0.4);
+    if (!playing) {                                    // boss died during the dread silence
+      trackId = id; track = TRACKS[id] || track; step = 0; lead = 0; nextTime = now + 0.05; playing = true;
+      gen = makeGen();
+      gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + 0.9);
+      gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + 0.9);
+      return;
+    }
+    swapGen(0.3, 0.9);                                 // boss theme out, biome fades back in
+    trackId = id; track = TRACKS[id] || track; step = 0; lead = 0; nextTime = now + 0.05;
   };
   M.resume = () => {                                  // fade the music in (e.g. on boss death / after a cutscene)
     if (!ctx || playing) return; playing = true; nextTime = ctx.currentTime + 0.06; step = 0;
-    busDry.gain.cancelScheduledValues(ctx.currentTime);
-    busDry.gain.setTargetAtTime(0.9, ctx.currentTime, 0.9); busWet.gain.setTargetAtTime(0.6, ctx.currentTime, 0.9);
+    if (!gen) gen = makeGen();
+    const now = ctx.currentTime;
+    gen.d.gain.cancelScheduledValues(now); gen.d.gain.setValueAtTime(Math.max(0.0001, gen.d.gain.value), now); gen.d.gain.linearRampToValueAtTime(1, now + 0.3);
+    gen.w.gain.cancelScheduledValues(now); gen.w.gain.setValueAtTime(Math.max(0.0001, gen.w.gain.value), now); gen.w.gain.linearRampToValueAtTime(1, now + 0.3);
+    busDry.gain.cancelScheduledValues(now);
+    busDry.gain.setTargetAtTime(0.9, now, 0.9); busWet.gain.setTargetAtTime(0.6, now, 0.9);
   };
   M.playing = () => playing;
   M.current = () => trackId;
