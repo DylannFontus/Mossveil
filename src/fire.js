@@ -7,12 +7,14 @@
 (function () {
   const F = G.Fire = {};
   const BURN_BASE = 10, BURN_EMBERS = 20, BURN_PERSIST = 7200;   // seconds of gameplay a scorch mark lingers (2h)
+  const WET_AFTER = 6;                                            // grass stays too wet to catch this long after rain stops
   const FIRE_N = 900, SMOKE_N = 460;
 
   let room = null, cells = [], state = [], cellMap = null;
   let burnAttr = null;                                 // the foliage `aBurn` BufferAttribute (set per vertex range)
   let layer = null, firePts = null, smokePts = null, fireGeo = null, smokeGeo = null;
-  let playtime = 0, iced = false;
+  let snowMat = null, snowDepth = 0;                    // snow accumulates on the ground during snow/blizzard
+  let playtime = 0, iced = false, wetT = 0;
   const burntByRoom = {};                              // roomId -> Map(cellIndex -> expiry playtime) : survives transitions
   const burningEnemies = [];                           // { e, t, tickT, dmg }
 
@@ -45,6 +47,31 @@
     const pts = new THREE.Points(geo, pointsMaterial(blending));
     pts.frustumCulled = false; pts.position.z = z;
     return { geo, pts, pos, col, size, alpha };
+  }
+
+  // ---- deep snow: a white cap on every ground-top tile whose height grows with accumulation ----
+  function buildSnow(tops) {
+    if (!tops || !tops.length) return null;
+    const SNOW_MAX = 0.55, z = -0.28, pos = [], base = [];
+    const tri = (ax, ay, bx, by, cx, cy, b0) => { pos.push(ax, ay, z, bx, by, z, cx, cy, z); base.push(b0, b0, b0); };
+    for (const t of tops) {
+      const x0 = t.x - 0.5, x1 = t.x + 0.5, y0 = t.y + 0.14, y1 = y0 + SNOW_MAX;
+      tri(x0, y0, x1, y0, x1, y1, y0); tri(x0, y0, x1, y1, x0, y1, y0);   // base verts anchored at y0, tops at y1
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute('aBaseY', new THREE.BufferAttribute(new Float32Array(base), 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uDepth: { value: snowDepth } }, transparent: true, depthWrite: false,
+      vertexShader: `attribute float aBaseY; uniform float uDepth; varying float vH;
+        void main(){ vec3 p = position; vH = (p.y - aBaseY); p.y = aBaseY + vH * uDepth;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+      fragmentShader: `uniform float uDepth; varying float vH;
+        void main(){ float a = clamp(uDepth, 0.0, 1.0) * 0.92; gl_FragColor = vec4(0.93, 0.96, 1.0, a); }`,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
+    return { mesh, mat };
   }
 
   // ---- weather queries ----
@@ -81,6 +108,21 @@
     sp.l[i] = sp.m[i] = rnd(1.2, 2.4); sp.s[i] = rnd(0.06, 0.13); sp.k[i] = 3;
   }
   function smokePuff(x, y, n) { for (let j = 0; j < (n || 8); j++) spawnSmoke(x, y + 0.2, rnd(1.0, 2.2), true); }
+  function spawnSteam(x, y) {                          // fire meeting water: a fast, billowing white hiss
+    const i = si; si = (si + 1) % SMOKE_N;
+    sp.x[i] = x + rnd(-0.3, 0.3); sp.y[i] = y + rnd(0, 0.3); sp.z[i] = rnd(-0.12, 0.12);
+    sp.vx[i] = rnd(-0.4, 0.4) + windWorld() * 0.5; sp.vy[i] = rnd(1.7, 3.0);
+    sp.l[i] = sp.m[i] = rnd(0.9, 1.7); sp.s[i] = rnd(0.5, 0.9); sp.k[i] = 4;
+  }
+  function steamPuff(x, y, n) { for (let j = 0; j < (n || 8); j++) spawnSteam(x, y); }
+  function spawnHaze(x, y) {                           // rising hot air above flames / lava — a heat shimmer
+    const i = si; si = (si + 1) % SMOKE_N;
+    sp.x[i] = x + rnd(-0.4, 0.4); sp.y[i] = y + rnd(0.2, 0.8); sp.z[i] = rnd(-0.1, 0.1);
+    sp.vx[i] = rnd(-0.2, 0.2); sp.vy[i] = rnd(0.9, 1.6);
+    sp.l[i] = sp.m[i] = rnd(0.7, 1.3); sp.s[i] = rnd(0.7, 1.2); sp.k[i] = 5;
+  }
+  F.steam = (x, y, n) => steamPuff(x, y, n);           // other systems (lava over water etc.) can ask for steam
+  F.haze = (x, y) => spawnHaze(x, y);
 
   // ---- scorch (drive the foliage aBurn attribute over a cell's vertex range) ----
   function setScorch(i, amt) {
@@ -94,7 +136,7 @@
   function igniteCell(i, delay) {
     const s = state[i]; if (!s || s.st === 'burning') return false;
     if (s.st === 'burnt') return false;               // already ash; let it recover first
-    if (douses()) { smokePuff(cells[i].x, cells[i].y, 4); return false; }   // rain/snow: it won't catch
+    if (wetT > 0 || douses()) { steamPuff(cells[i].x, cells[i].y, 4); return false; }   // wet ground won't catch — just a hiss of steam
     state[i] = { st: 'burning', t: 0, delay: delay || 0, dur: burnDuration(), spread: 0.6 + Math.random() * 0.5 };
     return true;
   }
@@ -128,10 +170,11 @@
     else burningEnemies.push({ e, t: dur, tickT: 0, dmg: dps });
   };
 
-  function extinguish(i, hard) {
+  function extinguish(i, byWater) {
     const s = state[i]; if (!s || s.st !== 'burning') return;
     const established = s.delay <= 0 && s.t > 1.6;
-    smokePuff(cells[i].x, cells[i].y, established ? 10 : 5);
+    if (byWater) steamPuff(cells[i].x, cells[i].y, established ? 12 : 6);   // doused by rain/snow/water -> steam
+    else smokePuff(cells[i].x, cells[i].y, established ? 10 : 5);
     if (established) {                                 // it really burned -> ash that lingers
       state[i] = { st: 'burnt' }; setScorch(i, 0.9);
       (burntByRoom[room.id] || (burntByRoom[room.id] = new Map())).set(i, playtime + BURN_PERSIST);
@@ -141,7 +184,7 @@
   }
 
   // ---- room lifecycle ----
-  F.setRoom = function (rm, grassCells, folMesh) {
+  F.setRoom = function (rm, grassCells, folMesh, tops) {
     room = rm; cells = grassCells || []; iced = false;
     state = cells.map(() => ({ st: 'green' }));
     cellMap = new Map();
@@ -154,6 +197,8 @@
     smokePts = makePoints(SMOKE_N, THREE.NormalBlending, -0.12);
     fireGeo = firePts.geo; smokeGeo = smokePts.geo;
     layer.add(smokePts.pts, firePts.pts);
+    const snow = buildSnow(tops); snowMat = snow ? snow.mat : null;   // depth persists across rooms (module global)
+    if (snow) layer.add(snow.mesh);
     rm.group.add(layer);
     for (let i = 0; i < FIRE_N; i++) fp.l[i] = 0;
     for (let i = 0; i < SMOKE_N; i++) sp.l[i] = 0;
@@ -176,11 +221,14 @@
 
   F.update = function (dt) {
     if (!G.EDITOR) playtime += dt;
+    if (G.player) { G.player.envSlow = 1; G.player.envSink = 0; }   // env effects re-assert each frame (snow, mud zones)
     if (!layer) return;
     if (firePts) firePts.pts.material.uniforms.uPx.value = G.pxScale || 600;
     if (smokePts) smokePts.pts.material.uniforms.uPx.value = G.pxScale || 600;
     const rainNow = douses();
     const wWorld = windWorld();
+    if (rainNow) wetT = WET_AFTER; else if (wetT > 0) wetT = Math.max(0, wetT - dt);   // ground dries out after rain
+    const water = (room && room.lookState && room.lookState.water) || null;
 
     // burning enemies (fire DOT)
     for (let j = burningEnemies.length - 1; j >= 0; j--) {
@@ -194,18 +242,22 @@
     }
 
     // grass cells
+    let anyBurning = false;
     for (let i = 0; i < state.length; i++) {
       const s = state[i], c = cells[i];
       if (s.st === 'burning') {
-        if (rainNow) { extinguish(i); continue; }
+        anyBurning = true;
+        if (rainNow) { extinguish(i, true); continue; }
         if (s.delay > 0) { s.delay -= dt; if (Math.random() < dt * 6) spawnSmoke(c.x, c.y, 0.7, true); continue; }
         s.t += dt;
         const scorch = Math.min(0.9, (s.t / Math.min(s.dur * 0.5, 3.0)) * 0.9);
         setScorch(i, scorch);
-        // flames + embers + light smoke while alight
+        // flames + embers + light smoke + rising heat haze while alight
         let want = 12 * dt; while (want > 0) { if (want >= 1 || Math.random() < want) spawnFlame(c.x, c.y); want -= 1; }
         if (Math.random() < dt * 5) spawnEmber(c.x, c.y);
         if (Math.random() < dt * 3) spawnSmoke(c.x, c.y + 0.6, 1.4, true);
+        if (Math.random() < dt * 2) spawnHaze(c.x, c.y + 0.7);
+        if (water && water.y != null && Math.abs(c.y - water.y) < 1.2 && Math.random() < dt * 4) spawnSteam(c.x, water.y);   // flame over water -> steam
         // wind spreads established fire to the next cell downwind
         if (windy() && s.t > 0.7) {
           s.spread -= dt;
@@ -216,6 +268,20 @@
         const map = burntByRoom[room.id];
         const exp = map && map.get(i);
         if (exp == null || playtime > exp) { state[i] = { st: 'green' }; setScorch(i, 0); if (map) map.delete(i); }
+      }
+    }
+
+    // deep snow accumulates during snow/blizzard (and slowly melts near fire / when it clears)
+    const snowP = wprops().snow || 0;
+    const snowTarget = Math.max(0, (snowP >= 0.9 ? 0.9 : snowP > 0 ? 0.45 : 0) - (anyBurning ? 0.18 : 0));
+    snowDepth += (snowTarget - snowDepth) * Math.min(1, dt * 0.15);
+    if (Math.abs(snowTarget - snowDepth) < 0.002) snowDepth = snowTarget;
+    if (snowMat) snowMat.uniforms.uDepth.value = snowDepth;
+    if (snowDepth > 0.25 && G.player && !G.EDITOR) {
+      const b = G.player.body;
+      if (b && b.onGround) {
+        G.player.envSlow = Math.min(G.player.envSlow == null ? 1 : G.player.envSlow, 1 - snowDepth * 0.45);   // wade through deep snow
+        if (Math.abs(b.vx) > 1.2 && Math.random() < dt * 12) spawnFrost(b.x - Math.sign(b.vx) * 0.3, b.y - 0.5);   // kicked-up snow
       }
     }
 
@@ -245,14 +311,19 @@
         if (sp.l[i] <= 0) { A[i] = 0; S[i] = 0; continue; }
         sp.l[i] -= dt; if (sp.l[i] <= 0) { A[i] = 0; S[i] = 0; continue; }
         const frac = sp.l[i] / sp.m[i], age = 1 - frac;
-        sp.vy[i] += (sp.k[i] === 3 ? -0.05 : 0.35) * dt;
-        sp.vx[i] += (wWorld * 0.7 - sp.vx[i]) * dt * 1.4;
+        const k = sp.k[i];
+        const buoy = k === 3 ? -0.05 : k === 4 ? 0.8 : k === 5 ? 0.15 : 0.35;
+        sp.vy[i] += buoy * dt;
+        if (k === 5) sp.vx[i] += Math.sin(G.time * 3.2 + i) * 0.5 * dt;          // haze wobbles like hot air
+        else sp.vx[i] += (wWorld * 0.7 - sp.vx[i]) * dt * 1.4;
         sp.x[i] += sp.vx[i] * dt; sp.y[i] += sp.vy[i] * dt;
         const o = i * 3; P[o] = sp.x[i]; P[o + 1] = sp.y[i]; P[o + 2] = sp.z[i];
-        if (sp.k[i] === 3) { C[o] = 0.85; C[o + 1] = 0.92; C[o + 2] = 1.0; S[i] = sp.s[i]; A[i] = Math.min(1, age * 4) * frac * 0.9; }
+        if (k === 3) { C[o] = 0.85; C[o + 1] = 0.92; C[o + 2] = 1.0; S[i] = sp.s[i]; A[i] = Math.min(1, age * 4) * frac * 0.9; }
+        else if (k === 4) { C[o] = 0.9; C[o + 1] = 0.93; C[o + 2] = 0.96; S[i] = sp.s[i] * (0.8 + age * 2.0); A[i] = Math.min(1, age * 5) * frac * 0.5; }   // steam
+        else if (k === 5) { C[o] = 0.86; C[o + 1] = 0.79; C[o + 2] = 0.62; S[i] = sp.s[i] * (1.0 + age * 1.4); A[i] = Math.min(1, age * 4) * frac * 0.12; } // heat haze
         else {
-          const g = sp.k[i] === 2 ? (0.16 + age * 0.18) : (0.2 + age * 0.16);   // warm soot -> cool grey
-          C[o] = g + (sp.k[i] === 2 ? 0.06 * frac : 0); C[o + 1] = g; C[o + 2] = g + 0.02;
+          const g = k === 2 ? (0.16 + age * 0.18) : (0.2 + age * 0.16);          // warm soot -> cool grey
+          C[o] = g + (k === 2 ? 0.06 * frac : 0); C[o + 1] = g; C[o + 2] = g + 0.02;
           S[i] = sp.s[i] * (0.7 + age * 1.8); A[i] = Math.min(1, age * 5) * frac * 0.42;
         }
       }
@@ -278,7 +349,7 @@
   F.stats = function () {
     let burning = 0, burnt = 0;
     for (const s of state) { if (s.st === 'burning') burning++; else if (s.st === 'burnt') burnt++; }
-    return { cells: cells.length, burning, burnt, iced, playtime: +playtime.toFixed(1), enemies: burningEnemies.length };
+    return { cells: cells.length, burning, burnt, iced, playtime: +playtime.toFixed(1), enemies: burningEnemies.length, wet: +wetT.toFixed(1), snow: +snowDepth.toFixed(2) };
   };
   F._setPlaytime = function (v) { playtime = v; };     // tests only: fast-forward gameplay time
   F._sample = function () { return cells[0] ? { x: cells[0].x, y: cells[0].y } : null; };

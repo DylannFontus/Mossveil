@@ -45,7 +45,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       out.burningRain = F.stats().burning;
 
       // 5) embers make it burn longer than the 10s base (still alight at ~12s)
-      G.Weather.set('embers'); F.ignite(s.x, s.y, 1, { range: 6 }); step(120);
+      G.Weather.set('embers'); step(70);                // let the post-rain wetness dry off first
+      F.ignite(s.x, s.y, 1, { range: 6 }); step(120);
       out.burningEmbers12s = F.stats().burning;
       step(110); out.burntEmbers = F.stats().burnt;     // ...and out by ~23s
 
@@ -53,6 +54,19 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       G.room.lookState = G.room.lookState || {}; G.room.lookState.water = { y: 6, strength: 0.5, ripple: 1 };
       G.Weather.set('blizzard'); step(2); out.icedBlizzard = F.stats().iced;
       G.Weather.set('none'); step(2); out.icedClear = F.stats().iced;
+
+      // 7) wet ground won't catch — after rain stops it stays wet for a while, then dries
+      G.Weather.set('rain'); step(3); G.Weather.set('none');
+      out.wetAfterRain = F.stats().wet > 0;
+      out.litWhileWet = F.ignite(s.x, s.y, 1, { range: 6 }); step(1);
+      out.burningWhileWet = F.stats().burning;
+      step(80); out.driedOut = F.stats().wet === 0;     // ~8s later it's dry again
+
+      // 8) deep snow accumulates under blizzard, then melts when it clears
+      G.Weather.set('blizzard'); for (let i = 0; i < 200; i++) F.update(0.1);
+      out.snowDeep = F.stats().snow;                    // climbs toward ~0.9
+      G.Weather.set('none'); for (let i = 0; i < 220; i++) F.update(0.1);
+      out.snowMelted = F.stats().snow < 0.05;
 
       out.emberSpell = !!G.Main.SPELL_TREE.find(t => t.id === 'ember');
       return out;
@@ -66,6 +80,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.litRain === 0 && o.burningRain === 0
       && o.burningEmbers12s > 0 && o.burntEmbers > 0
       && o.icedBlizzard === true && o.icedClear === false
+      && o.wetAfterRain === true && o.litWhileWet === 0 && o.burningWhileWet === 0 && o.driedOut === true
+      && o.snowDeep > 0.4 && o.snowMelted === true
       && o.emberSpell && !errs.length;
     console.log(ok ? 'FIRE TEST: PASS' : 'FIRE TEST: FAIL');
     process.exitCode = ok ? 0 : 2;

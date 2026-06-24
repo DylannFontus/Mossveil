@@ -9,6 +9,7 @@
   const WALL_SLIDE = -3.4, WJ_X = 9.8, WJ_Y = 15.5, WALL_LOCK = 0.14;
   const DASH_V = 23, DASH_T = 0.16, DASH_CD = 0.45;
   const ATK_CD = 0.36, ATK_ACTIVE0 = 0.02, ATK_ACTIVE1 = 0.13, POGO_V = 14.5;
+  const WIND_GROUND = 4.5, WIND_AIR = 13;    // weather wind push (gentle underfoot, stronger midair)
   const ART_CHARGE = 0.55;   // hold attack this long to ready a Great Slash (nail art)
   const MAX_HP = 5, SOUL_MAX = 99, SOUL_HIT = 12, FOCUS_COST = 33, FOCUS_TIME = 0.85, SPELL_COST = 33;
   const INVULN = 1.3;
@@ -375,7 +376,8 @@
         G.FX.ghost(p.silGeo, b.x, b.y + 0.2, p.facing * 1.15);
       }
     } else if (canControl && p.wallLockT <= 0) {
-      const target = ax * RUN;
+      const slow = p.envSlow != null ? p.envSlow : 1;   // mud / deep snow cap speed
+      const target = ax * RUN * slow;
       const acc = b.onGround ? (ax !== 0 ? ACC : DEC) : AIR_ACC;
       if (ax !== 0 || b.onGround) {
         if (b.vx < target) b.vx = Math.min(target, b.vx + acc * dt);
@@ -394,6 +396,13 @@
       p.wingUsed = false;
       if (U.chance(dt * 14)) G.FX.burst('dust', b.x + p.facing * 0.35, b.y - 0.2, { n: 1 });
     }
+
+    // weather wind nudges the wanderer; soft ground (quicksand / deep mud) drags you down
+    if (p.dashT <= 0 && G.Weather && G.Weather.windVec) {
+      const wv = G.Weather.windVec();
+      if (Math.abs(wv) > 0.04) b.vx += wv * (b.onGround ? WIND_GROUND : WIND_AIR) * dt;
+    }
+    if (p.envSink) b.vy -= p.envSink * dt;
 
     // gravity
     if (p.dashT <= 0) {
@@ -521,9 +530,11 @@
     }
 
     // physics
-    const wasGround = b.onGround;
+    const wasGround = b.onGround, landVy = b.vy;
     G.Physics.move(b, dt);
     if (b.onGround) {
+      if (!wasGround && landVy < -10 && !p.diveActive)   // kick up dust on a hard landing
+        G.FX.burst('dust', b.x, b.y - 0.42, { n: Math.min(11, 3 + ((-landVy - 9) * 0.7) | 0) });
       p.coyoteT = COYOTE;
       p.wingUsed = false;
       if (!wasGround && p.diveActive) {                  // Desolate Dive shockwave on landing

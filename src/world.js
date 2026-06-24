@@ -2093,7 +2093,7 @@
     const folBuilt = fol.build();
     if (folBuilt) {
       group.add(folBuilt.mesh); room.shaderMats.push(folBuilt.mat);
-      if (G.Fire && G.Fire.setRoom) G.Fire.setRoom(room, grassCells, folBuilt.mesh);   // burnable grass + fire/smoke layer
+      if (G.Fire && G.Fire.setRoom) G.Fire.setRoom(room, grassCells, folBuilt.mesh, parsed.tops);   // burnable grass + fire/smoke + snow
     }
 
     // glow flowers
