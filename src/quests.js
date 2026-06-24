@@ -24,6 +24,7 @@
     if (G.Main && G.Main.persist) G.Main.persist();
     if (G.UI && G.UI.toast) G.UI.toast('Quest complete — ' + (s[id].title || id));
     if (G.Audio && G.Audio.sfx) G.Audio.sfx('heal');
+    if (G.Audio && G.Audio.stinger) G.Audio.stinger('item');
   };
   Q.active = () => Object.keys(store()).map(k => store()[k]).filter(q => q.state === 'active');
   Q.all = () => Object.keys(store()).map(k => store()[k]);

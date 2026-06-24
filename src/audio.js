@@ -264,6 +264,23 @@
     },
     // adaptive music: 0 = calm exploration, 1 = full combat tension (driven by on-screen danger)
     setIntensity(v) { targetIntensity = Math.max(0, Math.min(1, v || 0)); },
+    // short musical stingers layered over the score (boss reveal, item get, secret found)
+    stinger(name) {
+      if (!started) return;
+      const r = areaRoot;
+      if (name === 'boss') {
+        tone({ type: 'sawtooth', f0: r * 0.5, t: 0.75, vol: 0.16, a: 0.06 });
+        tone({ type: 'sawtooth', f0: r * 0.75, t: 0.75, vol: 0.1, a: 0.06 });
+        noiseHit({ f0: 130, f1: 40, t: 0.7, vol: 0.2, ftype: 'lowpass' });
+        bell(r, 0.12, 0.9);
+        tone({ type: 'sine', f0: r * 0.5, t: 1.5, vol: 0.14, a: 0.12, delay: 0.4 });
+      } else if (name === 'item') {                       // triumphant ascending major arpeggio
+        [0, 4, 7, 12, 16].forEach((s, i) => tone({ type: 'triangle', f0: r * 2 * Math.pow(2, s / 12), t: 0.5, vol: 0.1, a: 0.005, delay: i * 0.09 }));
+        bell(r * 4, 0.07, 1.0);
+      } else if (name === 'secret') {                      // soft sparkle
+        [0, 7, 12, 16, 19].forEach((s, i) => tone({ type: 'sine', f0: r * 3 * Math.pow(2, s / 12), t: 0.45, vol: 0.06, a: 0.005, delay: i * 0.08 }));
+      }
+    },
     setMusicState(state) {
       if (state === 'boss') { this.setBoss(true); targetIntensity = Math.max(targetIntensity, 0.6); }
       else if (state === 'combat' || state === 'tense') targetIntensity = 0.8;

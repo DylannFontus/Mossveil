@@ -922,7 +922,7 @@
           this.dead = true;
           pl.hasWings = true;
           G.save.wings = true; G.Main.persist();
-          G.Audio.sfx('pickup');
+          G.Audio.sfx('pickup'); if (G.Audio.stinger) G.Audio.stinger('item');
           G.FX.burst('healPop', p.x, grp.position.y);
           G.FX.ring(p.x, grp.position.y, { r1: 5, life: 0.6, color: 0xffffff });
           G.FX.shake(0.15, 0.3);
@@ -982,7 +982,7 @@
         if (pl && !pl.dead && Math.abs(pl.body.x - p.x) < 1 && Math.abs(pl.body.y - grp.position.y) < 1.3) {
           this.dead = true; grp.visible = false;
           if (G.Charms) G.Charms.grant(cid);
-          G.Audio.sfx('pickup');
+          G.Audio.sfx('pickup'); if (G.Audio.stinger) G.Audio.stinger('item');
           G.FX.burst('healPop', p.x, grp.position.y);
           G.FX.ring(p.x, grp.position.y, { r1: 4, life: 0.5, color: col });
           G.FX.shake(0.12, 0.25);

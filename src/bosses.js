@@ -512,6 +512,7 @@
     G.Enemies._addToRoom(bs);
     G.Audio.sfx('roar');
     G.Audio.setBoss(true);
+    if (G.Audio.stinger) G.Audio.stinger('boss');
     G.FX.shake(0.3, 0.8);
     G.UI.bossTitle(cfg.name, EPITHETS[typeId]);
     G.UI.setBoss(bs);

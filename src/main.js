@@ -669,7 +669,7 @@
     if (Main.glimmer() < price) { G.Audio.sfx('clink'); G.UI.toast('Not enough Glimmer.'); return; }
     Main.spendGlimmer(price);
     G.Charms.grant(c.id);
-    G.Audio.sfx('pickup');
+    G.Audio.sfx('pickup'); if (G.Audio.stinger) G.Audio.stinger('item');
     G.UI.toast('Acquired: ' + c.name);
     Main.shopList = G.Charms.LIST.filter(x => !G.Charms.isOwned(x.id));
     if (!Main.shopList.length) { Main.state = 'play'; return; }
