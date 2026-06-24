@@ -1501,6 +1501,7 @@
     let cd = 0, cleared = 0;
     return {
       type: 'gas', x: p.x, y: p.y, group: grp, flammableGas: true, body: rect,
+      gust() { if (cleared <= 0) cleared = 5; },                          // a Gale Bolt blows the cloud away
       ignite() {                                                          // an Ember Bolt sets the cloud alight
         if (cleared > 0) return; cleared = 8;
         G.FX.burst('ember', p.x, p.y, { n: 24, color: 0xff8a30 });

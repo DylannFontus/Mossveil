@@ -530,11 +530,9 @@
     }
 
     // physics
-    const wasGround = b.onGround, landVy = b.vy;
+    const wasGround = b.onGround;
     G.Physics.move(b, dt);
     if (b.onGround) {
-      if (!wasGround && landVy < -10 && !p.diveActive)   // kick up dust on a hard landing
-        G.FX.burst('dust', b.x, b.y - 0.42, { n: Math.min(11, 3 + ((-landVy - 9) * 0.7) | 0) });
       p.coyoteT = COYOTE;
       p.wingUsed = false;
       if (!wasGround && p.diveActive) {                  // Desolate Dive shockwave on landing
@@ -554,8 +552,16 @@
         p.stepT = 0.16;
         p.landAnim = 0.18;
         p.stretch = 0.72 - impact * 0.12;
-        if (impact > 0.45) {        // hard landing — just a bit of extra dust (no screen shake/jolt)
-          G.FX.burst('dust', b.x, b.y - 0.6, { n: Math.round(4 + impact * 6) });
+        if (impact > 0.28) {        // landing kicks up dust, scaled by impact (no screen shake/jolt)
+          G.FX.burst('dust', b.x, b.y - 0.6, { n: Math.round(5 + impact * 8) });
+        }
+      }
+      // running kicks up leaves on grass — ash on scorched ground
+      if (Math.abs(b.vx) > 4.5 && U.chance(dt * 7)) {
+        const sx = b.x - Math.sign(b.vx) * 0.3, sy = b.y - b.h / 2;
+        if ((G.World.surfaceAt ? G.World.surfaceAt(b.x, sy - 0.1) : '') === 'grass') {
+          if (G.Fire && G.Fire.scorchedNear && G.Fire.scorchedNear(b.x, b.y, 0.9)) G.FX.burst('dust', sx, sy + 0.1, { n: 1, color: 0x55504a });
+          else G.FX.burst('leaf', sx, sy + 0.15, { n: 1, color: (G.room && G.room.pal ? G.room.pal.moss : 0x6a9a4a) });
         }
       }
       p.safeAccum += dt;
@@ -610,9 +616,11 @@
   }
   function castBolt(p, lvl) {
     const big = lvl >= 2, b = p.body;
-    const fire = (G.Main && G.Main.spellLevel) ? G.Main.spellLevel('ember') : 0;   // Ember Bolt upgrade
-    const color = fire ? (fire >= 2 ? 0xff7a2a : 0xff9d4a) : (big ? 0xc9a0ff : 0xcfeaff);
-    G.Enemies.fireBolt(b.x + p.facing * 0.7, b.y + 0.35, p.facing, { dmg: big ? 5 : 3, speed: big ? 22 : 17, r: big ? 0.5 : 0.32, color, fire });
+    const el = (G.Main && G.Main.activeElement) ? G.Main.activeElement() : null;   // attuned bolt element
+    const elLvl = el ? G.Main.spellLevel(el) : 0;
+    const COL = { ember: elLvl >= 2 ? 0xff7a2a : 0xff9d4a, frost: 0x8fd8ff, gale: 0xe8f4ff };
+    const color = el ? COL[el] : (big ? 0xc9a0ff : 0xcfeaff);
+    G.Enemies.fireBolt(b.x + p.facing * 0.7, b.y + 0.35, p.facing, { dmg: big ? 5 : 3, speed: big ? 22 : 17, r: big ? 0.5 : 0.32, color, fire: el === 'ember' ? elLvl : 0, element: el, elementLvl: elLvl });
     b.vx -= p.facing * 3; G.FX.shake(big ? 0.15 : 0.1, 0.12);
     G.FX.burst('soul', b.x + p.facing * 0.8, b.y + 0.35, { n: big ? 10 : 6 });
   }

@@ -168,6 +168,23 @@
     for (let i = 0; i < state.length; i++) if (state[i].st === 'burning') { const c = cells[i]; if (Math.abs(c.x - x) < r && Math.abs(c.y - y) < r) return true; }
     return false;
   };
+  F.scorchedNear = function (x, y, r) {                 // is the ground burnt/ash near (x,y)? (kick up ash, not leaves)
+    r = r || 0.9;
+    for (let i = 0; i < state.length; i++) if (state[i].st === 'burnt') { const c = cells[i]; if (Math.abs(c.x - x) < r && Math.abs(c.y - y) < r) return true; }
+    return false;
+  };
+  F.douseAt = function (x, y, r) {                     // Frost Bolt: snuff nearby fire and leave the ground wet
+    r = r || 1.6; let n = 0;
+    for (let i = 0; i < state.length; i++) if (state[i].st === 'burning') { const c = cells[i]; if (Math.abs(c.x - x) < r && Math.abs(c.y - y) < r) { extinguish(i, true); n++; } }
+    if (n) { wetT = Math.max(wetT, 3); steamPuff(x, y, 5); }
+    return n;
+  };
+  F.fanAt = function (x, y, dir, r) {                  // Gale Bolt: fan fire onward to the next cell downwind
+    r = r || 2.0; dir = Math.sign(dir) || 1; let n = 0;
+    if (!cellMap) return 0;
+    for (let i = 0; i < state.length; i++) if (state[i].st === 'burning') { const c = cells[i]; if (Math.abs(c.x - x) < r && Math.abs(c.y - y) < r) { const nb = cellMap.get(Math.round(c.x + dir) + ',' + Math.round(c.y)); if (nb != null && state[nb].st === 'green') { igniteCell(nb, 0); n++; } } }
+    return n;
+  };
   F.burnEnemy = function (e, dur, dps) {
     if (!e || !e.isEnemy) return;
     const ex = burningEnemies.find(b => b.e === e);

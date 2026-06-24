@@ -846,7 +846,7 @@
     const ent = {
       type: 'projectile', friendly: !!o.friendly, alive: true, dead: false,
       body: { x: o.x, y: o.y, w: o.r * 2, h: o.r * 2, vx: o.vx, vy: o.vy },
-      group: grp, life: o.life || 3, dmg: o.dmg || 1, homing: o.homing || 0, fire: o.fire || 0,
+      group: grp, life: o.life || 3, dmg: o.dmg || 1, homing: o.homing || 0, fire: o.fire || 0, element: o.element || null, elementLvl: o.elementLvl || 0,
       pop() {
         if (this.dead) return;
         this.dead = true;
@@ -874,12 +874,27 @@
         // Ember Bolt: set the grass it flies over alight, in the direction it was thrown
         if (this.fire && G.Fire && G.Fire.igniteAt) G.Fire.igniteAt(b.x, b.y, Math.sign(b.vx) || 1);
         if (this.fire) for (const e of G.room.entities) { if (e.flammableGas && e.ignite && U.overlap(b, e.body)) { e.ignite(); break; } }   // ignite poison gas
+        // Frost Bolt snuffs fire it passes; Gale Bolt fans fire onward and blows away gas
+        if (this.element === 'frost' && G.Fire && G.Fire.douseAt) G.Fire.douseAt(b.x, b.y, 1.4);
+        if (this.element === 'gale') {
+          if (G.Fire && G.Fire.fanAt) G.Fire.fanAt(b.x, b.y, Math.sign(b.vx) || 1, 2.0);
+          for (const e of G.room.entities) if (e.flammableGas && e.gust && U.overlap(b, e.body)) e.gust();
+        }
         if (G.Physics.rectVsSolids(b)) { this.pop(); return; }
         if (this.friendly) {
           for (const e of G.room.entities) {
             if (e.isEnemy && e.alive && U.overlap(b, e.body)) {
-              e.hurt(this.dmg, Math.sign(b.vx) || 1, 'spell');
+              const dir = Math.sign(b.vx) || 1;
+              e.hurt(this.dmg, dir, 'spell');
               if (this.fire && G.Fire && G.Fire.burnEnemy) G.Fire.burnEnemy(e, this.fire >= 2 ? 5 : 3.5, this.fire >= 2 ? 3 : 2);   // fire DOT
+              if (this.element === 'frost') {                              // freeze the foe solid
+                if (E.stagger) E.stagger(e, this.elementLvl >= 2 ? 1.9 : 1.2);
+                if (e.body) { e.body.vx = 0; if (!e.fly) e.body.vy = Math.min(e.body.vy, 0); }
+                G.FX.burst('spark', e.body.x, e.body.y + 0.2, { n: 8, color: 0xbfe8ff });
+              } else if (this.element === 'gale') {                        // hurl the foe back
+                if (e.body) { e.body.vx += dir * (this.elementLvl >= 2 ? 17 : 11); e.body.vy += 3.5; }
+                G.FX.burst('spark', e.body.x, e.body.y + 0.2, { n: 6, color: 0xeaf4ff });
+              }
               this.pop();
               G.FX.shake(0.08, 0.1);
               break;

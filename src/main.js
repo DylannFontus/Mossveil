@@ -699,20 +699,38 @@
     { id: 'bolt', name: 'Soul Bolt', cast: 'Cast', tiers: ['', 'A bolt of soul flung forward.', 'Shade Soul — a greater, faster bolt.'], cost: [0, 0, 130] },
     { id: 'scream', name: 'Wraith Cry', cast: 'Hold ↑ + Cast', tiers: ['Not yet learned.', 'Howling Wraiths — spirits burst upward.', 'Abyss Shriek — a greater, wider cry.'], cost: [0, 80, 170] },
     { id: 'dive', name: 'Abyss Dive', cast: 'Hold ↓ + Cast (airborne)', tiers: ['Not yet learned.', 'Desolate Dive — slam down with a shockwave.', 'Descending Dark — a darker, wider dive.'], cost: [0, 110, 190] },
-    { id: 'ember', name: 'Ember Bolt', cast: 'augments Soul Bolt', tiers: ['Soul Bolt carries no flame.', 'Ember Bolt — bolts set grass alight and sear foes over time.', 'Cinder Bolt — hotter still: bigger flames, longer burn & sear.'], cost: [0, 90, 160] }
+    { id: 'ember', name: 'Ember Bolt', cast: 'attunes Soul Bolt', element: true, tiers: ['Soul Bolt carries no flame.', 'Ember Bolt — bolts set grass alight and sear foes over time.', 'Cinder Bolt — hotter still: bigger flames, longer burn & sear.'], cost: [0, 90, 160] },
+    { id: 'frost', name: 'Frost Bolt', cast: 'attunes Soul Bolt', element: true, tiers: ['Soul Bolt carries no chill.', 'Frost Bolt — snuffs fire, and freezes foes solid on hit.', 'Rime Bolt — a deeper, longer freeze.'], cost: [0, 90, 160] },
+    { id: 'gale', name: 'Gale Bolt', cast: 'attunes Soul Bolt', element: true, tiers: ['Soul Bolt carries no wind.', 'Gale Bolt — hurls foes back, fans fire and blows away gas.', 'Tempest Bolt — a fiercer gust.'], cost: [0, 110, 180] }
   ];
   Main.spellIndex = 0;
   Main.spellLevel = id => { const s = G.save && G.save.spells; return s && s[id] != null ? s[id] : (id === 'bolt' ? 1 : 0); };
   Main.spellCost = id => { const t = Main.SPELL_TREE.find(s => s.id === id); const lvl = Main.spellLevel(id); return (t && lvl < 2) ? t.cost[lvl + 1] : 0; };
+  Main.ELEMENTS = ['ember', 'frost', 'gale'];
+  // the Soul Bolt element you're attuned to (an Element you've learned), or null for plain
+  Main.activeElement = () => {
+    const sel = G.save && G.save.boltElement;
+    if (sel && Main.spellLevel(sel) >= 1) return sel;
+    for (const e of Main.ELEMENTS) if (Main.spellLevel(e) >= 1) return e;
+    return null;
+  };
   Main.upgradeSpell = id => {
-    const lvl = Main.spellLevel(id); if (lvl >= 2) { G.UI.toast('Already mastered.'); return; }
+    const node = Main.SPELL_TREE.find(s => s.id === id), lvl = Main.spellLevel(id);
+    // Element nodes double as an attunement: confirming a learned-but-inactive one just switches to it
+    if (node && node.element && lvl >= 1 && Main.activeElement() !== id) {
+      G.save.boltElement = id; Main.persist();
+      G.Audio.sfx('heal'); if (G.Post) G.Post.flash(0.25, 0x9fd8ff);
+      G.UI.toast('Attuned — ' + node.name); return;
+    }
+    if (lvl >= 2) { G.UI.toast('Already mastered.'); return; }
     const cost = Main.spellCost(id);
     if (Main.glimmer() < cost) { G.Audio.sfx('clink'); G.UI.toast('Not enough Glimmer — ' + cost + ' needed.'); return; }
     Main.spendGlimmer(cost);
-    G.save.spells = G.save.spells || { bolt: 1 }; G.save.spells[id] = lvl + 1; Main.persist();
+    G.save.spells = G.save.spells || { bolt: 1 }; G.save.spells[id] = lvl + 1;
+    if (node && node.element && lvl === 0) G.save.boltElement = id;   // learning an element attunes to it
+    Main.persist();
     G.Audio.sfx('heal'); if (G.Post) G.Post.flash(0.3, 0xc9a0ff); G.FX.shake(0.18, 0.25);
-    const nm = Main.SPELL_TREE.find(s => s.id === id).name;
-    G.UI.toast((lvl === 0 ? 'Learned — ' : 'Empowered — ') + nm);
+    G.UI.toast((lvl === 0 ? 'Learned — ' : 'Empowered — ') + node.name);
   };
   Main.openSpellTree = () => { Main.spellIndex = 0; G.save.spells = G.save.spells || { bolt: 1 }; menuGo('spelltree'); };
 

@@ -111,6 +111,13 @@
       ctx.stroke();
     }
     if (lightFlash > 0.01) { ctx.fillStyle = 'rgba(200,220,255,' + (lightFlash * 0.11).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
+    // frost creeps in from the screen edges during snow / blizzard
+    if (P.snow) {
+      const fr = Math.min(0.85, P.snow), a = (0.15 * fr + 0.03 * Math.max(0, Math.sin(t * 1.3))).toFixed(3);
+      const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.34, w / 2, h / 2, Math.max(w, h) * 0.62);
+      g.addColorStop(0, 'rgba(228,240,255,0)'); g.addColorStop(1, 'rgba(228,240,255,' + a + ')');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    }
     ctx.restore();
   };
 
