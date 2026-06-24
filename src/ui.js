@@ -1354,5 +1354,6 @@
         cx.fillRect(0, 0, w, h);
       }
     }
+    if (G.Debug && G.Debug.on && G.Debug.draw) G.Debug.draw(cx, w, h);   // dev entity inspector (F4)
   };
 })();
