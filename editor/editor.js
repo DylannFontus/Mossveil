@@ -273,6 +273,8 @@
     if (p.type === 'windzone') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 9 };
     if (p.type === 'spiketrap') return { x: p.x, y: p.y + 0.35, w: p.w || 2.4, h: 1 };
     if (p.type === 'platform' || p.type === 'crusher' || p.type === 'conveyor' || p.type === 'fallfloor') return { x: p.x, y: p.y, w: p.w || 4, h: p.h || 1 };
+    if (p.type === 'mire' || p.type === 'pool') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 1.5 };
+    if (p.type === 'gas') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 4 };
     if (p.type === 'breakable') return { x: p.x, y: p.y, w: p.w || 2, h: p.h || 4 };
     if (p.type === 'door') return { x: p.x, y: p.y + (p.h || 5) / 2, w: p.w || 1.2, h: p.h || 5 };
     if (p.type === 'npc') return { x: p.x, y: p.y + 1, w: 1.1 * (p.scale || 1), h: 2.1 * (p.scale || 1) };
@@ -703,6 +705,7 @@
       if (a.id === 'decor') p.kind = a.kind || 'tree';
       if (a.id === 'furniture') p.kind = a.kind || 'sofa';
       if (a.id === 'model') p.model = a.model || '';
+      if (a.kind && p.kind === undefined) p.kind = a.kind;   // mire / pool / etc. carry their kind
       L.props.push(p);
       sel = { kind: 'prop', i: L.props.length - 1 };
     }
@@ -785,6 +788,9 @@
       if (it.ref.type === 'fallfloor') col = '#d8b070';
       if (it.ref.type === 'breakable') col = '#b0a090';
       if (it.ref.type === 'lever' || it.ref.type === 'plate') col = '#ffd060';
+      if (it.ref.type === 'mire') col = '#a07850';
+      if (it.ref.type === 'pool') col = it.ref.kind === 'acid' ? '#9fe060' : '#ff7040';
+      if (it.ref.type === 'gas') col = '#9fd070';
       if (it.ref.type === 'door') col = '#a0b0c0';
       if (it.ref.type === 'npc') col = '#9fe8c0';
       // moving-platform travel path
@@ -1335,6 +1341,21 @@
           el('div', { class: 'insNote' }, body, 'Extends and retracts on a timer — only dangerous while out. Offset Phase to alternate several.');
           break;
         }
+        case 'mire': {
+          selectField(body, 'Kind', [{ v: 'mud', t: 'Mud (slow)' }, { v: 'quicksand', t: 'Quicksand (sink)' }, { v: 'ash', t: 'Ash drift (slow)' }], () => p.kind || 'mud', v => { p.kind = v; });
+          numField(body, 'Width', () => p.w || 6, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 1.4, v => { p.h = Math.max(0.5, v); }, 0.2);
+          el('div', { class: 'insNote' }, body, 'Soft ground: slows you (quicksand also drags you down). Place over walkable terrain.');
+          break;
+        }
+        case 'pool': {
+          selectField(body, 'Kind', [{ v: 'lava', t: 'Lava (heat haze)' }, { v: 'acid', t: 'Acid (eats breakables)' }], () => p.kind || 'lava', v => { p.kind = v; });
+          numField(body, 'Width', () => p.w || 6, v => { p.w = Math.max(1, v); }, 0.5);
+          numField(body, 'Height', () => p.h || 1.7, v => { p.h = Math.max(0.5, v); }, 0.2);
+          numField(body, 'Damage', () => p.dmg || 1, v => { p.dmg = Math.max(1, Math.round(v)); }, 1);
+          el('div', { class: 'insNote' }, body, 'Hazard pool: sears on contact and bounces you out. Lava radiates heat; acid dissolves breakable walls.');
+          break;
+        }
         case 'breakable': {
           numField(body, 'Width', () => p.w || 2, v => { p.w = Math.max(0.5, v); }, 0.5);
           numField(body, 'Height', () => p.h || 4, v => { p.h = Math.max(0.5, v); }, 0.5);
@@ -1700,6 +1721,11 @@
         { cat: 'prop', id: 'windzone', label: 'Wind current', ico: '🌬️', defaults: { w: 6, h: 9, fx: 0, fy: 14 } },
         { cat: 'prop', id: 'fallfloor', label: 'Collapsing floor', ico: '🧱', defaults: { w: 3, h: 0.7, delay: 0.55, respawn: 3 } },
         { cat: 'prop', id: 'spiketrap', label: 'Timed spikes', ico: '🔺', defaults: { w: 2.4, period: 2, onTime: 0.9, phase: 0 } },
+        { cat: 'prop', id: 'mire', kind: 'mud', label: 'Mud', ico: '🟤', defaults: { w: 6, h: 1.4 } },
+        { cat: 'prop', id: 'mire', kind: 'quicksand', label: 'Quicksand', ico: '🟫', defaults: { w: 6, h: 1.6 } },
+        { cat: 'prop', id: 'mire', kind: 'ash', label: 'Ash drift', ico: '🌫️', defaults: { w: 6, h: 1.2 } },
+        { cat: 'prop', id: 'pool', kind: 'lava', label: 'Lava pool', ico: '🌋', defaults: { w: 6, h: 1.8, dmg: 1 } },
+        { cat: 'prop', id: 'pool', kind: 'acid', label: 'Acid pool', ico: '🧪', defaults: { w: 6, h: 1.6, dmg: 1 } },
         { cat: 'prop', id: 'breakable', label: 'Breakable wall', ico: '🧱', defaults: { w: 2, h: 4, hp: 3 } },
         { cat: 'prop', id: 'lever', label: 'Lever', ico: '🎚️', defaults: { signal: '' } },
         { cat: 'prop', id: 'plate', label: 'Pressure plate', ico: '⏺️', defaults: { w: 1.8, signal: '', latch: false } },

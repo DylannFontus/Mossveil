@@ -1432,6 +1432,61 @@
     };
   };
 
+  // soft ground — mud / quicksand / ash drift: a placeable block you slow and sink in
+  mkProp.mire = (p) => {
+    const kind = p.kind || 'mud', w = p.w || 6, h = p.h || 1.4;
+    const COL = { mud: [0x241a12, 0x3a2a1a], quicksand: [0x4a3c22, 0x6a5630], ash: [0x26262b, 0x44444c] };
+    const c = COL[kind] || COL.mud;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, -0.05);
+    grp.add(rectMesh(w, h, c[0], c[1]));
+    const rect = { x: p.x, y: p.y, w, h };
+    const slow = kind === 'quicksand' ? 0.32 : kind === 'ash' ? 0.6 : 0.48;
+    const sink = kind === 'quicksand' ? 5.5 : 0;
+    return {
+      type: 'mire', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        const pl = G.player; if (!pl || pl.dead) return;
+        if (!U.overlap(rect, pl.body)) return;
+        pl.envSlow = Math.min(pl.envSlow == null ? 1 : pl.envSlow, slow);
+        if (sink) pl.envSink = Math.max(pl.envSink || 0, sink);
+        if (Math.abs(pl.body.vx) > 1 && U.chance(dt * 10)) {
+          if (kind === 'ash') G.FX.burst('dust', pl.body.x, pl.body.y - 0.4, { n: 1, color: 0x6a6a70 });
+          else G.FX.p(true, { x: pl.body.x + U.rand(-0.3, 0.3), y: pl.body.y - 0.5, vx: 0, vy: U.rand(0.3, 0.9), life: 0.5, size: U.rand(0.1, 0.2), color: c[1], alpha: 0.5 });
+        }
+      }
+    };
+  };
+
+  // hazard pool — lava / acid: a placeable block that sears (and bounces you out) on contact
+  mkProp.pool = (p) => {
+    const kind = p.kind || 'lava', w = p.w || 6, h = p.h || 1.7, dmg = p.dmg || 1, lava = kind === 'lava';
+    const base = lava ? 0x2a0c06 : 0x14260c, top = lava ? 0xff6a1e : 0x8aff4a;
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, -0.05);
+    grp.add(rectMesh(w, h, base, top));
+    if (U.glowSprite) { const g = U.glowSprite(lava ? 0xff5010 : 0x80ff40, Math.max(w, 6), 0.22); g.position.set(0, h / 2, -0.1); grp.add(g); }
+    const surf = { x: p.x, y: p.y + h / 2 - 0.3, w: w - 0.2, h: h * 0.6 };   // the harmful surface band
+    let cd = 0;
+    return {
+      type: 'pool', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        cd -= dt;
+        if (U.chance(dt * (lava ? 8 : 6))) {                              // surface bubbles + heat haze
+          const bx = p.x + U.rand(-w / 2, w / 2);
+          G.FX.p(true, { x: bx, y: p.y + h / 2 - 0.1, vx: 0, vy: U.rand(0.6, 1.6), life: 0.6, size: U.rand(0.12, 0.26), color: lava ? 0xffb030 : 0xbfff70, alpha: 0.85 });
+          if (lava && G.Fire && G.Fire.haze) G.Fire.haze(bx, p.y + h / 2);
+        }
+        const pl = G.player;
+        if (pl && !pl.dead && pl.invulnT <= 0 && cd <= 0 && U.overlap(surf, pl.body)) {
+          pl.damage(dmg, pl.body.x + (pl.body.x >= p.x ? 0.6 : -0.6));
+          pl.body.vy = Math.max(pl.body.vy, 12); cd = 0.8;               // bounce out like spikes
+          G.FX.burst('spark', pl.body.x, pl.body.y, { n: 8, color: top });
+        }
+        if (!lava && U.chance(dt * 0.5))                                  // acid eats breakable walls sitting in it
+          for (const e of G.room.entities) if (e.breakable && e.alive && U.overlap(surf, e.body)) e.hurt(1);
+      }
+    };
+  };
+
   // a floor that shakes then drops when you stand on it, and respawns
   mkProp.fallfloor = (p) => {
     const w = p.w || 3, h = p.h || 0.7, delay = p.delay !== undefined ? p.delay : 0.55, respawn = p.respawn || 3;
