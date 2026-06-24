@@ -43,6 +43,7 @@
     const c = ch[i];
     if (c.flag) { G.save.flags = G.save.flags || {}; G.save.flags[c.flag] = true; if (G.Main && G.Main.persist) G.Main.persist(); }
     if (c.quest && G.Quests && G.Quests.start) G.Quests.start(c.quest);
+    if (c.completeQuest && G.Quests && G.Quests.complete) G.Quests.complete(c.completeQuest);
     if (c.signal && G.EventGraph && G.EventGraph.signal) G.EventGraph.signal(c.signal);
     if (G.Audio && G.Audio.sfx) G.Audio.sfx('clink');
     next(c.goto != null ? c.goto : lineIdx + 1);

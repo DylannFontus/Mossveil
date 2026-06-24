@@ -116,11 +116,12 @@
   Main.menuItems = [];
   Main.confirm = null;   // { message, onYes, sel }
   Main.pauseIndex = 0;
-  Main.pauseItems = ['Resume', 'Charms', 'Journal', 'Map', 'Settings', 'Quit to Title'];
+  Main.pauseItems = ['Resume', 'Charms', 'Journal', 'Quests', 'Map', 'Settings', 'Quit to Title'];
   Main.pauseDescs = {
     'Resume': 'Return to the dream.',
     'Charms': 'Equip and inspect your charms.',
     'Journal': "The Hunter's record of the creatures you have slain.",
+    'Quests': 'Your active and finished tasks.',
     'Map': "Open the wanderer's map.",
     'Settings': 'Sound, screen shake, visual quality.',
     'Quit to Title': 'Leave to the title screen.'
@@ -129,6 +130,7 @@
   Main.journalIndex = 0;
   Main.ctrlIndex = 0; Main.ctrlListening = false;
   Main.dlgChoice = 0;
+  Main.questIndex = 0;
   Main.settingsIndex = 0;
 
   // ---------------- settings ----------------
@@ -203,6 +205,7 @@
     if (it === 'Resume') { if (G.UI.closePause) G.UI.closePause(); Main.state = 'play'; }
     else if (it === 'Charms') { Main.charmIndex = 0; Main._charmReturn = 'pause'; menuGo('charms'); }
     else if (it === 'Journal') { Main.journalIndex = 0; Main._journalReturn = 'pause'; menuGo('journal'); }
+    else if (it === 'Quests') { Main.questIndex = 0; menuGo('quests'); }
     else if (it === 'Map') { Main.mapView = Main.mapView || { pan: { x: 0, y: 0 }, zoom: 3 }; G.MapView.centerOn(G.room.id, Main.mapView); menuGo('map'); }
     else if (it === 'Settings') { Main.settingsIndex = 0; Main._settingsReturn = 'pause'; menuGo('settings'); }
     else if (it === 'Quit to Title') { G.Audio.setBoss(false); G.UI.setBoss(null); Main.menuIndex = 0; menuGo('title'); }
@@ -870,6 +873,14 @@
         if (I.pressed('pause')) G.Dialogue.cancel();
         break;
       }
+      case 'quests': {
+        dt = 0;
+        const n = Math.max(1, (G.Quests ? G.Quests.all().length : 0));
+        if (I.pressed('up')) { Main.questIndex = (Main.questIndex - 1 + n) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('down')) { Main.questIndex = (Main.questIndex + 1) % n; G.Audio.sfx('clink'); }
+        if (I.pressed('pause') || I.pressed('confirm')) { G.Audio.sfx('clink'); menuGo('pause'); }
+        break;
+      }
       case 'journal': {
         dt = 0;
         const n = (G.Enemies.TYPES || []).length || 1;
@@ -1013,6 +1024,7 @@
         G.Audio.setIntensity(Math.min(1, danger * 0.6));
       } else G.Audio.setIntensity(0);
     }
+    if (G.Quests && G.Quests.update && Main.state === 'play') G.Quests.update();
     G.Audio.update(rdt);
     if (G.Lights) G.Lights.update(rdt, G.time);
     if (G.EventGraph) G.EventGraph.update(rdt);

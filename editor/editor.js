@@ -1307,6 +1307,12 @@
               const go = el('input', { type: 'number', title: 'goto line (-1 = end)', value: c.goto != null ? c.goto : -1, style: 'width:42px' }, crow); go.addEventListener('change', () => c.goto = parseInt(go.value));
               const fl = el('input', { type: 'text', placeholder: 'flag', value: c.flag || '', style: 'width:62px' }, crow); fl.addEventListener('change', () => c.flag = fl.value || undefined);
               el('button', { class: 'tbtn', style: 'padding:0 6px' }, crow, '✕').addEventListener('click', () => { ln.choices.splice(ci, 1); refreshInspector(); });
+              const qrow = el('div', { class: 'frow', style: 'gap:4px;margin:2px 0 4px 12px' }, card);
+              el('div', { style: 'color:#86a89c;font-size:10px;align-self:center' }, qrow, 'quest');
+              const qt = el('input', { type: 'text', placeholder: 'title (starts quest)', value: (c.quest && c.quest.title) || '', style: 'flex:1;min-width:0' }, qrow);
+              const qo = el('input', { type: 'text', placeholder: 'objective', value: (c.quest && c.quest.objective) || '', style: 'flex:1;min-width:0' }, qrow);
+              const setQ = () => { const t = qt.value.trim(); if (t) c.quest = { id: t.toLowerCase().replace(/[^a-z0-9]+/g, '-'), title: t, objective: qo.value.trim() || t }; else delete c.quest; };
+              qt.addEventListener('change', setQ); qo.addEventListener('change', setQ);
             });
             el('button', { class: 'tbtn', style: 'margin-top:4px;padding:1px 7px' }, card, '+ choice').addEventListener('click', () => { ln.choices.push({ label: '...', goto: -1 }); refreshInspector(); });
           });

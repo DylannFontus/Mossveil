@@ -198,6 +198,54 @@
     cx.fillText('bench', ex, ey + (ey > h / 2 ? -15 : 21)); cx.restore();
   }
 
+  // top-right objective tracker for the currently-tracked quest (+ a world marker to its target)
+  function drawObjectiveTracker() {
+    if (!G.Quests) return;
+    const q = G.Quests.tracked(); if (!q) return;
+    cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
+    cx.shadowColor = 'rgba(0,0,0,0.65)'; cx.shadowBlur = 5;
+    cx.fillStyle = 'rgba(255,233,176,0.92)'; cx.font = `bold ${Math.round(h * 0.022)}px ${serif}`;
+    cx.fillText('◆ ' + (q.title || ''), w - 22, 30);
+    if (q.objective) { cx.fillStyle = 'rgba(208,222,214,0.82)'; cx.font = `italic ${Math.round(h * 0.018)}px ${serif}`; cx.fillText(q.objective, w - 22, 30 + Math.round(h * 0.026)); }
+    cx.restore();
+    if (q.target && G.room && q.target.room === G.room.id) {
+      const s = U.toScreen(q.target.x, q.target.y), m = 50;
+      if (s.x < m || s.x > w - m || s.y < m || s.y > h - m) {
+        const ex = U.clamp(s.x, m, w - m), ey = U.clamp(s.y, m, h - m), ang = Math.atan2(s.y - h / 2, s.x - w / 2);
+        cx.save(); cx.globalAlpha = 0.8; cx.translate(ex, ey); cx.rotate(ang);
+        cx.fillStyle = 'rgba(255,233,176,0.9)'; cx.strokeStyle = 'rgba(20,16,8,0.6)'; cx.lineWidth = 1.5;
+        cx.beginPath(); cx.moveTo(13, 0); cx.lineTo(-6, -7); cx.lineTo(-6, 7); cx.closePath(); cx.fill(); cx.stroke(); cx.restore();
+      } else {
+        cx.save(); cx.globalAlpha = 0.55 + Math.sin((G.time || 0) * 4) * 0.3; cx.fillStyle = 'rgba(255,233,176,0.9)';
+        cx.translate(s.x, s.y - 1.5); cx.rotate(Math.PI / 4); cx.fillRect(-5, -5, 10, 10); cx.restore();
+      }
+    }
+  }
+  // pause -> Quests log page (same menu chrome)
+  function drawQuestLog() {
+    pmAcc = biomeAccent(); menuChrome(); menuHeader('QUESTS');
+    const quests = G.Quests ? G.Quests.all() : [];
+    const rows = quests.filter(q => q.state === 'active').concat(quests.filter(q => q.state === 'done'));
+    if (!rows.length) { cx.save(); cx.textAlign = 'left'; cx.fillStyle = 'rgba(190,210,200,0.7)'; cx.font = `italic ${Math.round(h * 0.026)}px ${serif}`; cx.fillText('No quests yet — speak with the folk you meet.', w * 0.3, h * 0.4); cx.restore(); }
+    const lx = w * 0.3, ly = h * 0.27, step = Math.min(h * 0.086, 64);
+    const idx = U.clamp(G.Main.questIndex || 0, 0, Math.max(0, rows.length - 1));
+    const visible = Math.min(rows.length, Math.floor((h * 0.62) / step));
+    const top = U.clamp(idx - (visible >> 1), 0, Math.max(0, rows.length - visible));
+    cx.save(); cx.textBaseline = 'alphabetic';
+    for (let r = 0; r < visible; r++) {
+      const i = top + r, q = rows[i]; if (!q) break;
+      const yy = ly + r * step, sel = i === idx, isDone = q.state === 'done';
+      if (sel) { cx.globalAlpha = 0.9; cx.fillStyle = pmAcc; cx.fillRect(lx - 12, yy - 24, w * 0.46, step - 12); cx.globalAlpha = 1; }
+      cx.font = `${sel ? '900' : '700'} ${Math.round(h * 0.03)}px ${menuFont}`; cx.textAlign = 'left';
+      cx.fillStyle = sel ? '#06120e' : (isDone ? 'rgba(140,170,150,0.6)' : 'rgba(220,236,226,0.95)');
+      cx.fillText((isDone ? '✓ ' : '◆ ') + (q.title || q.id), lx, yy);
+      cx.font = `italic ${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = sel ? 'rgba(6,18,14,0.78)' : 'rgba(180,200,190,0.7)';
+      cx.fillText(isDone ? 'Complete' : (q.objective || ''), lx, yy + Math.round(h * 0.03));
+    }
+    cx.restore();
+    cx.save(); cx.textAlign = 'right'; cx.fillStyle = 'rgba(150,172,162,0.7)'; cx.font = `13px ${serif}`; cx.fillText('↑ ↓  browse        Esc  back', w - 32, h - 32); cx.restore();
+  }
+
   function drawPrompts() {
     cx.textAlign = 'center';
     for (const pr of prompts) {
@@ -1200,7 +1248,7 @@
 
     if (st === 'play' || st === 'dead' || st === 'pause' || st === 'transition' || st === 'dialogue') {
       drawHud(dt);
-      if (st === 'play') drawCompass();
+      if (st === 'play') { drawCompass(); drawObjectiveTracker(); }
       drawPrompts();
       drawAreaTitle(dt);
       drawBossBar(dt);
@@ -1230,6 +1278,7 @@
       drawPause(pmOpen);
     }
     if (st === 'dialogue') drawDialogue();
+    if (st === 'quests') drawQuestLog();
     if (st === 'charms') drawCharms();
     if (st === 'journal') drawJournal();
     if (st === 'settings') drawSettings();
