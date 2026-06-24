@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T20:24:33.069Z_
+_Last generated: 2026-06-24T20:31:13.180Z_
 
 ---
 
@@ -16573,3 +16573,57 @@ All pass — including the paraphrase *"how can i set a foe on fire"* → fire r
 ---
 
 > 🔧 _Actions: Write, PowerShell_
+
+## 🤖 Claude
+
+Pushed (`f664ad4..ba2371b`). Two of the three are fully shipped and tested; the third I made an honest call on — here's the rundown.
+
+## ✅ Proactive diagnostics
+The **🤖 Ask** button now wears an amber **issue-count badge**. It refreshes on a timer and flags likely wiring problems in the current room — doors with no/dangling **Signal**, boss triggers with no gates. Hover for the count; click and ask *"check this room"* for the full list with **▶ Show** jump buttons. Non-intrusive, no popups.
+
+## ✅ Per-asset field walkthrough
+A **🚶** button in the Companion header (and a **"Walk fields"** step button on every "place X" answer) **steps through the selected object's Inspector fields one by one**, flashing each with a caption like *"Field 3/10: Width."* Test confirms it walked all 10 fields of a selected prop.
+
+## ⚠️ The embedding model — honest call
+I did **not** vendor the ~30 MB neural MiniLM, for three concrete reasons:
+1. **I can't fetch it here** — getting the runtime + weights needs an online download this build environment can't make, so I couldn't ship or verify a working one.
+2. **Permanent repo bloat** — committing ~30 MB of binaries to your git history is hard to undo and clashes with the lean, single-vendored-lib ethos.
+3. **It isn't needed** — the engine already resolves the paraphrases I throw at it.
+
+Instead I shipped a **real, tested, zero-download semantic layer**: a character-trigram cosine blended into ranking. It catches paraphrase/word-order the keyword index alone would miss — e.g. the test query *"how can i set a foe on fire"* now correctly routes to the **fire** recipe. It's **fully offline, no model, no network**, and the ranker is **pluggable**, so a true local MiniLM could slot in later if you ever hit a real miss. I'd rather not bloat your repo for a marginal gain — but if you specifically want the neural model vendored, say so and I'll set up the one-time local-vendoring path (you'd run a small fetch once; it stays offline after).
+
+**Verified:** `companion-test` (now 236 KB entries) passes — proactive badge = 1 issue, field-walk = 10 fields, the paraphrase routes right, every prior routing intact, and **still zero outbound network calls**.
+
+The Companion is now genuinely a self-maintaining, act-capable, scene-aware, fully-offline editor assistant. If you'd like, I can keep widening recipe coverage (deep Logic-graph walkthroughs, charm synergies), or wire the badge to also nudge on the in-editor playtest — but I think this is a strong place to land.
+
+---
+
+## 👤 You
+
+yes widen the recipe covering even more
+
+---
+
+## 🤖 Claude
+
+Let me widen the recipe library with another big batch — deep Logic-graph walkthroughs, editor workflow, progression, decor/lights/lore, level settings, and more. Appending to the recipes:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Let me add a few routing assertions for the new recipes and re-run to confirm nothing regressed:
+
+---
+
+> 🔧 _Actions: Edit ×2, PowerShell_
+
+## 🤖 Claude
+
+All pass — 257 KB entries now, every new recipe routes correctly, and **no regressions** in the existing routings. Let me commit and push:
+
+---
+
+> 🔧 _Actions: PowerShell_
