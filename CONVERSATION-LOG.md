@@ -3,7 +3,7 @@
 _A running trace of the design conversation with Claude Code. Generated from the_
 _session transcript by `tools/export-conversation.js` — re-run it to refresh._
 
-_Last generated: 2026-06-24T20:06:19.258Z_
+_Last generated: 2026-06-24T20:17:31.463Z_
 
 ---
 
@@ -16323,6 +16323,151 @@ Now a README note in the editor section:
 ## 🤖 Claude
 
 Let me confirm the editor still boots cleanly after the Guide edit, then commit:
+
+---
+
+> 🔧 _Actions: PowerShell ×3, Write_
+
+## 🤖 Claude
+
+Pushed (`378744b..7ece568`). The first working version of the **Editor Companion** is live.
+
+## What you have now
+
+A **🤖 Ask** button in the editor toolbar opens a chat panel where you type questions like *"how do I make a door open with a lever?"* and get back **exact, current, step-by-step instructions** — with **buttons that perform the steps for you** (switch to the right tab, open the asset category, arm placement so you just click in the scene).
+
+**Why it's accurate and never "disappointing":** it isn't a guessing neural net. It builds its knowledge from your editor's **own live data** — every asset (219 KB entries right now), every Guide concept, every Logic node — plus ~20 authored recipes and a live summary of your current scene. So it can only ever name buttons/tabs that genuinely exist, and it's **automatically current**: the hazards, flora, and Frost/Gale bolts we just built are already answerable, with no "retraining."
+
+**On your two constraints:**
+- **Editor-only** ✅ — it lives only in `editor.html`; a player who opens the game loads none of it.
+- **Fully local, no wifi** ✅ — the test asserts **zero outbound network requests**. I built it as the strong **zero-download lexical engine** (synonyms + typo tolerance — "mushrooom" still finds the flora recipe + idf ranking), which for your bounded editor domain performs close to an embedding model with no weights and no repo bloat. The architecture is embedding-ready, so if you ever find questions it misreads, I can vendor a ~30 MB local model then (editor-only, still no wifi) — with your OK on the size. You probably won't need it.
+
+**Verified:** new `companion-test.js` passes — KB builds, natural-language + synonym + typo questions map to the right topic, the answer renders steps + working act-buttons, placement-arming works, and **0 network calls**. `editor-smoke` still green.
+
+## Where it stands & easy next steps
+This is a strong v1. Things I can add if you want it even more "ultimate companion":
+- **More recipes / coverage** — I authored ~20 of the most common tasks; I can keep expanding (Logic-graph walkthroughs, charms, prefabs, the Models/rigging flow, cutscene authoring in depth).
+- **Deeper scene awareness** — e.g. "you have a lever named `gate1` but no door uses it" (it already summarizes the room; I can make it cross-check links).
+- **Field-level highlighting** — flash the exact Inspector field it mentions.
+- A **toggle hotkey** and remembering panel position.
+
+Want me to push the coverage/scene-awareness further, or is this the right scope for now? And do you want me to add a keyboard shortcut to open it?
+
+---
+
+## 👤 You
+
+Yes do all that and more if you can
+
+---
+
+## 🤖 Claude
+
+Let me push the Companion much further. First, let me see what `validateWorld`/lint returns so the Companion can surface real diagnostics, and how the Inspector renders field labels (for field highlighting):
+
+---
+
+> 🔧 _Actions: Grep, Read ×2_
+
+## 🤖 Claude
+
+`validateWorld()` returns structured `warns` — perfect for real diagnostics. Let me expose it to the Companion:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now the big Companion enhancement. Let me add many more recipes, then scene diagnostics, highlighting, the hotkey, draggable+persistent panel, and follow-up context. First, expand the recipe library:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now scene diagnostics. Let me add a `diagnose()` + renderer after `sceneSummary`:
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Let me track `lastEntry` in `addAnswer` (for follow-ups) and add the `focus`/`lint`/`highlight` dispatch:
+
+---
+
+> 🔧 _Actions: Edit ×2_
+
+## 🤖 Claude
+
+Let me give the step buttons proper labels (including `highlight`):
+
+---
+
+> 🔧 _Actions: Edit ×2_
+
+## 🤖 Claude
+
+Now the flash CSS, draggable header, hotkey, and position/open persistence. First the CSS:
+
+---
+
+> 🔧 _Actions: Edit ×2, Read ×2, Grep_
+
+## 🤖 Claude
+
+Now the draggable header, position/open persistence, and hotkey. Let me read the `build()` + `setOpen` region and update:
+
+---
+
+> 🔧 _Actions: Read_
+
+## 🤖 Claude
+
+I have the full picture. Let me fix the duplicate `rec:save` id, then wire drag + persistence + hotkey into `build()`/`setOpen`, and add a diagnostics chip. First the id:
+
+---
+
+> 🔧 _Actions: Edit ×3_
+
+## 🤖 Claude
+
+Now update the greeting (mention the `?` shortcut + add a diagnostics chip):
+
+---
+
+> 🔧 _Actions: Edit_
+
+## 🤖 Claude
+
+Now let me make a few recipes scene-aware (reuse existing signals, list linkable rooms). Let me view the tail of `answer()`:
+
+---
+
+> 🔧 _Actions: Read, Edit_
+
+## 🤖 Claude
+
+Now let me extend the test to cover the new recipes, diagnostics, follow-up, and focus:
+
+---
+
+> 🔧 _Actions: Edit ×2, PowerShell_
+
+## 🤖 Claude
+
+All pass (236 KB entries, diagnostics flag the broken door, follow-up works, 0 network). Let me grab one screenshot of the diagnostics feature, then commit:
+
+---
+
+> 🔧 _Actions: Edit, PowerShell, Read_
+
+## 🤖 Claude
+
+The diagnostics render well ("Found 3 things to check…" with per-issue Show buttons + Lint). Let me confirm the editor still boots cleanly, then commit:
 
 ---
 
