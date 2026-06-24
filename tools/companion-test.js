@@ -40,6 +40,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       out.prefab = top('save a group of objects as a prefab');   // -> rec:prefab
       out.water = top('add reflective water to my level');       // -> rec:water
       out.nail = top('upgrade my nail');                         // -> rec:nailsmith
+      // newly-added recipe coverage
+      out.zone = top('logic trigger when the player enters a zone');   // -> rec:logic-zone
+      out.wings = top('add a double jump ability');                    // -> rec:wings
+      out.biome = top('change the biome of this room');                // -> rec:biome
+      out.elements = top('freeze enemies with a frost bolt');          // -> rec:elements
+      out.del = top('how do I duplicate and delete objects');          // -> rec:select
+      out.godray = top('add a god ray light shaft');                   // -> rec:godray
+      out.timer = top('do something after a delay on a timer');        // -> rec:logic-timer
       // answer() renders steps + act buttons into the log
       C.ask('how do I make a door open with a lever?');
       const log = document.getElementById('cpLog');
@@ -77,6 +85,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.weather === 'rec:weather' && /flora/.test(String(o.flora)) && o.rotate === 'rec:rotate'
       && /lava|hazard/.test(String(o.lava))
       && o.charm === 'rec:charm-pickup' && o.prefab === 'rec:prefab' && o.water === 'rec:water' && o.nail === 'rec:nailsmith'
+      && o.zone === 'rec:logic-zone' && o.wings === 'rec:wings' && o.biome === 'rec:biome'
+      && o.elements === 'rec:elements' && o.del === 'rec:select' && o.godray === 'rec:godray' && o.timer === 'rec:logic-timer'
       && o.rendered === true && o.armed === true && o.focus === true
       && o.diag === true && o.followup === true
       && o.issueCount >= 1 && o.badge === 'block' && o.walk > 0

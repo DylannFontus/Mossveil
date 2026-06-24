@@ -636,6 +636,122 @@
       steps: [
         { text: 'Left panel → **Levels** tab → New (pick a size + biome), or open/duplicate/delete an existing room.' },
         { text: 'Arrange the world layout by dragging rooms in the **Map** tab.', action: { kind: 'tab', tab: 'map' } }
+      ] },
+    // ---- Logic graph walkthroughs ----
+    { id: 'rec:logic-zone', title: 'Make something happen when the player enters an area', syn: 'logic zone enter walk into region trigger on event when reach area step',
+      body: 'In the **Logic** tab, an **On Zone** event fires when the player walks into a rectangle; link it to an action.',
+      steps: [
+        { text: 'Open the **Logic** tab.', action: { kind: 'tab', tab: 'logic' } },
+        { text: 'Drag an **On Zone** event from the palette and set its rectangle (x, y, w, h) and “once”.' },
+        { text: 'Drag an **action** (Set Flag / Set Active / Weather / Emit Signal / Text…) and link the event’s output to it. See the **Guide** for every node.', action: { kind: 'guide' } }
+      ] },
+    { id: 'rec:logic-flag', title: 'Remember a choice with a flag', syn: 'logic flag remember persistent saved state branch if condition permanent',
+      body: 'A **flag** is a saved on/off the game remembers (e.g. “bridge_built”).',
+      steps: [
+        { text: 'In **Logic**, use a **Set Flag** action to record it, then branch later with **If Flag / If Not Flag** conditions.', action: { kind: 'tab', tab: 'logic' } },
+        { text: 'Many objects (levers, breakables, NPC choices) can also set a flag directly in their Inspector.' }
+      ] },
+    { id: 'rec:logic-enemy-death', title: 'Open a path after defeating enemies / a boss', syn: 'logic enemy boss death defeat kill clear room reward unlock gate door open when',
+      body: 'Use a death event → set a flag / open a gate.',
+      steps: [
+        { text: 'Open **Logic**; add the relevant **death/cleared** event (e.g. boss-death or room-cleared).', action: { kind: 'tab', tab: 'logic' } },
+        { text: 'Link it to **Set Flag** or **Emit Signal**, and make a **Door** (Dynamic) listen for that signal/flag.', action: { kind: 'place', cat: 'dynamic', id: 'door', label: 'Door' } }
+      ] },
+    { id: 'rec:logic-signal', title: 'Fan one event out to many things (signals)', syn: 'logic signal broadcast emit on signal message many fan out trigger multiple',
+      body: '**Emit Signal** broadcasts a name; every **On Signal** with that name fires — one event, many reactions.',
+      steps: [
+        { text: 'In **Logic**, add **Emit Signal** with a name, and one or more **On Signal** nodes using the same name.', action: { kind: 'tab', tab: 'logic' } },
+        { text: 'Levers/plates also emit their **Signal** into the same system.' }
+      ] },
+    { id: 'rec:logic-timer', title: 'Do something after a delay / on a timer', syn: 'logic timer delay wait after seconds repeat interval periodic countdown',
+      body: 'A **Timer** event fires after a delay (and can repeat).',
+      steps: [{ text: 'In **Logic**, add a **Timer** event, set its seconds (+ repeat), and link it to any action.', action: { kind: 'tab', tab: 'logic' } }] },
+    { id: 'rec:win', title: 'End the game / set a win condition', syn: 'end game win finish goal complete victory ending credits beat',
+      body: 'Reach the **ending shrine**, or fire an ending from the Logic graph.',
+      steps: [
+        { text: 'Simplest: place an **Ending shrine** (Props) where the run should end.', action: { kind: 'place', cat: 'props', id: 'shrine', label: 'Ending shrine' } },
+        { text: 'Or trigger an end-state from **Logic** (e.g. on a flag) — see the Guide for the ending/cutscene actions.', action: { kind: 'guide' } }
+      ] },
+    // ---- progression ----
+    { id: 'rec:charms', title: 'Equip charms (and overcharm)', syn: 'charm equip notch overcharm synergy pair bench loadout',
+      body: 'Charms are equipped **at a bench**, up to your notch budget; pairs can **synergise**, and you can **overcharm** (one over budget) for double damage taken.',
+      steps: [
+        { text: 'Make sure the player can find charms (place a **Charm pickup**) and rest at a **bench** to equip.', action: { kind: 'place', cat: 'props', id: 'charmPickup', label: 'Charm pickup' } },
+        { text: 'Equipping/overcharming happens **in play** at the bench menu.' }
+      ] },
+    { id: 'rec:glimmer', title: 'Glimmer (currency) — how it’s earned & spent', syn: 'glimmer money currency buy upgrade spend coins reward',
+      body: '**Glimmer** drops from enemies/bosses and is spent at a **vendor** (charms) and **nailsmith** (nail).',
+      steps: [
+        { text: 'Place a **Vendor** and/or **Nailsmith** so the player can spend it.', action: { kind: 'place', cat: 'props', id: 'vendor', label: 'Vendor' } }
+      ] },
+    { id: 'rec:wings', title: 'Add a double-jump pickup (Moth Wings)', syn: 'wings double jump ability pickup moth flight glide upgrade',
+      body: 'The **Moth Wings** pickup grants a mid-air double jump.',
+      steps: [{ text: 'Props → place a **Moth Wings pickup**.', action: { kind: 'place', cat: 'props', id: 'wings', label: 'Moth Wings' } }] },
+    { id: 'rec:elements', title: 'Frost & Gale bolts (attune the spell)', syn: 'frost gale bolt freeze ice wind push element attune blow snuff soul well spell',
+      body: 'At a **soul well** the player attunes the bolt to **Frost** (freezes foes, snuffs fire) or **Gale** (hurls foes, fans fire, blows gas).',
+      steps: [
+        { text: 'Place a **Soul well** so the player can learn/attune elements.', action: { kind: 'place', cat: 'props', id: 'spellwell', label: 'Soul well' } },
+        { text: 'In play, commune and confirm a learned element to switch the bolt to it.' }
+      ] },
+    // ---- decor / lights / lore ----
+    { id: 'rec:lore', title: 'Add a lore sign / readable inscription', syn: 'sign lore tablet inscription readable text story tutorial message',
+      body: 'A **sign** or **lore readable** shows your text when the player stands near.',
+      steps: [
+        { text: 'Props → place a **Sign** (tutorial) or **Lore readable** (tablet/effigy/totem).', action: { kind: 'place', cat: 'props', id: 'readable', label: 'Lore readable' } },
+        { text: 'Set its **Title/Text** in the Inspector.', action: { kind: 'highlight', field: 'Text' } }
+      ] },
+    { id: 'rec:godray', title: 'Add a god ray / light shaft', syn: 'god ray light shaft beam sun atmosphere volumetric',
+      body: 'A **god ray** is a soft light shaft you can tilt and size.',
+      steps: [
+        { text: 'Lights → place a **God ray**; set its **W/H, Tilt (Rotation°)** and **Intensity**.', action: { kind: 'place', cat: 'lights', id: 'ray', label: 'God ray' } }
+      ] },
+    { id: 'rec:light', title: 'Add a glow light / lamp', syn: 'light glow lamp lantern illuminate crystal bright flicker bioflora',
+      body: 'A **glow light** adds a coloured halo; lamps/crystals are decorative glows.',
+      steps: [
+        { text: 'Lights → place a **Glow light** (set colour/size/intensity, optional flicker), or a **Lamp/Crystal** from Props.', action: { kind: 'place', cat: 'lights', id: 'light', label: 'Glow light' } }
+      ] },
+    { id: 'rec:decor', title: 'Add background decor (trees, plants, parallax)', syn: 'decor background trees plants foliage parallax layer scenery depth bushes vines',
+      body: 'The **Decor** tab has standing & hanging pieces placeable on any depth layer.',
+      steps: [
+        { text: 'Asset browser → **Decor** → pick a piece and click to place (turn on **⁂ Scatter** for clusters).', action: { kind: 'assetCat', cat: 'decor' } },
+        { text: 'Set its **depth/scale** in the Inspector to sit it in the background or foreground.' }
+      ] },
+    // ---- level settings & workflow ----
+    { id: 'rec:biome', title: 'Change a room’s biome / look', syn: 'biome theme look palette colour color grade environment style',
+      body: 'Biome is a **per-level** setting (or change it live with a look-changer zone).',
+      steps: [
+        { text: 'Click empty space to deselect → the **Inspector** shows **Level settings**; set **Biome**.', action: { kind: 'highlight', field: 'Biome' } },
+        { text: 'For a mid-room change, place a **Biome / look changer** zone (Markers).', action: { kind: 'place', cat: 'markers', id: 'lookTrigger', label: 'Biome / look changer' } }
+      ] },
+    { id: 'rec:areatitle', title: 'Show a room name / area title', syn: 'area title name text label intro banner room name display',
+      body: 'Each level has an **Area text** that can announce the place; an **intro** cutscene can play on entry.',
+      steps: [
+        { text: 'Deselect to show **Level settings**; set **Area text** (and an **Intro cutscene** if you want).', action: { kind: 'highlight', field: 'Area' } }
+      ] },
+    { id: 'rec:resize', title: 'Resize the room (bigger / smaller)', syn: 'resize size width height bigger larger smaller expand grow shrink dimensions',
+      body: 'A room’s size is in its **Level settings**.',
+      steps: [{ text: 'Deselect to show **Level settings**; set **Width** and **Height** (in tiles).', action: { kind: 'highlight', field: 'Width' } }] },
+    { id: 'rec:startroom', title: 'Set the starting room', syn: 'start first begin entry initial spawn opening room new game',
+      body: 'The **first** room in the Levels list is where a new game begins.',
+      steps: [
+        { text: 'Open the **Levels** tab; the top/first level is the start room. Place a **Spawn point** named for new-game arrival.', action: { kind: 'place', cat: 'markers', id: 'spawn', label: 'Spawn point' } }
+      ] },
+    { id: 'rec:select', title: 'Select, move, copy, duplicate or delete objects', syn: 'select move drag copy paste duplicate delete align snap marquee multi pick gizmo undo redo',
+      body: 'Use the **Select** tool (1). Marquee-drag or Shift-click for multi-select.',
+      steps: [
+        { text: 'Click to select & drag to move. **Ctrl+C/V** copy/paste, **Ctrl+D** duplicate, **Del** delete, **L** align, **Ctrl+Z/Y** undo/redo.', action: { kind: 'tab', tab: 'scene' } },
+        { text: '**G** toggles gizmos; the **Snap** toolbar button snaps to half-tiles. `[`/`]` rotate the selection.' }
+      ] },
+    { id: 'rec:autorig', title: 'Auto-rig & animate a model', syn: 'rig skeleton animate clip idle walk humanoid bones model pose keyframe',
+      body: 'Build a model in the **Models** tab and let it auto-rig + animate.',
+      steps: [
+        { text: 'Open **Models**; add parts, then **🦴 Auto-rig (humanoid)** builds a torso/limbs skeleton with idle + walk clips.', action: { kind: 'tab', tab: 'models' } },
+        { text: 'Or pose parts and **Add Key** at a few scrub times to author your own clip.' }
+      ] },
+    { id: 'rec:reverb', title: 'Add a reverb zone or ambient sound', syn: 'reverb echo ambient sound emitter audio sfx loop hall cave space mood',
+      body: 'An **Audio zone** can be a reverb zone (swaps room reverb), an ambient emitter, or a music-mood trigger.',
+      steps: [
+        { text: 'Markers → place an **Audio zone** and pick **mode** = reverb / emitter / music.', action: { kind: 'place', cat: 'markers', id: 'audio', label: 'Audio zone' } }
       ] }
   ];
 
