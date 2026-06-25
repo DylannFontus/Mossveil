@@ -3509,6 +3509,46 @@
     modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
     modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); },
     modelAutoRig: () => autoRigHumanoid(),
+    // ---- shared hooks for the authoring-tools framework (tools-core.js) ----
+    isDirty: () => dirty || csDirty,
+    save: () => save(),
+    serverPresent: () => serverPresent,
+    effectiveMode: () => effectiveMode(),
+    ghConfig: () => ghConfig(),
+    setSaveStatus: (m, ms) => setSaveStatus(m, ms),
+    // commit one authoring-tool dataset (data/<name>.json + .js mirror) straight to GitHub
+    commitData: (name, global, obj) => githubCommit(
+      [{ path: 'data/' + name + '.json', content: jsonText(obj) },
+       { path: 'data/' + name + '.js', content: mirrorJs(name, global, obj) }],
+      'Edit ' + name + ' dataset via MOSSVEIL editor'),
+    // full-world snapshot / restore for autosave + crash recovery
+    snapshot: () => ({ levels: G.LEVELS, cutscenes: G.CUTSCENES || {}, id: currentId, ts: Date.now() }),
+    loadWorld: (levels, cutscenes, id) => {
+      if (levels && typeof levels === 'object') G.LEVELS = levels;
+      if (cutscenes && typeof cutscenes === 'object') G.CUTSCENES = cutscenes;
+      const target = (id && G.LEVELS[id]) ? id : (currentId && G.LEVELS[currentId]) ? currentId : Object.keys(G.LEVELS)[0];
+      markDirty(); openLevel(target);
+    },
+    // core editor actions the command palette / keybinds can invoke
+    actions: () => [
+      { id: 'save', label: 'Save all', run: () => save() },
+      { id: 'undo', label: 'Undo', run: () => doUndo() },
+      { id: 'redo', label: 'Redo', run: () => doRedo() },
+      { id: 'playHere', label: 'Play here', run: () => $('btnPlayHere').click() },
+      { id: 'playStart', label: 'Play from start', run: () => $('btnTestStart').click() },
+      { id: 'tab.scene', label: 'View: Scene', run: () => setTab('scene') },
+      { id: 'tab.map', label: 'View: Map', run: () => setTab('map') },
+      { id: 'tab.cutscene', label: 'View: Cutscene', run: () => setTab('cutscene') },
+      { id: 'tab.logic', label: 'View: Logic', run: () => setTab('logic') },
+      { id: 'tab.models', label: 'View: Models', run: () => setTab('models') },
+      { id: 'left.hierarchy', label: 'Panel: Hierarchy', run: () => setLeftTab('H') },
+      { id: 'left.levels', label: 'Panel: Levels', run: () => setLeftTab('L') },
+      { id: 'left.guide', label: 'Panel: Guide', run: () => setLeftTab('G') },
+      { id: 'lint', label: 'Open Lint / issues', run: () => openLintPanel() },
+      { id: 'saveTarget', label: 'GitHub / Save destination…', run: () => saveTargetModal() },
+      { id: 'gizmos', label: 'Toggle gizmos', run: () => { gizmos = !gizmos; refreshToolbar(); } },
+      { id: 'retile', label: 'Auto-tile whole level', run: () => retileWholeLevel() }
+    ],
     // ---- Companion (offline editor assistant) API ----
     companion: {
       assetCats: () => ASSET_CATS.slice(),

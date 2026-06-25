@@ -49,6 +49,11 @@ function saveData(name, global, obj) {
 function saveLevels(levels) { saveData('levels', 'LEVELS', levels); }
 function saveCutscenes(cs) { saveData('cutscenes', 'CUTSCENES', cs); }
 
+// names/globals the generic data endpoint is allowed to write (keeps it from being
+// turned into an arbitrary-file writer). Each authoring tool owns one dataset file.
+const SAFE_NAME = /^[a-z][a-z0-9_-]{0,40}$/;
+const SAFE_GLOBAL = /^[A-Z][A-Za-z0-9_]{0,40}$/;
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
@@ -67,6 +72,39 @@ const server = http.createServer((req, res) => {
     const f = path.join(ROOT, 'data', 'cutscenes.json');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(fs.existsSync(f) ? fs.readFileSync(f) : '{}');
+    return;
+  }
+  // generic dataset read: GET /api/data/<name>  ->  data/<name>.json (or {} if absent).
+  // Lets every authoring tool (music, charms, biomes, ...) load its editable dataset.
+  if (url.pathname.startsWith('/api/data/') && req.method === 'GET') {
+    const name = url.pathname.slice('/api/data/'.length);
+    if (!SAFE_NAME.test(name)) { res.writeHead(400); res.end('{"ok":false,"error":"bad name"}'); return; }
+    const f = path.join(ROOT, 'data', name + '.json');
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(fs.existsSync(f) ? fs.readFileSync(f) : '{}');
+    return;
+  }
+  // generic dataset save: POST /api/data  { name, global, data }
+  // writes data/<name>.json + data/<name>.js (window.G.<global> = ...), with backups.
+  if (url.pathname === '/api/data' && req.method === 'POST') {
+    let body = '';
+    req.on('data', d => { body += d; if (body.length > 50e6) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const msg = JSON.parse(body);
+        const name = String(msg.name || ''), global = String(msg.global || '');
+        if (!SAFE_NAME.test(name)) throw new Error('bad dataset name');
+        if (!SAFE_GLOBAL.test(global)) throw new Error('bad global name');
+        if (msg.data == null || typeof msg.data !== 'object') throw new Error('bad data');
+        saveData(name, global, msg.data);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"ok":true}');
+        console.log(`[saved] dataset ${name} -> G.${global}`);
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
     return;
   }
   if ((url.pathname === '/api/levels' || url.pathname === '/api/cutscenes') && req.method === 'POST') {
