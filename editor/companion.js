@@ -233,6 +233,55 @@
     const row = el('div', { class: 'cpRow' }, b); actBtn(row, 'Open Lint tab', { kind: 'lint' });
   }
 
+  // ---------------- catalogs: answer "list / describe ALL the X" by enumerating a whole category ----------------
+  const WEATHER_DESC = { none: 'clear skies', rain: 'rain — douses fire, wets the ground', storm: 'thunderstorm — rain + lightning + wind', wind: 'windy — pushes you, spreads fire, blows gas away', fog: 'fog / mist', snow: 'snow — douses fire and accumulates underfoot', embers: 'embers / ash — fire burns longer', blizzard: 'blizzard — heavy snow + wind, freezes reflective water' };
+  function CATALOGS() {
+    return {
+      charms: { keys: ['charm', 'charms'], title: 'Charms', foot: { label: '▶ Place a Power-up to test', action: { kind: 'place', cat: 'props', id: 'powerup', label: 'Power-up' } },
+        items: () => ((G.Charms && G.Charms.LIST) || []).map(c => ({ name: c.name + ' (' + c.cost + ' notch' + (c.cost === 1 ? '' : 'es') + ')', desc: c.desc || '', token: c.id, first: c.name.split(' ')[0].toLowerCase() })) },
+      enemies: { keys: ['enemy', 'enemies', 'creature', 'creatures', 'foe', 'foes', 'monster', 'monsters'], title: 'Enemies', foot: { label: '▶ Open Enemies', action: { kind: 'assetCat', cat: 'enemies' } },
+        items: () => ((G.Enemies && G.Enemies.TYPES) || []).map(t => ({ name: t.label, desc: (G.Enemies.BESTIARY && G.Enemies.BESTIARY[t.id]) || '', token: t.id, first: t.id })) },
+      bosses: { keys: ['boss', 'bosses'], title: 'Bosses', foot: { label: '▶ Open Bosses', action: { kind: 'assetCat', cat: 'bosses' } },
+        items: () => ((G.Bosses && G.Bosses.LIST) || []).map(b => ({ name: b.label, desc: '', token: b.id, first: (b.label.split(' ')[0] || '').toLowerCase() })) },
+      spells: { keys: ['spell', 'spells', 'ability', 'abilities', 'power', 'powers', 'bolt', 'bolts'], title: 'Spells & bolt elements',
+        items: () => [
+          { name: 'Soul Bolt', desc: 'a forward bolt of soul (Shade Soul at tier 2)' }, { name: 'Wraith Cry (hold ↑)', desc: 'spirits burst upward' },
+          { name: 'Abyss Dive (hold ↓, airborne)', desc: 'slam down with a shockwave' }, { name: 'Ember Bolt', desc: 'ignite grass + sear foes over time' },
+          { name: 'Frost Bolt', desc: 'snuff fire + freeze foes solid' }, { name: 'Gale Bolt', desc: 'hurl foes back, fan fire, blow gas away' }] },
+      weather: { keys: ['weather', 'weathers'], title: 'Weather presets',
+        items: () => ((G.Weather && G.Weather.KINDS) || []).map(k => ({ name: (G.Weather.LABELS && G.Weather.LABELS[k]) || k, desc: WEATHER_DESC[k] || '', first: k })) },
+      biomes: { keys: ['biome', 'biomes'], title: 'Biomes',
+        items: () => Object.keys((G.World && G.World.PAL) || {}).map(k => ({ name: (G.World.PAL[k].label) || k, desc: '', first: k })) },
+      hazards: { keys: ['hazard', 'hazards', 'trap', 'traps'], title: 'Hazards & soft ground', foot: { label: '▶ Open Dynamic', action: { kind: 'assetCat', cat: 'dynamic' } },
+        items: () => [
+          { name: 'Lava pool', desc: 'sears + bounces you out; radiates heat' }, { name: 'Acid pool', desc: 'sears + dissolves breakable walls' },
+          { name: 'Mud', desc: 'slows you' }, { name: 'Quicksand', desc: 'slows + drags you down' }, { name: 'Ash drift', desc: 'slows you' },
+          { name: 'Poison gas', desc: 'damages over time; disperses in wind; ignitable' }, { name: 'Timed spikes / Crusher / Conveyor / Collapsing floor', desc: 'Dynamic traps & movers' }] }
+    };
+  }
+  function tryCatalog(ql) {
+    const strongList = /\b(all|every|each|list|describe all|show me all|every single|complete list|give me a)\b/.test(ql);
+    const cats = CATALOGS();
+    for (const key in cats) {
+      const c = cats[key];
+      if (!c.keys.some(k => new RegExp('\\b' + k + '\\b').test(ql))) continue;
+      const plural = c.keys.some(k => k.length > 4 && k.endsWith('s') && new RegExp('\\b' + k + '\\b').test(ql));
+      if (!(strongList || plural)) continue;
+      const items = c.items();
+      if (items.some(it => (it.token && new RegExp('\\b' + it.token + '\\b').test(ql)) || (it.first && it.first.length > 3 && new RegExp('\\b' + it.first + '\\b').test(ql)))) continue;   // a specific item is named — let search answer it
+      renderCatalog(c, items); return true;
+    }
+    return false;
+  }
+  function renderCatalog(c, items) {
+    const b = addMsg('bot', '');
+    el('div', { class: 'cpTitle' }, b).textContent = c.title + ' (' + items.length + ')';
+    const ul = el('ul', { class: 'cpSteps' }, b);
+    for (const it of items) { const li = el('li', {}, ul); li.innerHTML = '<b>' + esc(it.name) + '</b>' + (it.desc ? ' — ' + esc(it.desc) : ''); }
+    if (c.foot) { const row = el('div', { class: 'cpRow' }, b); actBtn(row, c.foot.label, c.foot.action); }
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
   // ---------------- answering ----------------
   let lastEntry = null;
   function answer(query) {
@@ -245,6 +294,8 @@
       const rel = search(lastEntry.title).slice(1, 6).map(r => r.e).filter(e => e.title);
       if (rel.length) { addRelated(rel); return; }
     }
+    // "list / describe ALL the charms / enemies / spells / weather / biomes…" -> enumerate the whole category
+    if (tryCatalog(ql)) return;
     // scene questions
     if (/\b(this room|this level|this scene|my scene|my level|my room|what('?s| is| do i have| have i)|how many)\b/.test(ql) && /\b(room|level|scene|place|object|have|here)\b/.test(ql)) {
       const sc = sceneSummary();
@@ -449,7 +500,7 @@
     addMsg('bot', '<div class="cpTitle">🤖 Editor Companion</div><div class="cpBody">Ask me how to do anything in the editor and I’ll give exact, current steps — with buttons that do them for you. Drag my header to move me; press <b>?</b> anytime to toggle. Try one:</div>');
     const b = logEl.lastChild.querySelector('.cpBub');
     const row = el('div', { class: 'cpRel' }, b);
-    for (const s of ['Make a door open with a lever', 'Add a lava pool', 'Connect two rooms', 'Set up a boss fight', 'Change the weather', 'What’s in this room?', 'Check this room for problems'])
+    for (const s of ['Make a door open with a lever', 'Add a lava pool', 'Describe all the charms', 'List every enemy', 'Connect two rooms', 'Change the weather', 'What’s in this room?', 'Check this room for problems'])
       { const c = el('span', { class: 'cpChip' }, row, s); c.addEventListener('click', () => answer(s)); }
   }
 

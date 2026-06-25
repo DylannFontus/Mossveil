@@ -70,6 +70,19 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       // follow-up: "more" yields a Related list
       C.ask('how do I add lava'); const m1 = log.textContent.length; C.ask('more');
       out.followup = /Related/.test(log.textContent.slice(m1));
+      // catalog: "describe all the charms" enumerates EVERY charm...
+      const c1 = log.textContent.length; C.ask('give me a description of all the charms and what they do');
+      const ct = log.textContent.slice(c1);
+      out.charmCatalog = /Stoneheart/.test(ct) && /Keen Edge/.test(ct) && /Glass Heart/.test(ct);
+      // ...but a specific charm still answers specifically (not the whole list)
+      const c2 = log.textContent.length; C.ask('what does the stoneheart charm do');
+      const st = log.textContent.slice(c2);
+      out.charmSpecific = /Stoneheart/.test(st) && !/Keen Edge/.test(st);
+      // enemies / spells catalogs
+      const c3 = log.textContent.length; C.ask('list all the enemies'); const et = log.textContent.slice(c3);
+      out.enemyCatalog = /Tumblebug/.test(et) && /Gnatling/.test(et);
+      const c4 = log.textContent.length; C.ask('what spells are there'); const sp = log.textContent.slice(c4);
+      out.spellCatalog = /Frost Bolt/.test(sp) && /Wraith Cry/.test(sp);
       // proactive badge reflects the broken door we pushed
       out.issueCount = C.issueCount();
       out.badge = C.refreshBadge();
@@ -95,6 +108,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.charmInfo === 'charm:stoneheart' && /tumblebug/.test(String(o.enemyInfo)) && /mossSovereign/.test(String(o.bossInfo)) && o.csCam === 'rec:cs-camera'
       && o.rendered === true && o.armed === true && o.focus === true
       && o.diag === true && o.followup === true
+      && o.charmCatalog === true && o.charmSpecific === true && o.enemyCatalog === true && o.spellCatalog === true
       && o.issueCount >= 1 && o.badge === 'block' && o.walk > 0
       && netHits === 0 && !errs.length;
     console.log(ok ? 'COMPANION TEST: PASS' : 'COMPANION TEST: FAIL');
