@@ -50,9 +50,10 @@
   #saveMsg { color:#7fd6a0; margin-left:4px; font-size:11px; }
   /* File / view dropdown menu */
   .menuWrap { position:relative; }
-  .ddmenu { position:absolute; top:100%; left:0; margin-top:4px; display:none; flex-direction:column;
+  /* fixed (not absolute) so the toolbar's overflow:hidden can't clip the dropdown — placed by JS */
+  .ddmenu { position:fixed; left:10px; top:40px; display:none; flex-direction:column;
     background:var(--bg2); border:1px solid var(--line); border-radius:7px; padding:4px; min-width:212px;
-    box-shadow:0 10px 30px rgba(0,0,0,.55); z-index:40; }
+    box-shadow:0 10px 30px rgba(0,0,0,.55); z-index:120; }
   .ddmenu.on { display:flex; }
   .ddmenu .ddrow { text-align:left; background:transparent; border:1px solid transparent; border-radius:5px; padding:7px 11px; }
   .ddmenu .ddrow:hover { background:var(--bg3); }

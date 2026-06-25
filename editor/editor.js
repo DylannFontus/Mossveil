@@ -2529,7 +2529,11 @@
   // File / view dropdown: toggle open, close on pick or click-outside
   (function () {
     const fb = $('btnFile'), fm = $('fileMenu'); if (!fb || !fm) return;
-    fb.addEventListener('click', e => { e.stopPropagation(); fm.classList.toggle('on'); });
+    fb.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!fm.classList.contains('on')) { const r = fb.getBoundingClientRect(); fm.style.left = r.left + 'px'; fm.style.top = (r.bottom + 3) + 'px'; }
+      fm.classList.toggle('on');
+    });
     fm.addEventListener('click', () => fm.classList.remove('on'));
     document.addEventListener('click', e => { if (!fb.contains(e.target) && !fm.contains(e.target)) fm.classList.remove('on'); });
   })();
