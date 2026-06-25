@@ -40,11 +40,24 @@ const SHOTS = path.join(ROOT, 'shots');
     await new Promise(r => setTimeout(r, 2000));
     await page.screenshot({ path: path.join(SHOTS, 'editor-gloom.png') });
 
-    // map tab
-    await page.click('#tabMap');
+    // map tab (view tabs now live in the File dropdown — switch via the API)
+    await page.evaluate(() => G.__ed.setTab('map'));
     await new Promise(r => setTimeout(r, 800));
     await page.screenshot({ path: path.join(SHOTS, 'editor-map.png') });
-    await page.click('#tabScene');
+    await page.evaluate(() => G.__ed.setTab('scene'));
+
+    // new top-bar File dropdown + bottom-bar Lint panel
+    const ui = await page.evaluate(() => {
+      const fb = document.getElementById('btnFile'); fb.click();
+      const fileOpen = document.getElementById('fileMenu').classList.contains('on');
+      document.getElementById('tabScene').click();   // pick a view (also closes the menu)
+      const ls = document.getElementById('lintStatus'); ls.click();
+      const lintOpen = document.getElementById('lintPanel').classList.contains('on');
+      document.getElementById('lintClose').click();
+      const lintClosed = !document.getElementById('lintPanel').classList.contains('on');
+      return { hasFile: !!fb, fileOpen, hasLint: !!ls, lintOpen, lintClosed };
+    });
+    console.log('UI:', JSON.stringify(ui));
 
     // place an enemy programmatically + save roundtrip
     const result = await page.evaluate(async () => {

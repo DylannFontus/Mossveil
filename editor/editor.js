@@ -2030,17 +2030,25 @@
   }
 
   // live count badge on the Lint left-panel tab (+ refresh the panel if it's open)
+  // status-bar lint summary (bottom bar): shows the last issue; click to expand the full panel
   function refreshLint() {
-    const tab = $('ltabLint'); if (!tab) return;
+    const s = $('lintStatus'); if (!s) return;
     const { warns } = validateWorld();
     const errs = warns.filter(w => w.sev === 'error').length;
-    tab.textContent = warns.length ? `Lint (${warns.length})` : 'Lint';
-    tab.classList.toggle('warn', errs > 0);
-    if ($('lint') && $('lint').style.display !== 'none') refreshLintPanel();
+    if (!warns.length) { s.textContent = '✓ Lint'; s.classList.remove('warn', 'err'); s.title = 'No world issues found'; }
+    else {
+      const last = warns[warns.length - 1];
+      s.textContent = '⚠ ' + warns.length + ' issue' + (warns.length > 1 ? 's' : '') + ' · ' + last.msg;
+      s.classList.toggle('err', errs > 0); s.classList.toggle('warn', errs === 0);
+      s.title = warns.length + ' world issue' + (warns.length > 1 ? 's' : '') + ' — click for the full list';
+    }
+    if ($('lintPanel') && $('lintPanel').classList.contains('on')) refreshLintPanel();
   }
-  // clickable list of every world issue, grouped by level — rendered into the left Lint panel
+  function openLintPanel() { const p = $('lintPanel'); if (!p) return; p.classList.add('on'); refreshLintPanel(); }
+  function closeLintPanel() { const p = $('lintPanel'); if (p) p.classList.remove('on'); }
+  // clickable list of every world issue, grouped by level — rendered into the bottom Lint panel
   function refreshLintPanel() {
-    const box = $('lint'); if (!box) return; box.innerHTML = '';
+    const box = $('lintPanelBody'); if (!box) return; box.innerHTML = '';
     const { warns } = validateWorld();
     if (!warns.length) { el('div', { class: 'insNote', style: 'color:#7fd89a;padding:12px 10px' }, box, '✓ No issues found — every link, reference and exit checks out.'); return; }
     const errs = warns.filter(w => w.sev === 'error').length;
@@ -2055,6 +2063,7 @@
         el('span', { style: 'color:#d8d2c8' }, row, w.msg);
         row.addEventListener('click', () => {
           if (!G.LEVELS[w.id]) return;
+          closeLintPanel();
           if (w.id !== currentId) openLevel(w.id);
           if (w.sel) setTimeout(() => { sel = w.sel; multi = []; const it = selectedItem(); if (it && it.ref) { camX = it.ref.x != null ? it.ref.x : (it.ref.rect ? it.ref.rect.x : camX); camY = it.ref.y != null ? it.ref.y : (it.ref.rect ? it.ref.rect.y : camY); } refreshInspector(); refreshHierarchy(); }, 200);
         });
@@ -2128,8 +2137,8 @@
     ['Profiler (F3)', 'Toggle the performance overlay: FPS + frame-time graph, draw calls, triangles, light count, active post passes.'],
     ['Record & replay (F6 / F7 / F8)', 'F6 records a run, F7 replays it deterministically, F8 stops. Great for demos and debugging a death.'],
     ['Tone mapping', 'In-game Settings → Tone mapping: Off / ACES / AgX filmic curves. Also Motion blur, Dynamic lighting toggles.'],
-    ['Tabs', 'Top: Scene (paint & place), Map, Cutscene, Logic (visual scripting). Left panel: Hierarchy, Levels, Scenes, Lint, Guide.'],
-    ['Lint', 'Validates the world — broken links, missing references, dead-end rooms, and now BFS reachability (rooms you can’t walk to from the start) + targets with no spawn points. Click an issue to jump straight to it.'],
+    ['Tabs', 'The ☰ File menu (top-left) holds the views — Scene (paint & place), Map, Cutscene, Logic (visual scripting), Models — plus Save and GitHub / Save destination. Left panel: Hierarchy, Levels, Scenes, Guide. Lint lives in the bottom status bar.'],
+    ['Lint', 'Validates the world — broken links, missing references, dead-end rooms, BFS reachability (rooms you can’t walk to from the start) and targets with no spawn points. The bottom status bar shows the latest issue; click it to expand the full list over the asset browser (✕ to collapse), and click any issue to jump straight to it.'],
     ['Asset tabs', 'Props, Decor, Furniture, Build, Lights, Enemies, Bosses, Markers, Prefabs. Shift+click to keep placing.'],
     ['Asset browser', 'Every prop / model / enemy renders a live 3D thumbnail. Search assets by name, and ★ favourite the ones you use most (favourites sort to the front; the ★ toggle shows favourites only).'],
     ['World graph (Map tab)', 'The Map tab doubles as a connection graph: room thumbnails + door links, a ▶START badge on the entry room, dimmed unreachable rooms, and red/amber outlines on rooms with lint errors/warnings.'],
@@ -2517,29 +2526,35 @@
   $('tabCutscene').addEventListener('click', () => setTab('cutscene'));
   $('tabLogic').addEventListener('click', () => setTab('logic'));
   $('tabModels').addEventListener('click', () => setTab('models'));
+  // File / view dropdown: toggle open, close on pick or click-outside
+  (function () {
+    const fb = $('btnFile'), fm = $('fileMenu'); if (!fb || !fm) return;
+    fb.addEventListener('click', e => { e.stopPropagation(); fm.classList.toggle('on'); });
+    fm.addEventListener('click', () => fm.classList.remove('on'));
+    document.addEventListener('click', e => { if (!fb.contains(e.target) && !fm.contains(e.target)) fm.classList.remove('on'); });
+  })();
   function setLeftTab(which) {
     csMode = which === 'S';
     $('ltabH').classList.toggle('on', which === 'H');
     $('ltabL').classList.toggle('on', which === 'L');
     $('ltabS').classList.toggle('on', which === 'S');
-    $('ltabLint').classList.toggle('on', which === 'Lint');
     $('ltabG').classList.toggle('on', which === 'G');
     $('hierarchy').style.display = which === 'H' ? 'block' : 'none';
     $('levels').style.display = which === 'L' ? 'block' : 'none';
     $('scenes').style.display = which === 'S' ? 'block' : 'none';
-    $('lint').style.display = which === 'Lint' ? 'block' : 'none';
     $('guide').style.display = which === 'G' ? 'block' : 'none';
     if (which === 'L') refreshLevels();
     if (which === 'S') { refreshScenes(); }
-    if (which === 'Lint') refreshLintPanel();
     if (which === 'G') buildGuide();
     refreshInspector();
   }
   $('ltabH').addEventListener('click', () => setLeftTab('H'));
   $('ltabL').addEventListener('click', () => setLeftTab('L'));
   $('ltabS').addEventListener('click', () => setLeftTab('S'));
-  $('ltabLint').addEventListener('click', () => setLeftTab('Lint'));
   $('ltabG').addEventListener('click', () => setLeftTab('G'));
+  // bottom-bar lint: click the summary to expand/collapse the issue panel over the assets
+  $('lintStatus').addEventListener('click', () => { const p = $('lintPanel'); p.classList.contains('on') ? closeLintPanel() : openLintPanel(); });
+  $('lintClose').addEventListener('click', closeLintPanel);
 
   // ================= save destination: local server vs GitHub =================
   // Local mode posts to the Node server (writes files on this PC). GitHub mode commits
@@ -3501,7 +3516,7 @@
       currentId: () => currentId,
       openAssetCat: cat => { setTab('scene'); setLeftTab('H'); assetCat = cat; refreshAssets(); },
       openGuide: () => { setLeftTab('G'); },
-      openLint: () => { setLeftTab('Lint'); },
+      openLint: () => { openLintPanel(); },
       lint: () => { try { return validateWorld(); } catch (e) { return { warns: [] }; } },
       gotoTab: t => setTab(t),
       focusSel: s => { try { sel = s; multi = []; const it = selectedItem(); if (it && it.ref) { if (it.ref.x != null) { camX = it.ref.x; camY = it.ref.y; } else if (it.ref.rect) { camX = it.ref.rect.x; camY = it.ref.rect.y; } } setTab('scene'); refreshInspector(); refreshHierarchy(); } catch (e) { } },
