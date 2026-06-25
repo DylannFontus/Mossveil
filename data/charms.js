@@ -1,0 +1,97 @@
+// generated from data/charms.json - do not edit by hand (use the editor)
+window.G = window.G || {};
+G.CHARMS = {
+ "list": [
+  {
+   "id": "stoneheart",
+   "name": "Stoneheart",
+   "cost": 3,
+   "desc": "+1 mask — a sturdier shell.",
+   "effects": {
+    "hp": 1
+   }
+  },
+  {
+   "id": "keenedge",
+   "name": "Keen Edge",
+   "cost": 2,
+   "desc": "Your strikes cut deeper (+1 damage).",
+   "effects": {
+    "nail": 1
+   }
+  },
+  {
+   "id": "swiftfocus",
+   "name": "Swift Focus",
+   "cost": 2,
+   "desc": "Mend a mask far faster.",
+   "effects": {
+    "focusMul": 0.55
+   }
+  },
+  {
+   "id": "windstep",
+   "name": "Wind Step",
+   "cost": 1,
+   "desc": "Dash recovers more quickly.",
+   "effects": {
+    "dashMul": 0.6
+   }
+  },
+  {
+   "id": "soulsiphon",
+   "name": "Soul Siphon",
+   "cost": 2,
+   "desc": "Draw more soul from each strike.",
+   "effects": {
+    "soulMul": 1.6
+   }
+  },
+  {
+   "id": "glassheart",
+   "name": "Glass Heart",
+   "cost": 1,
+   "desc": "+2 damage, but −1 mask. High risk.",
+   "effects": {
+    "nail": 2,
+    "hp": -1
+   }
+  }
+ ],
+ "synergies": [
+  {
+   "need": [
+    "keenedge",
+    "glassheart"
+   ],
+   "name": "Ruin Edge",
+   "desc": "Keen Edge + Glass Heart — strikes cut deeper still (+1 damage).",
+   "effects": {
+    "nail": 1
+   }
+  },
+  {
+   "need": [
+    "swiftfocus",
+    "soulsiphon"
+   ],
+   "name": "Soul Flow",
+   "desc": "Swift Focus + Soul Siphon — soul gathers and mends faster.",
+   "effects": {
+    "focusMul": 0.85,
+    "soulMul": 1.25
+   }
+  },
+  {
+   "need": [
+    "stoneheart",
+    "windstep"
+   ],
+   "name": "Sure Footing",
+   "desc": "Stoneheart + Wind Step — a steadier frame (+1 mask).",
+   "effects": {
+    "hp": 1
+   }
+  }
+ ]
+};
