@@ -23,6 +23,7 @@
   W.LABELS = { none: 'Clear', rain: 'Rain', storm: 'Thunderstorm', wind: 'Windy', fog: 'Fog / mist', snow: 'Snow', embers: 'Embers / ash', blizzard: 'Blizzard' };
 
   let P = {}, parts = [], fogBlobs = [], t = 0, lT = 0, lightFlash = 0, splashT = 0;
+  let trans = 1, transTo = 1, transRate = 2, pendingKind = null;   // smooth fade between weather presets
 
   function makeParts() {
     parts = [];
@@ -42,6 +43,14 @@
     lightFlash = 0; t = 0; splashT = 0;
     lT = P.lightning ? U.rand(2, 5) : 0;
     makeParts();
+    trans = 1; transTo = 1; pendingKind = null;        // instant set (room load) — no lingering fade
+  };
+  // fade smoothly to a new preset over `dur`s (used by the biome / look changer)
+  W.fadeTo = function (kind, dur) {
+    kind = (kind && PRESETS[kind]) ? kind : 'none';
+    if (kind === W.kind && pendingKind == null) return;
+    transRate = 1 / Math.max(0.25, (dur || 2) * 0.5);
+    pendingKind = kind; transTo = 0;                    // fade the current weather out, then the new one in
   };
 
   // current wind value with slow gusts (screen-fractions / sec, signed)
@@ -49,6 +58,9 @@
   W.windVec = function () { return wind(); };         // signed gusty wind (used by the fire system to drift flames & spread fire)
 
   W.update = function (dt) {
+    // advance any weather cross-fade (runs even when 'none' so the last preset can fade out)
+    if (trans !== transTo) { trans += Math.sign(transTo - trans) * transRate * dt; if (Math.abs(trans - transTo) < 0.02) trans = transTo; trans = Math.max(0, Math.min(1, trans)); }
+    if (trans <= 0.001 && pendingKind != null) { const k = pendingKind; pendingKind = null; W.set(k); trans = 0; transTo = 1; }
     t += dt;
     lightFlash = Math.max(0, lightFlash - dt * 3.2);
     if (W.kind === 'none' || W.userEnabled === false) return;
@@ -82,6 +94,7 @@
     if (W.userEnabled === false) return;
     if (W.kind === 'none' && lightFlash <= 0.01) return;
     ctx.save();
+    ctx.globalAlpha = trans;                            // fade the whole overlay during a weather transition
     // fog haze first (behind particles)
     for (const f of fogBlobs) {
       const g = ctx.createRadialGradient(f.x * w, f.y * h, 0, f.x * w, f.y * h, f.r * w);

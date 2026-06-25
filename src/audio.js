@@ -14,7 +14,7 @@
   // tone()/noiseHit() connect here; sfxAt() temporarily redirects it through a panner for positional one-shots
   let sfxTarget = null;
   // 'score' = the composed G.Music engine; 'classic' = the original drones + generative plucks
-  let musicStyle = 'score', musicTrack = 'gloom', musicSilenced = false;
+  let musicStyle = 'score', musicTrack = 'gloom', musicSilenced = false, musicBiome = null;
 
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
@@ -291,6 +291,9 @@
     musicTracks: () => (G.Music ? G.Music.TRACK_IDS : []),
     // choose the score track for the current room ('auto' => by biome). No effect in classic style.
     setMusicTrack(track, biome) {
+      // entering a room of the SAME biome (auto track) — let the music play on, no fade/restart
+      if ((!track || track === 'auto') && biome != null && biome === musicBiome) { musicBiome = biome; return; }
+      musicBiome = biome;
       const id = (!track || track === 'auto') ? (G.Music ? G.Music.trackForBiome(biome) : 'gloom') : track;
       musicTrack = id; if (G.Music) G.Music.setTrack(id);
     },

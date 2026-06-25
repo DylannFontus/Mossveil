@@ -58,18 +58,25 @@
 
   // ======================= LOOK / BIOME TRANSITIONS (lookTrigger) =======================
   let biomeFade = null;   // active biome cross-fade { mask, t, phase, opts }
+  let waterTween = null;  // reflective-water fade-in/out { from, to, t, dur }
   // smoothly fade the colour grade / weather / water (no biome change) over `dur` seconds
   W.applyLook = function (opts, dur) {
     if (!G.room) return;
+    dur = Math.max(0.3, dur || 2);
     const ls = G.room.lookState = G.room.lookState || {};
     if (opts.grade !== undefined && G.Post) {
-      G.Post.setGradeRate(2.5 / Math.max(0.25, dur || 2));
+      G.Post.setGradeRate(2.5 / dur);
       let g = gradeFor(G.room.pal); if (G.Weather) g = G.Weather.gradeFor(g);
       G.Post.setGrade(g); if (opts.grade) G.Post.setGrade(opts.grade);
       ls.grade = opts.grade || null;
     }
-    if (opts.weather !== undefined && G.Weather) { G.Weather.set(opts.weather || 'none'); ls.weather = opts.weather || 'none'; }
-    if (opts.water !== undefined && G.Post) { G.Post.setWater(opts.water || null); ls.water = opts.water || null; }
+    if (opts.weather !== undefined && G.Weather) { (G.Weather.fadeTo || G.Weather.set)(opts.weather || 'none', dur); ls.weather = opts.weather || 'none'; }
+    if (opts.water !== undefined && G.Post) {           // fade the reflection in / out instead of snapping
+      const from = ls.water || null, to = opts.water || null;
+      waterTween = { from, to, t: 0, dur };
+      if (to) G.Post.setWater(Object.assign({}, to, { strength: 0.0001 }));   // start invisible, fade up
+      ls.water = to;
+    }
   };
   // change biome (+ any look options) behind a background-only fade to black (1.5s each way)
   W.changeBiome = function (opts) {
@@ -83,6 +90,12 @@
     biomeFade = { mask, t: 0, phase: 'in', opts };
   };
   W.updateLook = function (dt) {
+    if (waterTween && G.Post) {                          // ramp the reflective-water strength smoothly
+      const w = waterTween; w.t += dt; const k = Math.min(1, w.t / w.dur);
+      if (w.to) { const s = (w.to.strength != null ? w.to.strength : 0.55); G.Post.setWater(Object.assign({}, w.to, { strength: Math.max(0.0001, s * k) })); }
+      else if (w.from) { const s0 = (w.from.strength != null ? w.from.strength : 0.55); if (k < 1) G.Post.setWater(Object.assign({}, w.from, { strength: s0 * (1 - k) })); else G.Post.setWater(null); }
+      if (k >= 1) waterTween = null;
+    }
     if (!biomeFade) return;
     const f = biomeFade, DUR = 1.5;
     if (G.camera) f.mask.position.set(G.camera.position.x, G.camera.position.y, -6);
