@@ -276,6 +276,7 @@
     if (p.type === 'mire' || p.type === 'pool') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 1.5 };
     if (p.type === 'gas') return { x: p.x, y: p.y, w: p.w || 6, h: p.h || 4 };
     if (p.type === 'bioflora') return { x: p.x, y: p.y + 0.55, w: 0.95, h: 1.4 };
+    if (p.type === 'powerup') return { x: p.x, y: p.y + 0.5, w: 1, h: 1.2 };
     if (p.type === 'breakable') return { x: p.x, y: p.y, w: p.w || 2, h: p.h || 4 };
     if (p.type === 'door') return { x: p.x, y: p.y + (p.h || 5) / 2, w: p.w || 1.2, h: p.h || 5 };
     if (p.type === 'npc') return { x: p.x, y: p.y + 1, w: 1.1 * (p.scale || 1), h: 2.1 * (p.scale || 1) };
@@ -793,6 +794,7 @@
       if (it.ref.type === 'pool') col = it.ref.kind === 'acid' ? '#9fe060' : '#ff7040';
       if (it.ref.type === 'gas') col = '#9fd070';
       if (it.ref.type === 'bioflora') col = '#ff9ad8';
+      if (it.ref.type === 'powerup') col = '#b0f0ff';
       if (it.ref.type === 'door') col = '#a0b0c0';
       if (it.ref.type === 'npc') col = '#9fe8c0';
       // moving-platform travel path
@@ -1495,6 +1497,17 @@
           numField(body, 'H', () => p.h || 18, v => { p.h = v; });
           numField(body, 'Intensity', () => p.opacity || 0.1, v => { p.opacity = U.clamp(v, 0, 1); }, 0.02);
           break;
+        case 'powerup': {
+          const gopts = [
+            { v: 'wings', t: 'Moth Wings (double jump)' }, { v: 'bolt', t: 'Soul Bolt (max)' },
+            { v: 'ember', t: 'Ember Bolt' }, { v: 'frost', t: 'Frost Bolt' }, { v: 'gale', t: 'Gale Bolt' },
+            { v: 'scream', t: 'Wraith Cry' }, { v: 'dive', t: 'Abyss Dive' },
+            { v: 'soul', t: 'Fill Soul' }, { v: 'glimmer', t: '+200 Glimmer' }, { v: 'all', t: 'Everything' }
+          ].concat((G.Charms && G.Charms.LIST ? G.Charms.LIST : []).map(c => ({ v: 'charm:' + c.id, t: 'Charm: ' + c.name })));
+          selectField(body, 'Grants', gopts, () => p.grant || 'wings', v => { p.grant = v; });
+          el('div', { class: 'insNote' }, body, 'A dev pickup: walk into it to instantly gain the chosen power (re-usable) — handy for testing spells, bolt elements, charms and the dynamic environment.');
+          break;
+        }
         case 'bioflora':
           selectField(body, 'Kind', [{ v: 'flower', t: 'Flower' }, { v: 'mushroom', t: 'Mushroom' }], () => p.kind || 'flower', v => { p.kind = v; });
           colorField(body, 'Glow colour', () => p.color || (p.kind === 'mushroom' ? '#7ce0ff' : '#ff7ad0'), v => { p.color = v || undefined; });
@@ -1716,7 +1729,8 @@
         { cat: 'prop', id: 'smith', label: 'Nailsmith (forge)', ico: '⚒️' },
         { cat: 'prop', id: 'spellwell', label: 'Soul well (spells)', ico: '🔮' },
         { cat: 'prop', id: 'charmPickup', label: 'Charm pickup', ico: '🔆', defaults: { charm: 'stoneheart' } },
-        { cat: 'prop', id: 'npc', label: 'NPC (dialogue)', ico: '🧝', defaults: { name: 'Wanderer', color: '#6a7a8a', dialogue: { lines: [{ speaker: 'Wanderer', text: 'These tunnels remember more than they tell.' }] } } }
+        { cat: 'prop', id: 'npc', label: 'NPC (dialogue)', ico: '🧝', defaults: { name: 'Wanderer', color: '#6a7a8a', dialogue: { lines: [{ speaker: 'Wanderer', text: 'These tunnels remember more than they tell.' }] } } },
+        { cat: 'prop', id: 'powerup', label: 'Power-up (test)', ico: '⚡', defaults: { grant: 'wings' } }
       ];
       case 'decor': {
         const out = [];

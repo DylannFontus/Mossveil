@@ -1578,6 +1578,46 @@
     return ent;
   };
 
+  // a test/dev pickup that grants a chosen power on contact (spells, bolt elements,
+  // charms, wings…) so you can quickly try the new abilities & dynamic environment.
+  const GRANT_LABEL = { wings: 'Moth Wings', bolt: 'Soul Bolt', ember: 'Ember Bolt', frost: 'Frost Bolt', gale: 'Gale Bolt', scream: 'Wraith Cry', dive: 'Abyss Dive', soul: 'full Soul', glimmer: '200 Glimmer', all: 'everything' };
+  function grantLabel(g) { return g && g.indexOf('charm:') === 0 ? ((G.Charms && G.Charms.LIST.find(c => c.id === g.slice(6)) || {}).name || g.slice(6)) : (GRANT_LABEL[g] || g); }
+  function applyGrant(g) {
+    const S = G.save; if (!S) return; S.spells = S.spells || { bolt: 1 };
+    if (g === 'wings') { S.wings = true; if (G.player) G.player.hasWings = true; }
+    else if (g === 'ember' || g === 'frost' || g === 'gale') { S.spells[g] = 2; S.boltElement = g; }
+    else if (g === 'bolt' || g === 'scream' || g === 'dive') { S.spells[g] = 2; }
+    else if (g === 'soul') { if (G.player) G.player.soul = 99; }
+    else if (g === 'glimmer') { if (G.Main && G.Main.addGlimmer) G.Main.addGlimmer(200); else S.glimmer = (S.glimmer || 0) + 200; }
+    else if (g.indexOf('charm:') === 0) { const id = g.slice(6); if (G.Charms) { G.Charms.grant(id); const eq = S.charmsEquipped || []; if (eq.indexOf(id) < 0) S.charmsEquipped = eq.concat([id]); if (G.Charms.apply) G.Charms.apply(G.player); } }
+    else if (g === 'all') { for (const k of ['bolt', 'scream', 'dive', 'ember', 'frost', 'gale']) S.spells[k] = 2; S.boltElement = 'ember'; S.wings = true; if (G.player) { G.player.hasWings = true; G.player.soul = 99; } }
+    if (G.Main && G.Main.persist) G.Main.persist();
+  }
+  mkProp.powerup = (p) => {
+    const grant = p.grant || 'wings';
+    const COL = { wings: 0xdfeaff, ember: 0xff8a3a, frost: 0x8fd8ff, gale: 0xeaf4ff, bolt: 0xc9a0ff, scream: 0xc9d8ff, dive: 0xb070ff, soul: 0xbfe8ff, glimmer: 0xffd060, all: 0xffffff };
+    const col = grant.indexOf('charm:') === 0 ? 0xffcf5a : (COL[grant] || 0xb0f0ff);
+    const grp = new THREE.Group(); grp.position.set(p.x, p.y, p.z || 0);
+    const orb = U.flat(U.ellipse(0.3, 0.34), col, { additive: true, opacity: 0.85, y: 0.5 }); grp.add(orb);
+    if (U.glowSprite) { const g = U.glowSprite(col, 3.4, 0.4); g.position.set(0, 0.5, -0.1); grp.add(g); }
+    let ph = U.rand(0, 9), cd = 0;
+    return {
+      type: 'powerup', x: p.x, y: p.y, group: grp,
+      update(dt) {
+        ph += dt; orb.position.y = 0.5 + Math.sin(ph * 2) * 0.12; orb.material.opacity = 0.7 + Math.sin(ph * 3) * 0.15; orb.rotation.z += dt;
+        if (U.chance(dt * 4)) G.FX.p(true, { x: p.x + U.rand(-0.3, 0.3), y: p.y + 0.4, vx: 0, vy: U.rand(0.4, 1.0), life: 0.8, size: 0.12, color: col, alpha: 0.6 });
+        cd -= dt;
+        const pl = G.player;
+        if (pl && !pl.dead && cd <= 0 && Math.abs(pl.body.x - p.x) < 1.1 && Math.abs(pl.body.y - (p.y + 0.5)) < 1.3) {
+          cd = 1.4; applyGrant(grant);
+          G.FX.burst('heal', p.x, p.y + 0.5, { n: 14, color: col }); G.FX.ring(p.x, p.y + 0.5, { r1: 2.4, life: 0.4, color: col, alpha: 0.7 });
+          if (G.Audio) G.Audio.sfx('heal');
+          if (G.UI && G.UI.toast) G.UI.toast('Granted: ' + grantLabel(grant));
+        }
+      }
+    };
+  };
+
   // a floor that shakes then drops when you stand on it, and respawns
   mkProp.fallfloor = (p) => {
     const w = p.w || 3, h = p.h || 0.7, delay = p.delay !== undefined ? p.delay : 0.55, respawn = p.respawn || 3;

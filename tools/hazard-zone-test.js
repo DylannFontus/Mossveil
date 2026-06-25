@@ -29,6 +29,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       L.props.push({ type: 'gas', x: 70, y: 8, w: 6, h: 4, dmg: 1 });
       L.props.push({ type: 'bioflora', kind: 'flower', x: 80, y: 8, mortal: true });
       L.props.push({ type: 'bioflora', kind: 'mushroom', x: 84, y: 8 });
+      L.props.push({ type: 'powerup', x: 90, y: 8, grant: 'frost' });
+      L.props.push({ type: 'powerup', x: 94, y: 8, grant: 'wings' });
+      L.props.push({ type: 'powerup', x: 98, y: 8, grant: 'charm:stoneheart' });
       G.Weather.set('none');                            // no wind, so gas is harmful
       G.World.load(id, 'P');
       const p = G.player, out = {};
@@ -57,6 +60,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       out.floraMortal = fl.breakable === true; out.floraPermanent = mush.breakable === false;
       fl.hurt(1); out.floraDied = fl.dead === true;
 
+      // power-up pickups grant the chosen power on contact
+      G.save.spells = { bolt: 1 }; G.save.wings = false; G.save.charmsOwned = []; G.save.charmsEquipped = [];
+      put(90, 8.5); tick(); out.gotFrost = G.save.spells.frost === 2 && G.save.boltElement === 'frost';
+      put(94, 8.5); tick(); out.gotWings = G.save.wings === true && p.hasWings === true;
+      put(98, 8.5); tick(); out.gotCharm = (G.save.charmsOwned || []).indexOf('stoneheart') >= 0 && (G.save.charmsEquipped || []).indexOf('stoneheart') >= 0;
+
       out.hasMire = !!G.room.entities.find(e => e.type === 'mire');
       out.hasPool = !!G.room.entities.find(e => e.type === 'pool');
       return out;
@@ -68,6 +77,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.lavaHurt === true && o.lavaBounce === true
       && o.gasHurt === true && o.gasClears === true
       && o.floraMortal === true && o.floraPermanent === true && o.floraDied === true
+      && o.gotFrost === true && o.gotWings === true && o.gotCharm === true
       && o.hasMire && o.hasPool && !errs.length;
     console.log(ok ? 'HAZARD ZONE TEST: PASS' : 'HAZARD ZONE TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
