@@ -7,7 +7,8 @@ const ROOT = path.resolve(__dirname, '..');
 // each: { name, global, srcs:[files loaded in order], pick(G) -> serialisable data }
 const DATASETS = [
   { name: 'charms', global: 'CHARMS', srcs: ['src/charms.js'], pick: G => G.Charms.exportDefaults() },
-  { name: 'sfx', global: 'SFX_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.sfxExportDefaults() }
+  { name: 'sfx', global: 'SFX_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.sfxExportDefaults() },
+  { name: 'weather', global: 'WEATHER_DATA', srcs: ['src/weather.js'], pick: G => G.Weather.exportDefaults() }
 ];
 
 function evalModule(srcs) {

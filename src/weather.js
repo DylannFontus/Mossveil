@@ -9,7 +9,9 @@
 
   // preset → properties. rain/snow/leaves/embers are particle densities (0..1),
   // wind is horizontal strength, fog is haze, wet drives reflection+grade, lightning bool.
-  const PRESETS = {
+  // built-in presets are the FALLBACK; the engine reads data/weather.js (window.G.WEATHER_DATA)
+  // as the source of truth, authored by the in-editor Weather preset editor (Edit ▸ World).
+  const DEFAULT_PRESETS = {
     none: {},
     rain: { rain: 0.6, wet: 0.6, wind: 0.18 },
     storm: { rain: 1.0, wet: 1.0, wind: 0.55, lightning: 1, fog: 0.15 },
@@ -19,8 +21,24 @@
     embers: { embers: 0.6, wind: 0.28, fog: 0.12 },
     blizzard: { snow: 1.0, wind: 1.0, fog: 0.45 }
   };
-  W.KINDS = Object.keys(PRESETS);
-  W.LABELS = { none: 'Clear', rain: 'Rain', storm: 'Thunderstorm', wind: 'Windy', fog: 'Fog / mist', snow: 'Snow', embers: 'Embers / ash', blizzard: 'Blizzard' };
+  const DEFAULT_LABELS = { none: 'Clear', rain: 'Rain', storm: 'Thunderstorm', wind: 'Windy', fog: 'Fog / mist', snow: 'Snow', embers: 'Embers / ash', blizzard: 'Blizzard' };
+  const clone = o => JSON.parse(JSON.stringify(o));
+  let PRESETS = {}, LABELS = {};
+  function applyData(data) {
+    const d = data || G.WEATHER_DATA || null;
+    PRESETS = clone(DEFAULT_PRESETS); LABELS = Object.assign({}, DEFAULT_LABELS);
+    if (d) {
+      if (d.presets) PRESETS = Object.assign({ none: {} }, clone(d.presets));
+      if (d.labels) LABELS = Object.assign({}, d.labels);
+    }
+    if (!PRESETS.none) PRESETS.none = {};
+    W.KINDS = Object.keys(PRESETS);
+    W.LABELS = LABELS;
+  }
+  W.applyData = applyData;
+  W.exportDefaults = () => ({ presets: clone(DEFAULT_PRESETS), labels: Object.assign({}, DEFAULT_LABELS) });
+  W.exportCurrent = () => ({ presets: clone(PRESETS), labels: Object.assign({}, LABELS) });
+  applyData();
 
   let P = {}, parts = [], fogBlobs = [], t = 0, lT = 0, lightFlash = 0, splashT = 0;
   let trans = 1, transTo = 1, transRate = 2, pendingKind = null;   // smooth fade between weather presets
@@ -146,4 +164,14 @@
     return g;
   };
   W.props = function () { return P; };
+
+  // ---- live preview for the Weather preset editor: audition an unsaved preset's properties ----
+  let _prevKind = null;
+  W.previewProps = function (props) {
+    if (_prevKind === null) _prevKind = W.kind;          // remember the real weather the first time
+    W.kind = '__preview'; P = Object.assign({}, props || {});
+    lightFlash = 0; t = 0; splashT = 0; lT = P.lightning ? U.rand(2, 5) : 0;
+    makeParts(); trans = 1; transTo = 1; pendingKind = null;
+  };
+  W.previewEnd = function () { if (_prevKind !== null) { const k = _prevKind; _prevKind = null; W.set(k); } };
 })();
