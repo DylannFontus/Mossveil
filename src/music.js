@@ -14,46 +14,88 @@
 
   const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10], DOR = [0, 2, 3, 5, 7, 9, 10], PHR = [0, 1, 3, 5, 7, 8, 10],
     PENT = [0, 3, 5, 7, 10], LYD = [0, 2, 4, 6, 7, 9, 11], HARM = [0, 2, 3, 5, 7, 8, 11], WHOLE = [0, 2, 4, 6, 8, 10], LOC = [0, 1, 3, 5, 6, 8, 10];
-  // root in Hz, a scale, a 4-bar chord progression (scale-degree roots), instrument character
-  const TRACKS = {
+  const SCALES = { MAJ, MIN, DOR, PHR, PENT, LYD, HARM, WHOLE, LOC };
+  const WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
+  // exposed for the Music editor (Edit ▸ Audio)
+  M.SCALES = SCALES; M.SCALE_NAMES = Object.keys(SCALES); M.WAVES = WAVES.slice();
+
+  // Built-in default soundtracks. Each: root in Hz, a scale (by NAME so it serialises cleanly),
+  // a 4-bar chord progression (scale-degree roots), pad/bass waveform, filter cutoffs, drum weight.
+  // These are only the FALLBACK — the engine reads data/music.js (window.G.MUSIC) as the source of
+  // truth, which the in-editor Music tool writes. So tracks can be added/edited/removed forever.
+  const DEFAULT_TRACKS = {
     // ---- the six biome themes (used by Auto-by-biome) ----
-    verdant: { bpm: 86, root: 220.0, scale: MAJ, prog: [0, 5, 3, 4], pad: 'sawtooth', padCut: 950, bass: 'triangle', leadCut: 2400, drums: 0.5 },
-    gloom: { bpm: 70, root: 146.8, scale: MIN, prog: [0, 5, 3, 4], pad: 'sawtooth', padCut: 720, bass: 'sine', leadCut: 1900, drums: 0.45 },
-    city: { bpm: 74, root: 196.0, scale: MIN, prog: [0, 3, 4, 3], pad: 'triangle', padCut: 1050, bass: 'triangle', leadCut: 2500, drums: 0.4 },
-    forge: { bpm: 110, root: 130.8, scale: DOR, prog: [0, 0, 6, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1700, drums: 0.8 },
-    tomb: { bpm: 58, root: 130.8, scale: PHR, prog: [0, 1, 4, 1], pad: 'sine', padCut: 620, bass: 'sine', leadCut: 1500, drums: 0.3 },
-    garden: { bpm: 92, root: 261.6, scale: PENT, prog: [0, 2, 3, 4], pad: 'triangle', padCut: 1150, bass: 'triangle', leadCut: 2700, drums: 0.4 },
+    verdant: { bpm: 86, root: 220.0, scale: 'MAJ', prog: [0, 5, 3, 4], pad: 'sawtooth', padCut: 950, bass: 'triangle', leadCut: 2400, drums: 0.5 },
+    gloom: { bpm: 70, root: 146.8, scale: 'MIN', prog: [0, 5, 3, 4], pad: 'sawtooth', padCut: 720, bass: 'sine', leadCut: 1900, drums: 0.45 },
+    city: { bpm: 74, root: 196.0, scale: 'MIN', prog: [0, 3, 4, 3], pad: 'triangle', padCut: 1050, bass: 'triangle', leadCut: 2500, drums: 0.4 },
+    forge: { bpm: 110, root: 130.8, scale: 'DOR', prog: [0, 0, 6, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1700, drums: 0.8 },
+    tomb: { bpm: 58, root: 130.8, scale: 'PHR', prog: [0, 1, 4, 1], pad: 'sine', padCut: 620, bass: 'sine', leadCut: 1500, drums: 0.3 },
+    garden: { bpm: 92, root: 261.6, scale: 'PENT', prog: [0, 2, 3, 4], pad: 'triangle', padCut: 1150, bass: 'triangle', leadCut: 2700, drums: 0.4 },
     // ---- standalone moods (pick per-level): upbeat → dark, plus some off-vibe ----
-    radiant: { bpm: 128, root: 293.7, scale: MAJ, prog: [0, 4, 5, 4], pad: 'sawtooth', padCut: 1300, bass: 'triangle', leadCut: 3000, drums: 0.85 },
-    triumph: { bpm: 112, root: 261.6, scale: MAJ, prog: [0, 3, 4, 5], pad: 'sawtooth', padCut: 1200, bass: 'sawtooth', leadCut: 2800, drums: 0.8 },
-    hopeful: { bpm: 100, root: 246.9, scale: MAJ, prog: [0, 5, 3, 4], pad: 'triangle', padCut: 1100, bass: 'triangle', leadCut: 2600, drums: 0.55 },
-    skyward: { bpm: 104, root: 261.6, scale: LYD, prog: [0, 1, 4, 0], pad: 'triangle', padCut: 1250, bass: 'triangle', leadCut: 2900, drums: 0.6 },
-    serene: { bpm: 76, root: 220.0, scale: LYD, prog: [0, 4, 1, 0], pad: 'sine', padCut: 900, bass: 'sine', leadCut: 2200, drums: 0.2 },
-    nocturne: { bpm: 68, root: 174.6, scale: MIN, prog: [0, 5, 3, 4], pad: 'sine', padCut: 760, bass: 'sine', leadCut: 1700, drums: 0.3 },
-    wistful: { bpm: 80, root: 196.0, scale: DOR, prog: [0, 4, 5, 3], pad: 'triangle', padCut: 980, bass: 'triangle', leadCut: 2300, drums: 0.35 },
-    mystic: { bpm: 84, root: 174.6, scale: DOR, prog: [0, 2, 5, 4], pad: 'sawtooth', padCut: 860, bass: 'sine', leadCut: 2000, drums: 0.4 },
-    arcane: { bpm: 88, root: 185.0, scale: WHOLE, prog: [0, 2, 4, 2], pad: 'sine', padCut: 880, bass: 'sine', leadCut: 2100, drums: 0.35 },
-    glacial: { bpm: 62, root: 207.7, scale: MIN, prog: [0, 3, 5, 3], pad: 'sine', padCut: 1000, bass: 'sine', leadCut: 2400, drums: 0.2 },
-    lament: { bpm: 60, root: 164.8, scale: HARM, prog: [0, 4, 1, 4], pad: 'sine', padCut: 700, bass: 'sine', leadCut: 1600, drums: 0.25 },
-    somber: { bpm: 64, root: 146.8, scale: MIN, prog: [0, 5, 6, 4], pad: 'sawtooth', padCut: 680, bass: 'sine', leadCut: 1500, drums: 0.3 },
-    tense: { bpm: 96, root: 130.8, scale: HARM, prog: [0, 6, 4, 0], pad: 'sawtooth', padCut: 760, bass: 'sawtooth', leadCut: 1700, drums: 0.6 },
-    march: { bpm: 100, root: 146.8, scale: MIN, prog: [0, 6, 5, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1800, drums: 0.85 },
-    chase: { bpm: 138, root: 146.8, scale: PHR, prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 900, bass: 'sawtooth', leadCut: 1900, drums: 0.95 },
-    frantic: { bpm: 132, root: 130.8, scale: LOC, prog: [0, 4, 1, 5], pad: 'sawtooth', padCut: 840, bass: 'sawtooth', leadCut: 1800, drums: 0.95 },
-    abyss: { bpm: 56, root: 110.0, scale: PHR, prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 560, bass: 'sine', leadCut: 1300, drums: 0.3 },
-    void: { bpm: 52, root: 98.0, scale: LOC, prog: [0, 6, 1, 0], pad: 'sine', padCut: 500, bass: 'sine', leadCut: 1200, drums: 0.25 },
+    radiant: { bpm: 128, root: 293.7, scale: 'MAJ', prog: [0, 4, 5, 4], pad: 'sawtooth', padCut: 1300, bass: 'triangle', leadCut: 3000, drums: 0.85 },
+    triumph: { bpm: 112, root: 261.6, scale: 'MAJ', prog: [0, 3, 4, 5], pad: 'sawtooth', padCut: 1200, bass: 'sawtooth', leadCut: 2800, drums: 0.8 },
+    hopeful: { bpm: 100, root: 246.9, scale: 'MAJ', prog: [0, 5, 3, 4], pad: 'triangle', padCut: 1100, bass: 'triangle', leadCut: 2600, drums: 0.55 },
+    skyward: { bpm: 104, root: 261.6, scale: 'LYD', prog: [0, 1, 4, 0], pad: 'triangle', padCut: 1250, bass: 'triangle', leadCut: 2900, drums: 0.6 },
+    serene: { bpm: 76, root: 220.0, scale: 'LYD', prog: [0, 4, 1, 0], pad: 'sine', padCut: 900, bass: 'sine', leadCut: 2200, drums: 0.2 },
+    nocturne: { bpm: 68, root: 174.6, scale: 'MIN', prog: [0, 5, 3, 4], pad: 'sine', padCut: 760, bass: 'sine', leadCut: 1700, drums: 0.3 },
+    wistful: { bpm: 80, root: 196.0, scale: 'DOR', prog: [0, 4, 5, 3], pad: 'triangle', padCut: 980, bass: 'triangle', leadCut: 2300, drums: 0.35 },
+    mystic: { bpm: 84, root: 174.6, scale: 'DOR', prog: [0, 2, 5, 4], pad: 'sawtooth', padCut: 860, bass: 'sine', leadCut: 2000, drums: 0.4 },
+    arcane: { bpm: 88, root: 185.0, scale: 'WHOLE', prog: [0, 2, 4, 2], pad: 'sine', padCut: 880, bass: 'sine', leadCut: 2100, drums: 0.35 },
+    glacial: { bpm: 62, root: 207.7, scale: 'MIN', prog: [0, 3, 5, 3], pad: 'sine', padCut: 1000, bass: 'sine', leadCut: 2400, drums: 0.2 },
+    lament: { bpm: 60, root: 164.8, scale: 'HARM', prog: [0, 4, 1, 4], pad: 'sine', padCut: 700, bass: 'sine', leadCut: 1600, drums: 0.25 },
+    somber: { bpm: 64, root: 146.8, scale: 'MIN', prog: [0, 5, 6, 4], pad: 'sawtooth', padCut: 680, bass: 'sine', leadCut: 1500, drums: 0.3 },
+    tense: { bpm: 96, root: 130.8, scale: 'HARM', prog: [0, 6, 4, 0], pad: 'sawtooth', padCut: 760, bass: 'sawtooth', leadCut: 1700, drums: 0.6 },
+    march: { bpm: 100, root: 146.8, scale: 'MIN', prog: [0, 6, 5, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1800, drums: 0.85 },
+    chase: { bpm: 138, root: 146.8, scale: 'PHR', prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 900, bass: 'sawtooth', leadCut: 1900, drums: 0.95 },
+    frantic: { bpm: 132, root: 130.8, scale: 'LOC', prog: [0, 4, 1, 5], pad: 'sawtooth', padCut: 840, bass: 'sawtooth', leadCut: 1800, drums: 0.95 },
+    abyss: { bpm: 56, root: 110.0, scale: 'PHR', prog: [0, 1, 0, 6], pad: 'sawtooth', padCut: 560, bass: 'sine', leadCut: 1300, drums: 0.3 },
+    void: { bpm: 52, root: 98.0, scale: 'LOC', prog: [0, 6, 1, 0], pad: 'sine', padCut: 500, bass: 'sine', leadCut: 1200, drums: 0.25 },
     // the boss theme — driving, dramatic harmonic-minor; always plays at full intensity
-    boss: { bpm: 118, root: 130.8, scale: HARM, prog: [0, 6, 1, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1750, drums: 0.95 }
+    boss: { bpm: 118, root: 130.8, scale: 'HARM', prog: [0, 6, 1, 4], pad: 'sawtooth', padCut: 820, bass: 'sawtooth', leadCut: 1750, drums: 0.95 }
   };
-  const BIOME = {
+  const DEFAULT_BIOME = {
     verdant: 'verdant', garden: 'garden', village: 'verdant', warm: 'verdant', crown: 'verdant',
     gloom: 'gloom', mine: 'gloom', pale: 'gloom', frost: 'gloom', marsh: 'gloom', fungal: 'garden',
     city: 'city', sunken: 'city', dusk: 'city', aurora: 'city',
     forge: 'forge', ember: 'forge',
     tombs: 'tomb', bone: 'tomb', archive: 'tomb'
   };
-  M.TRACK_IDS = Object.keys(TRACKS).filter(id => id !== 'boss');   // 'boss' is internal, not a per-level choice
+
+  // the live, normalised set the engine plays from (scale resolved to an interval array)
+  let TRACKS = {}, BIOME = {};
+  const clone = o => JSON.parse(JSON.stringify(o));
+  function normalizeTrack(t) {
+    t = t || {};
+    const name = typeof t.scale === 'string' ? t.scale : (t.scaleName || 'MIN');
+    return {
+      bpm: +t.bpm || 90, root: +t.root || 146.8,
+      scaleName: SCALES[name] ? name : 'MIN', scale: SCALES[name] || (Array.isArray(t.scale) ? t.scale : SCALES.MIN),
+      prog: (Array.isArray(t.prog) && t.prog.length === 4) ? t.prog.map(n => n | 0) : [0, 5, 3, 4],
+      pad: WAVES.includes(t.pad) ? t.pad : 'sawtooth', padCut: +t.padCut || 800,
+      bass: WAVES.includes(t.bass) ? t.bass : 'sine', leadCut: +t.leadCut || 2000,
+      drums: t.drums != null ? Math.max(0, Math.min(1, +t.drums)) : 0.4
+    };
+  }
+  // (re)build TRACKS/BIOME from the defaults, overlaid by the editor's data (window.G.MUSIC or arg)
+  function applyData(data) {
+    const d = data || G.MUSIC || null;
+    TRACKS = {}; for (const id in DEFAULT_TRACKS) TRACKS[id] = normalizeTrack(DEFAULT_TRACKS[id]);
+    BIOME = clone(DEFAULT_BIOME);
+    if (d) {
+      if (d.tracks && typeof d.tracks === 'object') for (const id in d.tracks) TRACKS[id] = normalizeTrack(d.tracks[id]);
+      if (d.biome && typeof d.biome === 'object') BIOME = clone(d.biome);
+    }
+    if (!TRACKS.boss) TRACKS.boss = normalizeTrack(DEFAULT_TRACKS.boss);  // boss theme must always exist
+    M.TRACK_IDS = Object.keys(TRACKS).filter(id => id !== 'boss');        // 'boss' is internal, not a per-level choice
+    if (trackId && TRACKS[trackId]) track = TRACKS[trackId];             // keep the running track in sync after a hot edit
+  }
+  M.applyData = applyData;
+  // serialisable snapshots for the editor: scale stored by NAME
+  const serializeTrack = t => ({ bpm: t.bpm, root: t.root, scale: t.scaleName, prog: t.prog.slice(), pad: t.pad, padCut: t.padCut, bass: t.bass, leadCut: t.leadCut, drums: t.drums });
+  M.exportDefaults = () => ({ tracks: clone(DEFAULT_TRACKS), biome: clone(DEFAULT_BIOME) });
+  M.exportCurrent = () => { const tr = {}; for (const id in TRACKS) tr[id] = serializeTrack(TRACKS[id]); return { tracks: tr, biome: clone(BIOME) }; };
   M.trackForBiome = b => BIOME[b] || 'gloom';
+  applyData();
 
   function chord(t, d) {                              // triad semitone offsets for scale-degree d
     const sc = t.scale, n = sc.length, at = i => sc[((i % n) + n) % n] + 12 * Math.floor(i / n);
@@ -223,6 +265,23 @@
       busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.18);
     } else { busDry.gain.setTargetAtTime(0.0001, now, 0.6); busWet.gain.setTargetAtTime(0.0001, now, 0.6); }
   };
+  // ---- live preview for the Music editor: audition an unsaved track definition ----
+  // pass a serialisable track def (scale by name is fine); the tool drives M.update each frame.
+  M.previewDef = (def, inten) => {
+    if (!ctx) return false;
+    track = normalizeTrack(def); trackId = '__preview';
+    intensity = Math.max(0, Math.min(1, inten || 0)); bossOn = false;
+    step = 0; lead = 0; nextTime = ctx.currentTime + 0.05; playing = true;
+    if (!gen) gen = makeGen();
+    const now = ctx.currentTime;
+    gen.d.gain.cancelScheduledValues(now); gen.d.gain.setValueAtTime(1, now);
+    gen.w.gain.cancelScheduledValues(now); gen.w.gain.setValueAtTime(1, now);
+    busDry.gain.cancelScheduledValues(now); busDry.gain.setTargetAtTime(0.9, now, 0.08);
+    busWet.gain.cancelScheduledValues(now); busWet.gain.setTargetAtTime(0.6, now, 0.08);
+    return true;
+  };
+  M.previewIntensity = v => { intensity = Math.max(0, Math.min(1, v || 0)); };
+  M.stopPreview = () => { if (ctx) M.pause(true); };
   M.update = () => {
     if (!playing || !ctx || !track) return;
     const dur16 = 60 / track.bpm / 4;

@@ -1,0 +1,426 @@
+{
+ "tracks": {
+  "verdant": {
+   "bpm": 86,
+   "root": 220,
+   "scale": "MAJ",
+   "prog": [
+    0,
+    5,
+    3,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 950,
+   "bass": "triangle",
+   "leadCut": 2400,
+   "drums": 0.5
+  },
+  "gloom": {
+   "bpm": 70,
+   "root": 146.8,
+   "scale": "MIN",
+   "prog": [
+    0,
+    5,
+    3,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 720,
+   "bass": "sine",
+   "leadCut": 1900,
+   "drums": 0.45
+  },
+  "city": {
+   "bpm": 74,
+   "root": 196,
+   "scale": "MIN",
+   "prog": [
+    0,
+    3,
+    4,
+    3
+   ],
+   "pad": "triangle",
+   "padCut": 1050,
+   "bass": "triangle",
+   "leadCut": 2500,
+   "drums": 0.4
+  },
+  "forge": {
+   "bpm": 110,
+   "root": 130.8,
+   "scale": "DOR",
+   "prog": [
+    0,
+    0,
+    6,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 820,
+   "bass": "sawtooth",
+   "leadCut": 1700,
+   "drums": 0.8
+  },
+  "tomb": {
+   "bpm": 58,
+   "root": 130.8,
+   "scale": "PHR",
+   "prog": [
+    0,
+    1,
+    4,
+    1
+   ],
+   "pad": "sine",
+   "padCut": 620,
+   "bass": "sine",
+   "leadCut": 1500,
+   "drums": 0.3
+  },
+  "garden": {
+   "bpm": 92,
+   "root": 261.6,
+   "scale": "PENT",
+   "prog": [
+    0,
+    2,
+    3,
+    4
+   ],
+   "pad": "triangle",
+   "padCut": 1150,
+   "bass": "triangle",
+   "leadCut": 2700,
+   "drums": 0.4
+  },
+  "radiant": {
+   "bpm": 128,
+   "root": 293.7,
+   "scale": "MAJ",
+   "prog": [
+    0,
+    4,
+    5,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 1300,
+   "bass": "triangle",
+   "leadCut": 3000,
+   "drums": 0.85
+  },
+  "triumph": {
+   "bpm": 112,
+   "root": 261.6,
+   "scale": "MAJ",
+   "prog": [
+    0,
+    3,
+    4,
+    5
+   ],
+   "pad": "sawtooth",
+   "padCut": 1200,
+   "bass": "sawtooth",
+   "leadCut": 2800,
+   "drums": 0.8
+  },
+  "hopeful": {
+   "bpm": 100,
+   "root": 246.9,
+   "scale": "MAJ",
+   "prog": [
+    0,
+    5,
+    3,
+    4
+   ],
+   "pad": "triangle",
+   "padCut": 1100,
+   "bass": "triangle",
+   "leadCut": 2600,
+   "drums": 0.55
+  },
+  "skyward": {
+   "bpm": 104,
+   "root": 261.6,
+   "scale": "LYD",
+   "prog": [
+    0,
+    1,
+    4,
+    0
+   ],
+   "pad": "triangle",
+   "padCut": 1250,
+   "bass": "triangle",
+   "leadCut": 2900,
+   "drums": 0.6
+  },
+  "serene": {
+   "bpm": 76,
+   "root": 220,
+   "scale": "LYD",
+   "prog": [
+    0,
+    4,
+    1,
+    0
+   ],
+   "pad": "sine",
+   "padCut": 900,
+   "bass": "sine",
+   "leadCut": 2200,
+   "drums": 0.2
+  },
+  "nocturne": {
+   "bpm": 68,
+   "root": 174.6,
+   "scale": "MIN",
+   "prog": [
+    0,
+    5,
+    3,
+    4
+   ],
+   "pad": "sine",
+   "padCut": 760,
+   "bass": "sine",
+   "leadCut": 1700,
+   "drums": 0.3
+  },
+  "wistful": {
+   "bpm": 80,
+   "root": 196,
+   "scale": "DOR",
+   "prog": [
+    0,
+    4,
+    5,
+    3
+   ],
+   "pad": "triangle",
+   "padCut": 980,
+   "bass": "triangle",
+   "leadCut": 2300,
+   "drums": 0.35
+  },
+  "mystic": {
+   "bpm": 84,
+   "root": 174.6,
+   "scale": "DOR",
+   "prog": [
+    0,
+    2,
+    5,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 860,
+   "bass": "sine",
+   "leadCut": 2000,
+   "drums": 0.4
+  },
+  "arcane": {
+   "bpm": 88,
+   "root": 185,
+   "scale": "WHOLE",
+   "prog": [
+    0,
+    2,
+    4,
+    2
+   ],
+   "pad": "sine",
+   "padCut": 880,
+   "bass": "sine",
+   "leadCut": 2100,
+   "drums": 0.35
+  },
+  "glacial": {
+   "bpm": 62,
+   "root": 207.7,
+   "scale": "MIN",
+   "prog": [
+    0,
+    3,
+    5,
+    3
+   ],
+   "pad": "sine",
+   "padCut": 1000,
+   "bass": "sine",
+   "leadCut": 2400,
+   "drums": 0.2
+  },
+  "lament": {
+   "bpm": 60,
+   "root": 164.8,
+   "scale": "HARM",
+   "prog": [
+    0,
+    4,
+    1,
+    4
+   ],
+   "pad": "sine",
+   "padCut": 700,
+   "bass": "sine",
+   "leadCut": 1600,
+   "drums": 0.25
+  },
+  "somber": {
+   "bpm": 64,
+   "root": 146.8,
+   "scale": "MIN",
+   "prog": [
+    0,
+    5,
+    6,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 680,
+   "bass": "sine",
+   "leadCut": 1500,
+   "drums": 0.3
+  },
+  "tense": {
+   "bpm": 96,
+   "root": 130.8,
+   "scale": "HARM",
+   "prog": [
+    0,
+    6,
+    4,
+    0
+   ],
+   "pad": "sawtooth",
+   "padCut": 760,
+   "bass": "sawtooth",
+   "leadCut": 1700,
+   "drums": 0.6
+  },
+  "march": {
+   "bpm": 100,
+   "root": 146.8,
+   "scale": "MIN",
+   "prog": [
+    0,
+    6,
+    5,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 820,
+   "bass": "sawtooth",
+   "leadCut": 1800,
+   "drums": 0.85
+  },
+  "chase": {
+   "bpm": 138,
+   "root": 146.8,
+   "scale": "PHR",
+   "prog": [
+    0,
+    1,
+    0,
+    6
+   ],
+   "pad": "sawtooth",
+   "padCut": 900,
+   "bass": "sawtooth",
+   "leadCut": 1900,
+   "drums": 0.95
+  },
+  "frantic": {
+   "bpm": 132,
+   "root": 130.8,
+   "scale": "LOC",
+   "prog": [
+    0,
+    4,
+    1,
+    5
+   ],
+   "pad": "sawtooth",
+   "padCut": 840,
+   "bass": "sawtooth",
+   "leadCut": 1800,
+   "drums": 0.95
+  },
+  "abyss": {
+   "bpm": 56,
+   "root": 110,
+   "scale": "PHR",
+   "prog": [
+    0,
+    1,
+    0,
+    6
+   ],
+   "pad": "sawtooth",
+   "padCut": 560,
+   "bass": "sine",
+   "leadCut": 1300,
+   "drums": 0.3
+  },
+  "void": {
+   "bpm": 52,
+   "root": 98,
+   "scale": "LOC",
+   "prog": [
+    0,
+    6,
+    1,
+    0
+   ],
+   "pad": "sine",
+   "padCut": 500,
+   "bass": "sine",
+   "leadCut": 1200,
+   "drums": 0.25
+  },
+  "boss": {
+   "bpm": 118,
+   "root": 130.8,
+   "scale": "HARM",
+   "prog": [
+    0,
+    6,
+    1,
+    4
+   ],
+   "pad": "sawtooth",
+   "padCut": 820,
+   "bass": "sawtooth",
+   "leadCut": 1750,
+   "drums": 0.95
+  }
+ },
+ "biome": {
+  "verdant": "verdant",
+  "garden": "garden",
+  "village": "verdant",
+  "warm": "verdant",
+  "crown": "verdant",
+  "gloom": "gloom",
+  "mine": "gloom",
+  "pale": "gloom",
+  "frost": "gloom",
+  "marsh": "gloom",
+  "fungal": "garden",
+  "city": "city",
+  "sunken": "city",
+  "dusk": "city",
+  "aurora": "city",
+  "forge": "forge",
+  "ember": "forge",
+  "tombs": "tomb",
+  "bone": "tomb",
+  "archive": "tomb"
+ }
+}
