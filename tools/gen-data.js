@@ -25,7 +25,8 @@ const DATASETS = [
   { name: 'poststack', global: 'POSTFX_DATA', srcs: ['src/poststack.js'], pick: G => G.PostFX.exportDefaults() },
   { name: 'water', global: 'WATER_DATA', srcs: ['src/water.js'], pick: G => G.WaterFX.exportDefaults() },
   { name: 'musicfx', global: 'MUSICFX_DATA', srcs: ['src/musicfx.js'], pick: G => G.MusicFX.exportDefaults() },
-  { name: 'positional', global: 'POSITIONAL_DATA', srcs: ['src/positional.js'], pick: G => G.Positional.exportDefaults() }
+  { name: 'positional', global: 'POSITIONAL_DATA', srcs: ['src/positional.js'], pick: G => G.Positional.exportDefaults() },
+  { name: 'sfxvar', global: 'SFXVAR_DATA', srcs: ['src/sfxvar.js'], pick: G => G.SfxVar.exportDefaults() }
 ];
 
 function evalModule(srcs) {

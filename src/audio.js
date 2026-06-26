@@ -314,8 +314,10 @@
     if (L.f0Rand) o.f0 = (L.f0 || 0) + Math.random() * L.f0Rand;
     if (L.kind === 'noise') noiseHit(o); else tone(o);
   }
-  function playSpec(layers) { (layers || []).forEach(playLayer); }
-  const makePlayer = layers => () => playSpec(layers);
+  // per-play SFX variation (pitch/gain wobble) authored in the Randomization-pools editor
+  // (data/sfxvar.js); inert by default -> varySpec returns the spec untouched (byte-identical).
+  function playSpec(layers, name) { (G.SfxVar ? G.SfxVar.varySpec(layers || [], name) : (layers || [])).forEach(playLayer); }
+  const makePlayer = (layers, name) => () => playSpec(layers, name);
 
   // the live set: a player fn per name, plus the source specs (for the editor)
   let SFX = {}, SFX_SPECS = {};
@@ -323,7 +325,7 @@
     const d = data || G.SFX_DATA || null;
     SFX_SPECS = clone((d && d.sfx) ? d.sfx : DEFAULT_SFX);
     SFX = {};
-    for (const name in SFX_SPECS) SFX[name] = makePlayer(SFX_SPECS[name]);
+    for (const name in SFX_SPECS) SFX[name] = makePlayer(SFX_SPECS[name], name);
   }
   applySfxData();
 
@@ -337,7 +339,9 @@
     sfxExportCurrent: () => clone({ sfx: SFX_SPECS }),
     sfxApplyData: d => applySfxData(d),
     sfxSpec: name => clone(SFX_SPECS[name] || []),
-    sfxPlaySpec(layers) { if (started) playSpec(layers); },   // audition an unsaved spec live
+    sfxPlaySpec(layers, name) { if (started) playSpec(layers, name); },   // audition an unsaved spec live (name => its variation pool)
+    // read-only test hook: the exact layer spec one play of `name` would feed the synths (variation applied)
+    _varied: (name, rng) => (G.SfxVar ? G.SfxVar.varySpec(SFX_SPECS[name], name, rng) : SFX_SPECS[name]),
     // ---- mixer (Edit ▸ Audio ▸ Mixer) ----
     setMix(partial) {
       Object.assign(mix, partial || {});
