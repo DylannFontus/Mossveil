@@ -1066,6 +1066,7 @@
         break;
     }
 
+    if (G.DebugTime) dt = G.DebugTime.apply(dt, rdt, Main.state);   // playtest time controls (#62): pause / slow / fast / step
     if (dt > 0) {
       G.time += dt;
       G.World.update(dt);
