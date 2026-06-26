@@ -1909,22 +1909,47 @@
   // Solid tile characters paint different ground materials. All collide identically;
   // only the look (colour + whether grass/moss grows on the top) differs. '#' is the
   // biome's default grassy ground.
-  const TERRAIN_MATS = W.TERRAIN_MATS = {
-    '#': { id: 'grass', label: 'Grassy', foliage: true, smooth: false, col: p => p.terrain },
-    'd': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: false, col: () => 0x2a1d12 },
-    'k': { id: 'rock', label: 'Rocky', foliage: false, smooth: false, col: () => 0x242832 },
-    's': { id: 'sand', label: 'Sandy', foliage: false, smooth: false, col: () => 0x352b19 },
-    'p': { id: 'pale', label: 'Pale stone', foliage: false, smooth: false, col: () => 0x30323a },
-    'w': { id: 'wood', label: 'Wood floor', foliage: false, smooth: false, col: () => 0x4a3320 },
-    'b': { id: 'brick', label: 'City stone', foliage: false, smooth: false, col: () => 0x1b2c44 },
+  // Built-in materials are the FALLBACK; externalised to data/materials.js (window.G.MATERIAL_DATA),
+  // authored by the Terrain-material editor. `col` serialises as 'terrain' (use the biome terrain
+  // colour) or a #rrggbb string, and becomes a function at runtime. `sound` overrides the footstep
+  // surface. Keys are the tile characters used in level data — never change existing ones.
+  const DEFAULT_MATS = {
+    '#': { id: 'grass', label: 'Grassy', foliage: true, smooth: false, col: 'terrain' },
+    'd': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: false, col: '#2a1d12' },
+    'k': { id: 'rock', label: 'Rocky', foliage: false, smooth: false, col: '#242832' },
+    's': { id: 'sand', label: 'Sandy', foliage: false, smooth: false, col: '#352b19' },
+    'p': { id: 'pale', label: 'Pale stone', foliage: false, smooth: false, col: '#30323a' },
+    'w': { id: 'wood', label: 'Wood floor', foliage: false, smooth: false, col: '#4a3320' },
+    'b': { id: 'brick', label: 'City stone', foliage: false, smooth: false, col: '#1b2c44' },
     // curvy (smooth-rendered) variants of each material — combined freely in one level
-    'G': { id: 'grass', label: 'Grassy', foliage: true, smooth: true, col: p => p.terrain },
-    'D': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: true, col: () => 0x2a1d12 },
-    'K': { id: 'rock', label: 'Rocky', foliage: false, smooth: true, col: () => 0x242832 },
-    'S': { id: 'sand', label: 'Sandy', foliage: false, smooth: true, col: () => 0x352b19 },
-    'P': { id: 'pale', label: 'Pale stone', foliage: false, smooth: true, col: () => 0x30323a }
+    'G': { id: 'grass', label: 'Grassy', foliage: true, smooth: true, col: 'terrain' },
+    'D': { id: 'dirt', label: 'Rough dirt', foliage: false, smooth: true, col: '#2a1d12' },
+    'K': { id: 'rock', label: 'Rocky', foliage: false, smooth: true, col: '#242832' },
+    'S': { id: 'sand', label: 'Sandy', foliage: false, smooth: true, col: '#352b19' },
+    'P': { id: 'pale', label: 'Pale stone', foliage: false, smooth: true, col: '#30323a' }
   };
-  const SOLID_SET = new Set(Object.keys(TERRAIN_MATS));
+  const matColFn = tok => tok === 'terrain' ? (p => p.terrain)
+    : (() => { const n = (typeof tok === 'string') ? (parseInt(tok.replace('#', ''), 16) || 0) : (tok | 0); return () => n; })();
+  function serMats(table) {
+    const o = {};
+    for (const ch in table) { const m = table[ch]; o[ch] = { id: m.id, label: m.label, foliage: !!m.foliage, smooth: !!m.smooth, col: m.colTok != null ? m.colTok : m.col }; if (m.sound) o[ch].sound = m.sound; }
+    return o;
+  }
+  let TERRAIN_MATS = W.TERRAIN_MATS = {};
+  let SOLID_SET = new Set();
+  function applyMaterialData(data) {
+    const d = data || G.MATERIAL_DATA || null;
+    const src = (d && d.materials && Object.keys(d.materials).length) ? d.materials : DEFAULT_MATS;
+    TERRAIN_MATS = {};
+    for (const ch in src) { const m = src[ch]; TERRAIN_MATS[ch] = { id: m.id || 'stone', label: m.label || m.id || ch, foliage: !!m.foliage, smooth: !!m.smooth, colTok: m.col, col: matColFn(m.col), sound: m.sound || null }; }
+    if (!TERRAIN_MATS['#']) TERRAIN_MATS['#'] = { id: 'grass', label: 'Grassy', foliage: true, smooth: false, colTok: 'terrain', col: matColFn('terrain'), sound: null };
+    W.TERRAIN_MATS = TERRAIN_MATS;
+    SOLID_SET = new Set(Object.keys(TERRAIN_MATS));
+  }
+  W.applyMaterialData = applyMaterialData;
+  W.exportMaterialDefaults = () => ({ materials: serMats(DEFAULT_MATS) });
+  W.exportMaterialCurrent = () => ({ materials: serMats(TERRAIN_MATS) });
+  applyMaterialData();
   // what's underfoot at (x,y) — for surface-aware footsteps (wood / grass / stone / metal)
   W.surfaceAt = function (x, y) {
     let best = null, bestTop = -Infinity;
@@ -1933,7 +1958,9 @@
       const top = s.y + s.h / 2;
       if (top <= y + 0.35 && top > bestTop) { bestTop = top; best = s; }
     }
-    const id = best && TERRAIN_MATS[best.mat] ? TERRAIN_MATS[best.mat].id : 'stone';
+    const md = best && TERRAIN_MATS[best.mat];
+    if (md && md.sound) return md.sound;                 // authored surface sound wins
+    const id = md ? md.id : 'stone';
     if (id === 'wood') return 'wood';
     if (id === 'grass') return 'grass';
     if (G.room && G.room.biome === 'forge') return 'metal';
