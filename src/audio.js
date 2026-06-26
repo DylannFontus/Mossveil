@@ -3,7 +3,7 @@
   let ctx = null, master = null, verb = null, verbGain = null, sfxBus = null, ambBus = null;
   let muted = false, started = false, volume = 0.8;
   const masterLevel = () => (muted ? 0 : 0.55 * volume);
-  let droneNodes = [], windGain = null;
+  let droneNodes = [], windGain = null, windLp = null, windLfo = null, windLfoG = null;
   let dripT = 2, pluckT = 3, bossPulseT = 0, combatPulseT = 0;
   let areaRoot = 220, bossOn = false;
   let bossPulseGain = null;
@@ -20,6 +20,53 @@
   const DEFAULT_MIX = { music: 1, sfx: 1, ambient: 1 };
   let mix = Object.assign({}, DEFAULT_MIX);
   (function () { const d = G.MIXER_DATA; if (d) for (const k in DEFAULT_MIX) if (d[k] != null) mix[k] = +d[k]; })();
+
+  // ---- ambience / soundscape (Edit ▸ Audio ▸ Ambience #5) : the drone bed + cave wind, overlaid
+  // from data/ambience.js (G.AMBIENCE_DATA). The wind is the always-on ambient bed; the drone voices
+  // are part of the 'classic' soundtrack style. An empty overlay is byte-identical to these defaults. ----
+  const DEFAULT_AMB = {
+    bed: 0.05,                                   // ambient-bus base level (× the ambient mixer fader)
+    drones: [                                    // slow detuned pad voices, pitch = areaRoot × mult
+      { mult: 0.5, vol: 0.055, type: 'sine' },
+      { mult: 0.75, vol: 0.035, type: 'sine' },
+      { mult: 1.0, vol: 0.022, type: 'triangle' }
+    ],
+    wind: { gain: 0.10, freq: 260, q: 0.4, lfoRate: 0.045, lfoDepth: 0.05 }   // filtered-noise cave wind
+  };
+  let AMB = JSON.parse(JSON.stringify(DEFAULT_AMB));
+  function applyAmbData(d) {
+    AMB = JSON.parse(JSON.stringify(DEFAULT_AMB));
+    if (d) {
+      if (typeof d.bed === 'number') AMB.bed = d.bed;
+      if (Array.isArray(d.drones) && d.drones.length) AMB.drones = d.drones.map((dr, i) => Object.assign({}, DEFAULT_AMB.drones[i] || DEFAULT_AMB.drones[0], dr));
+      if (d.wind) Object.assign(AMB.wind, d.wind);
+    }
+    applyAmbLive();
+  }
+  // push tuning to the already-running ambient nodes (no rebuild needed — every node is live-settable)
+  function applyAmbLive() {
+    if (!started || !ctx) return;
+    const t = ctx.currentTime;
+    AMB.drones.forEach((d, i) => {
+      const n = droneNodes[i]; if (!n) return;
+      n.mult = d.mult; n.baseVol = d.vol; n.o.type = d.type;
+      n.o.frequency.setTargetAtTime(areaRoot * d.mult, t, 0.3);
+      if (musicStyle === 'classic') n.g.gain.setTargetAtTime(bossOn ? d.vol * 2 : d.vol, t, 0.4);
+      if (n.lfoG) n.lfoG.gain.setTargetAtTime(d.vol * 0.35, t, 0.3);
+    });
+    if (windGain) windGain.gain.setTargetAtTime(bossOn ? AMB.wind.gain * 1.6 : AMB.wind.gain, t, 0.4);
+    if (windLp) { windLp.frequency.setTargetAtTime(AMB.wind.freq, t, 0.3); windLp.Q.setTargetAtTime(AMB.wind.q, t, 0.3); }
+    if (windLfo) windLfo.frequency.setTargetAtTime(AMB.wind.lfoRate, t, 0.3);
+    if (windLfoG) windLfoG.gain.setTargetAtTime(AMB.wind.lfoDepth, t, 0.3);
+    if (ambBus) ambBus.gain.setTargetAtTime(AMB.bed * mix.ambient, t, 0.3);
+  }
+  applyAmbData(G.AMBIENCE_DATA);
+  // editor schema: per group, fields to expose with label + slider range
+  const AMB_SCHEMA = {
+    bed: [['bed', 'Bed level', 0, 0.2, 0.005]],
+    wind: [['gain', 'Wind level', 0, 0.4, 0.01], ['freq', 'Wind cutoff (Hz)', 80, 800, 10], ['q', 'Wind resonance', 0.1, 4, 0.1], ['lfoRate', 'Gust rate', 0.005, 0.3, 0.005], ['lfoDepth', 'Gust depth', 0, 0.2, 0.005]],
+    drone: [['vol', 'Level', 0, 0.12, 0.002], ['mult', 'Pitch ×', 0.25, 2, 0.05]]
+  };
 
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
@@ -44,7 +91,7 @@
     sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9 * mix.sfx;
     sfxBus.connect(master); sfxBus.connect(verb);
     sfxTarget = sfxBus;
-    ambBus = ctx.createGain(); ambBus.gain.value = 0.05 * mix.ambient;   // gentler ambient bed (less invasive)
+    ambBus = ctx.createGain(); ambBus.gain.value = AMB.bed * mix.ambient;   // gentler ambient bed (less invasive)
     ambBus.connect(master); ambBus.connect(verb);
     startAmbience();
     if (G.Music && G.Music.start) { musicBus = ctx.createGain(); musicBus.gain.value = mix.music; musicBus.connect(master); G.Music.start(ctx, musicBus, verb); G.Music.setTrack(musicTrack); }
@@ -69,7 +116,7 @@
   }
 
   function startAmbience() {
-    // two slow detuned drones (root + fifth)
+    // slow detuned drone voices (authored in the Ambience editor; pitch = areaRoot × mult)
     droneNodes = [];
     const mk = (mult, vol, type) => {
       const o = ctx.createOscillator(); o.type = type;
@@ -80,12 +127,10 @@
       g.gain.setTargetAtTime(vol, ctx.currentTime, 4);
       o.connect(g); g.connect(ambBus);
       o.start(); lfo.start();
-      droneNodes.push({ o, g, mult, baseVol: vol });
+      droneNodes.push({ o, g, lfo, lfoG, mult, baseVol: vol });
       return o;
     };
-    mk(0.5, 0.055, 'sine');
-    mk(0.75, 0.035, 'sine');
-    mk(1.0, 0.022, 'triangle');
+    AMB.drones.forEach(dr => mk(dr.mult, dr.vol, dr.type));
     retune();
     // cave wind: filtered noise
     const len = ctx.sampleRate * 4;
@@ -94,13 +139,14 @@
     let last = 0;
     for (let i = 0; i < len; i++) { last = (last + (Math.random() * 2 - 1) * 0.02) * 0.998; d[i] = last * 6; }
     const src = ctx.createBufferSource(); src.buffer = nb; src.loop = true;
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; lp.Q.value = 0.4;
-    windGain = ctx.createGain(); windGain.gain.value = 0.10;
-    const wLfo = ctx.createOscillator(); wLfo.frequency.value = 0.045;
-    const wLfoG = ctx.createGain(); wLfoG.gain.value = 0.05;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = AMB.wind.freq; lp.Q.value = AMB.wind.q;
+    windGain = ctx.createGain(); windGain.gain.value = AMB.wind.gain;
+    const wLfo = ctx.createOscillator(); wLfo.frequency.value = AMB.wind.lfoRate;
+    const wLfoG = ctx.createGain(); wLfoG.gain.value = AMB.wind.lfoDepth;
     wLfo.connect(wLfoG); wLfoG.connect(windGain.gain);
     src.connect(lp); lp.connect(windGain); windGain.connect(ambBus);
     src.start(); wLfo.start();
+    windLp = lp; windLfo = wLfo; windLfoG = wLfoG;
     // boss pulse bus (silent until boss)
     bossPulseGain = ctx.createGain(); bossPulseGain.gain.value = 0;
     bossPulseGain.connect(master);
@@ -296,12 +342,19 @@
       if (!started) return;
       const t = ctx.currentTime;
       if (sfxBus) sfxBus.gain.setTargetAtTime(0.9 * mix.sfx, t, 0.05);
-      if (ambBus) ambBus.gain.setTargetAtTime(0.05 * mix.ambient, t, 0.05);
+      if (ambBus) ambBus.gain.setTargetAtTime(AMB.bed * mix.ambient, t, 0.05);
       if (musicBus) musicBus.gain.setTargetAtTime(mix.music, t, 0.05);
     },
     applyMixData(d) { if (d) for (const k in DEFAULT_MIX) if (d[k] != null) mix[k] = +d[k]; G.Audio.setMix({}); },
     mixExportDefaults: () => Object.assign({}, DEFAULT_MIX),
     mixExportCurrent: () => Object.assign({}, mix),
+    // ---- ambience / soundscape (Edit ▸ Audio ▸ Ambience) ----
+    ambApplyData: d => applyAmbData(d),                   // also pushes live to the running nodes
+    ambExportDefaults: () => JSON.parse(JSON.stringify(DEFAULT_AMB)),
+    ambExportCurrent: () => JSON.parse(JSON.stringify(AMB)),
+    ambParams: () => AMB,
+    ambSchema: () => AMB_SCHEMA,
+    setAmb(params) { applyAmbData(params || AMB); },      // audition unsaved ambience params live
     // master VU level 0..1 (RMS of the time-domain signal at the master bus)
     meterLevel() { if (!analyser) return 0; const a = new Uint8Array(analyser.fftSize); analyser.getByteTimeDomainData(a); let s = 0; for (let i = 0; i < a.length; i++) { const v = (a[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / a.length) * 3); },
     setArea(root) { areaRoot = root; if (started) retune(); },
@@ -309,7 +362,7 @@
       bossOn = on;
       if (started) {
         if (musicStyle === 'classic') droneNodes.forEach(n => n.g.gain.setTargetAtTime(on ? n.baseVol * 2.0 : n.baseVol, ctx.currentTime, 1.5));
-        if (windGain) windGain.gain.setTargetAtTime(on ? 0.16 : 0.10, ctx.currentTime, 1.5);
+        if (windGain) windGain.gain.setTargetAtTime(on ? AMB.wind.gain * 1.6 : AMB.wind.gain, ctx.currentTime, 1.5);
       }
       // score: biome music full-stops, then the boss theme drives in; on death it fades back to the biome
       if (G.Music && musicStyle === 'score' && !musicSilenced) { if (on) G.Music.startBoss(); else G.Music.endBoss(musicTrack); }

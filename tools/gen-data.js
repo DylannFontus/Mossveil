@@ -11,7 +11,8 @@ const DATASETS = [
   { name: 'weather', global: 'WEATHER_DATA', srcs: ['src/weather.js'], pick: G => G.Weather.exportDefaults() },
   { name: 'difficulty', global: 'DIFFICULTY_DATA', srcs: ['src/difficulty.js'], pick: G => G.Difficulty.exportDefaults() },
   { name: 'achievements', global: 'ACHIEVEMENTS_DATA', srcs: ['src/achievements.js'], pick: G => G.Achievements.exportDefaults() },
-  { name: 'quests', global: 'QUESTS_DATA', srcs: ['src/quests.js'], pick: G => G.Quests.exportDefaults() }
+  { name: 'quests', global: 'QUESTS_DATA', srcs: ['src/quests.js'], pick: G => G.Quests.exportDefaults() },
+  { name: 'ambience', global: 'AMBIENCE_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.ambExportDefaults() }
 ];
 
 function evalModule(srcs) {
