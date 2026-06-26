@@ -3511,6 +3511,44 @@
   }
   function clipKeyTimes() { const c = modelDoc.clips[modelClip]; if (!c || !c.tracks) return []; const s = new Set(); for (const id in c.tracks) for (const k of c.tracks[id]) s.add(+k.t.toFixed(3)); return [...s].sort((a, b) => a - b); }
   function refreshClipScrub() { const sl = document.getElementById('mScrub'); if (sl && modelClip) { const d = clipDur(); sl.value = ((modelTime % d) / d * 1000) | 0; } }
+  // ---- Models 2.0: keyframe navigation + clip duplicate/rename ----
+  function modelGotoTime(t) {
+    if (!modelClip || !modelDoc.clips[modelClip]) return;
+    modelPlaying = false;
+    modelTime = Math.max(0, Math.min(clipDur(), t));
+    syncPoseFromClip(modelTime); rebuildModelMeshes(); refreshClipScrub(); refreshModelPanel(); refreshInspector();
+  }
+  function modelGotoKey(dir) {
+    const kt = clipKeyTimes(); if (!kt.length) return;
+    const eps = 1e-3;
+    let target;
+    if (dir < 0) { const before = kt.filter(t => t < modelTime - eps); target = before.length ? before[before.length - 1] : kt[kt.length - 1]; }
+    else { const after = kt.filter(t => t > modelTime + eps); target = after.length ? after[0] : kt[0]; }
+    modelGotoTime(target);
+  }
+  function modelDeleteKey() {
+    if (!modelClip || !modelDoc.clips[modelClip]) return false;
+    const clip = modelDoc.clips[modelClip], tr = clip.tracks || {}, eps = 1e-3;
+    let removed = 0;
+    for (const id in tr) { const n0 = tr[id].length; tr[id] = tr[id].filter(k => Math.abs(k.t - modelTime) > eps); removed += n0 - tr[id].length; if (!tr[id].length) delete tr[id]; }
+    if (removed) { syncPoseFromClip(modelTime); rebuildModelMeshes(); markDirty(); refreshModelPanel(); refreshInspector(); }
+    return removed > 0;
+  }
+  function modelDupClip() {
+    if (!modelClip || !modelDoc.clips[modelClip]) return false;
+    const base = modelClip + ' copy'; let name = base, n = 2;
+    while (modelDoc.clips[name]) name = base + ' ' + (n++);
+    modelDoc.clips[name] = JSON.parse(JSON.stringify(modelDoc.clips[modelClip]));
+    modelClip = name; modelTime = 0; modelPlaying = false; markDirty(); refreshModelPanel(); refreshInspector();
+    return name;
+  }
+  function modelRenameClip(nm) {
+    nm = (nm || '').trim();
+    if (!modelClip || !nm || nm === modelClip || modelDoc.clips[nm]) return false;
+    modelDoc.clips[nm] = modelDoc.clips[modelClip]; delete modelDoc.clips[modelClip];
+    modelClip = nm; markDirty(); refreshModelPanel(); refreshInspector();
+    return true;
+  }
 
   function partDepth(p) { let d = 0, q = p, g = 0; while (q && q.parent != null && g++ < 99) { d++; q = modelDoc.parts.find(x => x.id === q.parent); } return d; }
   function refreshModelPanel() {
@@ -3565,11 +3603,24 @@
       const pRow = el('div', { class: 'mrow' }, box);
       el('button', {}, pRow, modelPlaying ? '⏸ Stop' : '▶ Play').addEventListener('click', () => { modelPlaying = !modelPlaying; if (!modelPlaying) { syncPoseFromClip(modelTime); rebuildModelMeshes(); } refreshModelPanel(); });
       el('button', { title: 'Snapshot the current pose as a keyframe at the scrub time' }, pRow, '◉ Add Key').addEventListener('click', addClipKey);
+      el('button', { title: 'Duplicate this clip' }, pRow, '⧉').addEventListener('click', () => modelDupClip());
+      el('button', { title: 'Rename this clip' }, pRow, '✎').addEventListener('click', () => { const n = prompt('Rename clip', modelClip); if (n) modelRenameClip(n); });
       el('button', { class: 'danger', title: 'Delete clip' }, pRow, '🗑').addEventListener('click', () => { if (confirm('Delete clip “' + modelClip + '”?')) { delete modelDoc.clips[modelClip]; modelClip = ''; modelPlaying = false; rebuildModelMeshes(); markDirty(); refreshModelPanel(); refreshInspector(); } });
       const scr = el('input', { type: 'range', id: 'mScrub', min: 0, max: 1000, value: 0, style: 'width:100%' }, box);
       scr.addEventListener('input', () => { modelPlaying = false; modelTime = (scr.value / 1000) * (clip.dur || 1); syncPoseFromClip(modelTime); rebuildModelMeshes(); refreshInspector(); });
-      const kt = clipKeyTimes(); if (kt.length) el('div', { style: 'color:#86a89c;font-size:10px;margin-top:2px' }, box, 'keys: ' + kt.map(t => t.toFixed(2)).join('  '));
-      el('div', { class: 'insNote', style: 'opacity:.5;font-size:10px' }, box, 'Pose the parts (rotation), then Add Key at a few scrub times → Play.');
+      // keyframe navigation (Models 2.0): step prev/next key, delete the key at the scrub time, jump via chips
+      const kRow = el('div', { class: 'mrow' }, box);
+      el('button', { title: 'Jump to the previous keyframe ( , )' }, kRow, '◀ Key').addEventListener('click', () => modelGotoKey(-1));
+      el('button', { title: 'Jump to the next keyframe ( . )' }, kRow, 'Key ▶').addEventListener('click', () => modelGotoKey(1));
+      el('button', { class: 'danger', title: 'Delete the keyframe at the scrub time' }, kRow, '⌫ Key').addEventListener('click', () => modelDeleteKey());
+      const kt = clipKeyTimes();
+      if (kt.length) {
+        const kbar = el('div', { style: 'display:flex;flex-wrap:wrap;gap:3px;margin-top:2px' }, box);
+        el('span', { style: 'color:#86a89c;font-size:10px;align-self:center' }, kbar, 'keys:');
+        const eps = (clip.dur || 1) / 1000 + 1e-3;
+        kt.forEach(t => { const chip = el('button', { class: 'mkey' + (Math.abs(t - modelTime) <= eps ? ' on' : ''), title: 'Jump to ' + t.toFixed(2) + 's' }, kbar, t.toFixed(2)); chip.addEventListener('click', () => modelGotoTime(t)); });
+      }
+      el('div', { class: 'insNote', style: 'opacity:.5;font-size:10px' }, box, 'Pose the parts (rotation), then Add Key at a few scrub times → Play. ◀/▶ Key step keys (, / .), ⌫ Key removes the one at the scrub time, key chips jump.');
     }
   }
   function refreshModelInspector(body) {
@@ -3679,7 +3730,7 @@
       else if (e.code === 'KeyF' && !e.ctrlKey) { e.preventDefault(); logicFrameAll(); }
       return;
     }
-    if (tab === 'models') { if ((e.code === 'Delete' || e.code === 'Backspace') && modelSel >= 0) { e.preventDefault(); modelDeletePart(modelSel); } else if (e.code === 'KeyD' && e.ctrlKey && modelSel >= 0) { e.preventDefault(); modelDupPart(modelSel); } return; }
+    if (tab === 'models') { if ((e.code === 'Delete' || e.code === 'Backspace') && modelSel >= 0) { e.preventDefault(); modelDeletePart(modelSel); } else if (e.code === 'KeyD' && e.ctrlKey && modelSel >= 0) { e.preventDefault(); modelDupPart(modelSel); } else if (e.code === 'Comma') { e.preventDefault(); modelGotoKey(-1); } else if (e.code === 'Period') { e.preventDefault(); modelGotoKey(1); } return; }
     if (tab === 'cutscene') {
       // timeline 2.0 shortcuts (selected event): Ctrl+D duplicate, Del delete, ←/→ nudge by snap step
       if (e.code === 'KeyD' && e.ctrlKey) { e.preventDefault(); csDuplicate(); }
@@ -3866,6 +3917,11 @@
     modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
     modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); },
     modelAutoRig: () => autoRigHumanoid(),
+    // Models 2.0 hooks (tests / Companion): keyframe nav + clip duplicate/rename on the working model doc
+    modelAddKey: () => addClipKey(), modelKeyTimes: () => clipKeyTimes(), modelGotoTime: t => modelGotoTime(t),
+    modelGotoKey: d => modelGotoKey(d), modelDeleteKey: () => modelDeleteKey(),
+    modelDupClip: () => modelDupClip(), modelRenameClip: n => modelRenameClip(n),
+    modelTime: () => modelTime, modelClip: () => modelClip,
     // ---- shared hooks for the authoring-tools framework (tools-core.js) ----
     isDirty: () => dirty || csDirty,
     save: () => save(),
@@ -3937,7 +3993,7 @@
   // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
   // tools-core.js has loaded — it runs after editor.js in the script list.
   // #33 Hierarchy 2.0, #34 Asset browser 2.0, #31 Logic graph 2.0
-  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39, 32, 36); } catch (_) { } }, 0);
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39, 32, 36, 38); } catch (_) { } }, 0);
 
   boot();
 })();
