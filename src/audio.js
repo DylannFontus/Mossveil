@@ -389,6 +389,20 @@
     // master VU level 0..1 (RMS of the time-domain signal at the master bus)
     meterLevel() { if (!analyser) return 0; const a = new Uint8Array(analyser.fftSize); analyser.getByteTimeDomainData(a); let s = 0; for (let i = 0; i < a.length; i++) { const v = (a[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / a.length) * 3); },
     _spatial: (x, y) => spatial(x, y),   // read-only test hook: positional gain/pan for a world point
+    // ---- spectrum / oscilloscope viz (Edit ▸ Audio ▸ Spectrum) — read-only taps on the master analyser ----
+    analyserInfo: () => ({ started, fftSize: analyser ? analyser.fftSize : 0, bins: analyser ? analyser.frequencyBinCount : 0, sampleRate: ctx ? ctx.sampleRate : 0 }),
+    spectrum(out) { if (!analyser) return (out && out.fill) ? (out.fill(0), out) : new Uint8Array(0); const n = analyser.frequencyBinCount, a = (out && out.length === n) ? out : new Uint8Array(n); analyser.getByteFrequencyData(a); return a; },
+    waveform(out) { if (!analyser) return (out && out.fill) ? (out.fill(128), out) : new Uint8Array(0); const n = analyser.fftSize, a = (out && out.length === n) ? out : new Uint8Array(n); analyser.getByteTimeDomainData(a); return a; },
+    // play a short tone (optionally gliding to toFreq) through the SFX bus — a test signal for the spectrum viz
+    testTone(freq, dur, type, toFreq) {
+      if (!started) return 0;
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime, d = Math.max(0.05, dur || 0.5);
+      o.type = type || 'sine'; o.frequency.setValueAtTime(Math.max(20, freq || 440), t);
+      if (toFreq && toFreq !== freq) o.frequency.exponentialRampToValueAtTime(Math.max(20, toFreq), t + d);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25, t + Math.min(0.03, d * 0.3));
+      g.gain.setValueAtTime(0.25, Math.max(t + 0.031, t + d - 0.05)); g.gain.linearRampToValueAtTime(0, t + d);
+      o.connect(g); g.connect(sfxBus || master); o.start(t); o.stop(t + d + 0.03); return d;
+    },
     setArea(root) { areaRoot = root; if (started) retune(); },
     setBoss(on) {
       bossOn = on;
