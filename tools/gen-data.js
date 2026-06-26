@@ -22,7 +22,8 @@ const DATASETS = [
   { name: 'credits', global: 'CREDITS_DATA', srcs: ['src/credits.js'], pick: G => G.Credits.exportDefaults() },
   { name: 'saves', global: 'SAVES_DATA', srcs: ['src/saves.js'], pick: G => G.Saves.exportDefaults() },
   { name: 'camera', global: 'CAMERA_DATA', srcs: ['src/camera.js'], pick: G => G.Cam.exportDefaults() },
-  { name: 'poststack', global: 'POSTFX_DATA', srcs: ['src/poststack.js'], pick: G => G.PostFX.exportDefaults() }
+  { name: 'poststack', global: 'POSTFX_DATA', srcs: ['src/poststack.js'], pick: G => G.PostFX.exportDefaults() },
+  { name: 'water', global: 'WATER_DATA', srcs: ['src/water.js'], pick: G => G.WaterFX.exportDefaults() }
 ];
 
 function evalModule(srcs) {

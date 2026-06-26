@@ -92,8 +92,9 @@
   W.updateLook = function (dt) {
     if (waterTween && G.Post) {                          // ramp the reflective-water strength smoothly
       const w = waterTween; w.t += dt; const k = Math.min(1, w.t / w.dur);
-      if (w.to) { const s = (w.to.strength != null ? w.to.strength : 0.55); G.Post.setWater(Object.assign({}, w.to, { strength: Math.max(0.0001, s * k) })); }
-      else if (w.from) { const s0 = (w.from.strength != null ? w.from.strength : 0.55); if (k < 1) G.Post.setWater(Object.assign({}, w.from, { strength: s0 * (1 - k) })); else G.Post.setWater(null); }
+      const defS = () => (G.WaterFX ? G.WaterFX.strength() : 0.55);
+      if (w.to) { const s = (w.to.strength != null ? w.to.strength : defS()); G.Post.setWater(Object.assign({}, w.to, { strength: Math.max(0.0001, s * k) })); }
+      else if (w.from) { const s0 = (w.from.strength != null ? w.from.strength : defS()); if (k < 1) G.Post.setWater(Object.assign({}, w.from, { strength: s0 * (1 - k) })); else G.Post.setWater(null); }
       if (k >= 1) waterTween = null;
     }
     if (!biomeFade) return;

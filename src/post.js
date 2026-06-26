@@ -32,7 +32,9 @@
   // screen-space reflection for water / wet floors. `y` is the WORLD height of the
   // reflective surface (projected to a screen line each frame); pixels below it mirror
   // the scene above with ripple + tint. Set y=null to disable.
+  // water surface look — defaults from data/water.js (G.WaterFX); zones override via Post.setWater
   const water = { y: null, strength: 0.55, ripple: 1, fade: 1.6, caustics: 0.5, color: new THREE.Color(0.62, 0.78, 0.95) };
+  if (G.WaterFX) { water.strength = G.WaterFX.strength(); water.ripple = G.WaterFX.ripple(); water.fade = G.WaterFX.fade(); water.caustics = G.WaterFX.caustics(); const c = G.WaterFX.colorRGB(); water.color.setRGB(c.r, c.g, c.b); }
   const _wv = new THREE.Vector3();
   Post.setWater = function (o) {
     if (!o) { water.y = null; return; }
@@ -385,6 +387,7 @@
   Post.flash = function (amt, color) { flash = Math.max(flash, amt || (G.PostFX ? G.PostFX.flashDefault() : 0.4)); if (color !== undefined) flashCol.set(color); };
   Post._aberr = () => aberr;   // test hooks (read-only)
   Post._flash = () => flash;
+  Post._water = () => ({ y: water.y, strength: water.strength, ripple: water.ripple, fade: water.fade, caustics: water.caustics, color: { r: water.color.r, g: water.color.g, b: water.color.b } });
 
   function drawQuad(mat, rt, noClear) {
     quad.material = mat;
