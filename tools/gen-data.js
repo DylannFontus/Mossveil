@@ -18,7 +18,8 @@ const DATASETS = [
   { name: 'theme', global: 'THEME_DATA', srcs: ['src/theme.js'], pick: G => G.Theme.exportDefaults() },
   { name: 'drops', global: 'DROPS_DATA', srcs: ['src/drops.js'], pick: G => G.Drops.exportDefaults() },
   { name: 'settings', global: 'SETTINGS_DATA', srcs: ['src/settings.js'], pick: G => G.Settings.exportDefaults() },
-  { name: 'loadout', global: 'LOADOUT_DATA', srcs: ['src/loadout.js'], pick: G => G.Loadout.exportDefaults() }
+  { name: 'loadout', global: 'LOADOUT_DATA', srcs: ['src/loadout.js'], pick: G => G.Loadout.exportDefaults() },
+  { name: 'credits', global: 'CREDITS_DATA', srcs: ['src/credits.js'], pick: G => G.Credits.exportDefaults() }
 ];
 
 function evalModule(srcs) {

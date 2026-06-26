@@ -1256,26 +1256,30 @@
   }
 
   function drawEnding(t) {
+    // ending / credits roll — content & style externalised to data/credits.js (G.Credits); the literal
+    // fallback reproduces the old hardcoded roll byte-for-byte.
+    const C = G.Credits;
     cx.save();
-    cx.fillStyle = `rgba(240,248,244,${Math.min(0.92, t * 0.8)})`;
+    cx.fillStyle = C ? C.bgStyle(Math.min(0.92, t * 0.8)) : `rgba(240,248,244,${Math.min(0.92, t * 0.8)})`;
     cx.fillRect(0, 0, w, h);
     cx.textAlign = 'center';
-    const lines = [
-      ['M O S S V E I L', 46, 0.5],
-      ['the glade remembers you', 22, 1.6],
-      ['', 10, 0],
-      ['woven from code alone — every shape, sound and shadow', 16, 2.8],
-      ['', 10, 0],
-      ['press any key to wander on', 17, 4.0]
+    const lines = C ? C.lines() : [
+      { text: 'M O S S V E I L', size: 46, delay: 0.5, italic: false },
+      { text: 'the glade remembers you', size: 22, delay: 1.6, italic: true },
+      { text: '', size: 10, delay: 0, italic: true },
+      { text: 'woven from code alone — every shape, sound and shadow', size: 16, delay: 2.8, italic: true },
+      { text: '', size: 10, delay: 0, italic: true },
+      { text: 'press any key to wander on', size: 17, delay: 4.0, italic: true }
     ];
-    let y = h * 0.36;
-    for (const [text, size, delay] of lines) {
-      const a = U.clamp((t - delay) / 0.8, 0, 1);
+    const tcol = C ? C.textColor() : '#1c2a24', gap = C ? C.lineGap() : 18;
+    let y = h * (C ? C.startY() : 0.36);
+    for (const ln of lines) {
+      const a = U.clamp((t - ln.delay) / 0.8, 0, 1);
       cx.globalAlpha = a;
-      cx.fillStyle = '#1c2a24';
-      cx.font = `${size === 46 ? '' : 'italic '}${size}px ${serif}`;
-      cx.fillText(text, w / 2, y);
-      y += size + 18;
+      cx.fillStyle = tcol;
+      cx.font = `${ln.italic ? 'italic ' : ''}${ln.size}px ${serif}`;
+      cx.fillText(ln.text, w / 2, y);
+      y += ln.size + gap;
     }
     cx.restore();
   }

@@ -1046,7 +1046,7 @@
       case 'ending':
         dt = rdt * 0.3;
         Main.endingT += rdt;
-        if (Main.endingT > 4.5 && I.anyPressed()) {
+        if (Main.endingT > (G.Credits ? G.Credits.dismissAfter() : 4.5) && I.anyPressed()) {
           Main.state = 'play';
           if (!G.save.endingSeen) { G.save.endingSeen = true; Main.persist(); }
         }

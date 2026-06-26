@@ -1,0 +1,45 @@
+{
+ "bg": "#f0f8f4",
+ "textColor": "#1c2a24",
+ "startY": 0.36,
+ "lineGap": 18,
+ "dismissAfter": 4.5,
+ "lines": [
+  {
+   "text": "M O S S V E I L",
+   "size": 46,
+   "delay": 0.5,
+   "italic": false
+  },
+  {
+   "text": "the glade remembers you",
+   "size": 22,
+   "delay": 1.6,
+   "italic": true
+  },
+  {
+   "text": "",
+   "size": 10,
+   "delay": 0,
+   "italic": true
+  },
+  {
+   "text": "woven from code alone — every shape, sound and shadow",
+   "size": 16,
+   "delay": 2.8,
+   "italic": true
+  },
+  {
+   "text": "",
+   "size": 10,
+   "delay": 0,
+   "italic": true
+  },
+  {
+   "text": "press any key to wander on",
+   "size": 17,
+   "delay": 4,
+   "italic": true
+  }
+ ]
+}
