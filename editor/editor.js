@@ -3511,6 +3511,8 @@
     getClip: () => clipboard, getPrefabs: () => prefabs, setLastWorld: (x, y) => { lastWorld = { x, y }; },
     nestPrefab: (parent, child, dx, dy) => nestPrefab(parent, child, dx, dy), stampPrefab: (n, x, y) => stampPrefab(n, x, y),
     savePrefabAs: (n) => savePrefab(n), playUrl: () => playUrl(),
+    // prefab library store for the Prefab 2.0 manager: mutate get(), then persist() to save + refresh the asset browser
+    prefabsAPI: { get: () => prefabs, persist: () => { try { localStorage.setItem('mossveil-ed-prefabs', JSON.stringify(prefabs)); } catch (e) { } refreshAssets(); } },
     openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
     pickAt: (x, y) => pickAt(x, y),
     retileAll: () => retileWholeLevel(),
