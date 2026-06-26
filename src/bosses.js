@@ -634,7 +634,7 @@
     G.UI.setBoss(null);
     if (G.Post) { G.Post.flash(0.6, 0xffffff); G.Post.punch(2.4); }
     if (G.Main.camPunch) G.Main.camPunch(2.8);
-    if (G.Main.dropGlimmer) G.Main.dropGlimmer(bs.body.x, bs.body.y + 1, 40 + (Math.random() * 20 | 0));
+    if (G.Main.dropGlimmer) G.Main.dropGlimmer(bs.body.x, bs.body.y + 1, G.Drops ? G.Drops.bossRoll(bs.typeId) : 40 + (Math.random() * 20 | 0));
   }
 
   function pickMove(bs) {
