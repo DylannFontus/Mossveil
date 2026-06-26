@@ -142,6 +142,25 @@
       body: '**' + k + '** — ' + (cse[k].hint || 'a cutscene event') + '. Add it on a track in the **Cutscene** tab.',
       actions: [{ label: 'Open Cutscene tab', action: { kind: 'tab', tab: 'cutscene' } }], weight: 0.6
     });
+    // ---- authoring tools (Edit menu) — auto-discovered so a NEW tool is instantly askable (#100) ----
+    const TOOL_SYN = {
+      music: 'soundtrack score song track tempo melody compose adaptive', sfx: 'sound effect noise synth jump hit',
+      charms: 'charm notch effect synergy equip', spells: 'spell ability bolt cast tier upgrade element',
+      biomes: 'biome palette colour color fog terrain moss decor area look', grade: 'colour color grade exposure contrast saturation bloom vignette tone',
+      weather: 'weather rain snow storm fog wind atmosphere preset', reverb: 'reverb echo space hall room acoustics audio',
+      mixer: 'mixer volume balance bus loudness audio level meter', fx: 'particle particles fx effect burst spark emitter', materials: 'terrain material ground tile floor surface footstep'
+    };
+    const tools = (G.Tools && G.Tools.tools) || [];
+    for (const t of tools) entry({
+      id: 'edittool:' + t.id, kind: 'tool', title: 'Edit: ' + t.label,
+      text: t.label + ' ' + (t.sub || '') + ' ' + (t.group || '') + ' edit author create design make customise tool ' + (TOOL_SYN[t.id] || ''),
+      body: '**' + t.label + '**' + (t.sub ? ' — ' + t.sub : '') + '. Open it from the **Edit** menu ▸ **' + (t.group || 'Tools') + '** ▸ **' + t.label + '**, or the command palette (**Ctrl+K**).',
+      actions: [{ label: 'Open ' + t.label, action: { kind: 'openTool', tool: t.id, label: t.label } }], weight: 1.5
+    });
+    if (G.Tools && G.Tools.roadmapStats) {
+      const s = G.Tools.roadmapStats();
+      entry({ id: 'meta:roadmap', kind: 'meta', title: 'Editor roadmap & changelog', text: 'roadmap changelog whats new features planned shipped progress what can the editor do self sufficient', body: 'The editor is being built toward full self-sufficiency — **' + s.done + ' features shipped**, ' + s.planned + ' planned. See **Edit ▸ Roadmap** for the live list of what exists vs what’s coming.', actions: [{ label: 'Open the roadmap', action: { kind: 'openSettings', section: 'roadmap' } }], weight: 0.6 });
+    }
     // ---- authored recipes (the high-value "how do I make X") ----
     for (const r of RECIPES) entry(Object.assign({ kind: 'recipe', weight: 1.6 }, r, { text: (r.title + ' ' + (r.syn || '') + ' ' + (r.body || '') + ' ' + r.steps.map(s => s.text).join(' ')) }));
     // ---- meta / capabilities ----
@@ -337,6 +356,8 @@
     else if (a.kind === 'focus') { if (c.focusSel) c.focusSel(a.sel); setOpen(false); flash('Selected it in the scene.'); }
     else if (a.kind === 'highlight') { highlightUI(a); }
     else if (a.kind === 'walk') { walkFields(); }
+    else if (a.kind === 'openTool') { if (G.Tools && G.Tools.openTool) { G.Tools.openTool(a.tool); setOpen(false); flash('Opened the ' + (a.label || a.tool) + ' tool.'); } }
+    else if (a.kind === 'openSettings') { if (G.Tools && G.Tools.openSettings) { G.Tools.openSettings(a.section); setOpen(false); } }
   }
   // step through the selected object's Inspector fields, flashing each in turn
   let walkT = null;
@@ -855,4 +876,6 @@
   C.refreshBadge = () => { updateBadge(); return badge ? badge.style.display : 'none'; };
   // editor.js boots synchronously before us; init now (DOM + #toolbar already exist)
   if (document.readyState !== 'loading') C.init(); else document.addEventListener('DOMContentLoaded', C.init);
+  // the Companion auto-documents every authoring tool (auto-discovered from G.Tools) + the roadmap
+  if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(100);
 })();

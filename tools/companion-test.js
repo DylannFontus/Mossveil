@@ -91,6 +91,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       out.walk = C.walkFields();
       // a paraphrase the token index alone might miss (semantic trigram nudge)
       out.para = top('how can i set a foe on fire');
+      // auto-discovered authoring tools (#100): the Companion knows the new Edit-menu tools
+      out.musicTool = top('open the soundtrack editor to compose tracks');   // -> edittool:music
+      out.sfxTool = top('design a new sound effect');             // -> edittool:sfx
+      out.roadmapMeta = top('what features are planned on the roadmap');   // -> meta:roadmap
       out.kb2 = C.kbSize();
       return out;
     });
@@ -110,6 +114,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       && o.diag === true && o.followup === true
       && o.charmCatalog === true && o.charmSpecific === true && o.enemyCatalog === true && o.spellCatalog === true
       && o.issueCount >= 1 && o.badge === 'block' && o.walk > 0
+      && o.musicTool === 'edittool:music' && o.sfxTool === 'edittool:sfx' && o.roadmapMeta === 'meta:roadmap'
       && netHits === 0 && !errs.length;
     console.log(ok ? 'COMPANION TEST: PASS' : 'COMPANION TEST: FAIL');
     process.exitCode = ok ? 0 : 2;
