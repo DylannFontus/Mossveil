@@ -116,8 +116,11 @@
     }
   };
 
-  // ============================ 13 BIOME PALETTES ============================
-  const PAL = W.PAL = {
+  // ============================ BIOME PALETTES (built-in defaults) ============================
+  // These are the FALLBACK. The engine reads data/biomes.js (window.G.BIOME_DATA) as the source of
+  // truth, authored by the in-editor Biome / palette editor (Edit ▸ World). Colours serialise to
+  // readable #rrggbb strings in the data file and are parsed back to numbers here.
+  const DEFAULT_PAL = {
     verdant: {
       label: 'Verdant (mossy green)', bgTop: 0x2a7a60, bgBottom: 0x0a2a22, fog: 0x256b50, fogNear: 31, fogFar: 72,
       sil: 0x0b2c23, terrain: 0x091410, moss: 0x55b070, mossDark: 0x336e48, glow: 0xa8f0c8,
@@ -239,7 +242,34 @@
       deco: ['tombstone', 'sarcophagus', 'urn', 'statue', 'brokenPillar'], amb: 'mote'
     }
   };
-  W.BIOMES = Object.keys(PAL);
+  // ---- biome palette data overlay ----
+  const PAL_COLOR_KEYS = ['bgTop', 'bgBottom', 'fog', 'sil', 'terrain', 'moss', 'mossDark', 'glow', 'dust', 'light'];
+  let PAL = W.PAL = {};
+  const palToNum = v => typeof v === 'string' ? (parseInt(v.replace('#', ''), 16) || 0) : (v | 0);
+  function normPalette(p) {
+    const o = Object.assign({}, p);
+    PAL_COLOR_KEYS.forEach(k => { if (o[k] != null) o[k] = palToNum(o[k]); });
+    o.fogNear = +o.fogNear || 30; o.fogFar = +o.fogFar || 70; o.root = +o.root || 174.6;
+    o.rays = !!o.rays; o.deco = Array.isArray(o.deco) ? o.deco.slice() : []; o.amb = o.amb || 'mote';
+    o.label = o.label || p.label || '';
+    return o;
+  }
+  function serPalette(p) {
+    const o = Object.assign({}, p);
+    PAL_COLOR_KEYS.forEach(k => { if (o[k] != null) o[k] = '#' + (o[k] >>> 0).toString(16).padStart(6, '0'); });
+    o.deco = (p.deco || []).slice();
+    return o;
+  }
+  function applyBiomeData(data) {
+    const d = data || G.BIOME_DATA || null;
+    PAL = {}; for (const id in DEFAULT_PAL) PAL[id] = normPalette(DEFAULT_PAL[id]);
+    if (d && d.palettes) for (const id in d.palettes) PAL[id] = normPalette(d.palettes[id]);
+    W.PAL = PAL; W.BIOMES = Object.keys(PAL);
+  }
+  W.applyBiomeData = applyBiomeData;
+  W.exportBiomeDefaults = () => { const o = {}; for (const id in DEFAULT_PAL) o[id] = serPalette(normPalette(DEFAULT_PAL[id])); return { palettes: o }; };
+  W.exportBiomeCurrent = () => { const o = {}; for (const id in PAL) o[id] = serPalette(PAL[id]); return { palettes: o }; };
+  applyBiomeData();
 
   // per-biome reverb character [wet, tail-seconds, decay] — big stone halls ring, forges are dry
   const REVERB = W.REVERB = {
