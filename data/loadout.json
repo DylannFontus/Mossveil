@@ -1,0 +1,7 @@
+{
+ "baseNotches": 3,
+ "notchesPerBoss": 1,
+ "notchCap": 9,
+ "allowOvercharm": true,
+ "overcharmDamageMult": 2
+}

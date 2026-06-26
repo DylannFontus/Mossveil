@@ -149,7 +149,7 @@
           this.body.vx = -threatDir * 5;
           return false;
         }
-        this.hp -= (this.overcharmed ? n * 2 : n);     // overcharm: fragile, take double
+        this.hp -= (this.overcharmed ? n * (G.Loadout ? G.Loadout.overcharmDamageMult() : 2) : n);  // overcharm: fragile, take double (editor-tunable)
         this.cancelFocus();
         G.UI.onPlayerHurt();
         G.FX.hitStop(0.22);

@@ -57,13 +57,14 @@
   C.synergies = () => SYNERGIES.filter(s => s.need.every(id => C.isEquipped(id)));
   applyData();
 
-  // available notches: a base of 3, plus one per boss felled (capped)
+  // available notches: a base of 3, plus one per boss felled (capped). Tuning lives in data/loadout.js
+  // (G.Loadout) so the editor can author it; the literal fallback keeps the old 3 / +1 / cap-9 behaviour.
   C.notches = () => {
     const s = G.save || {};
-    let n = 3;
-    if (s.bosses) { for (const k in s.bosses) if (s.bosses[k]) n++; }
-    else if (s.bossDead) n++;
-    return Math.min(9, n);
+    let bosses = 0;
+    if (s.bosses) { for (const k in s.bosses) if (s.bosses[k]) bosses++; }
+    else if (s.bossDead) bosses = 1;
+    return G.Loadout ? G.Loadout.notchesForBosses(bosses) : Math.min(9, 3 + bosses);
   };
   C.equipped = () => (G.save && G.save.charmsEquipped) || [];
   C.usedNotches = () => C.equipped().reduce((a, id) => a + (byId[id] ? byId[id].cost : 0), 0);
@@ -74,6 +75,7 @@
     const c = byId[id]; if (!c) return false;
     const used = C.usedNotches();
     if (used + c.cost <= C.notches()) return true;       // fits normally
+    if (G.Loadout && !G.Loadout.allowOvercharm()) return false;  // overcharm disabled by the editor
     return used <= C.notches();                          // overcharm (one over) allowed if not already over
   };
   C.isOvercharmed = () => C.usedNotches() > C.notches();

@@ -17,7 +17,8 @@ const DATASETS = [
   { name: 'hud', global: 'HUD_DATA', srcs: ['src/hud.js'], pick: G => G.HUD.exportDefaults() },
   { name: 'theme', global: 'THEME_DATA', srcs: ['src/theme.js'], pick: G => G.Theme.exportDefaults() },
   { name: 'drops', global: 'DROPS_DATA', srcs: ['src/drops.js'], pick: G => G.Drops.exportDefaults() },
-  { name: 'settings', global: 'SETTINGS_DATA', srcs: ['src/settings.js'], pick: G => G.Settings.exportDefaults() }
+  { name: 'settings', global: 'SETTINGS_DATA', srcs: ['src/settings.js'], pick: G => G.Settings.exportDefaults() },
+  { name: 'loadout', global: 'LOADOUT_DATA', srcs: ['src/loadout.js'], pick: G => G.Loadout.exportDefaults() }
 ];
 
 function evalModule(srcs) {
