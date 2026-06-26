@@ -38,9 +38,13 @@
   let csCurrent = null;          // current cutscene id
   let csSel = -1;                // selected event index (-1 = cutscene-level props)
   let csDirty = false;
-  let csDrag = null;             // active timeline block drag
+  let csDrag = null;             // active timeline block drag (mode: 'move' | 'resize')
   let csPreview = null;          // in-viewport cutscene preview { id, restoreId, sx, sy, lastCam, done }
+  let csZoom = 64;               // timeline 2.0: px per second (− / + buttons)
+  let csSnap = 0.1;              // timeline 2.0: retime/resize snap step in seconds (0 = free)
   const csCur = () => G.CUTSCENES && G.CUTSCENES[csCurrent];
+  // snap a time/duration value to the current grid (and clean up floating-point dust)
+  const csSnapT = v => Math.round((csSnap > 0 ? Math.round(v / csSnap) * csSnap : v) * 1000) / 1000;
 
   // event type schema: default params + inspector fields. t & dur are implicit on every event.
   const CS_EVENTS = {
@@ -146,8 +150,18 @@
   (function () {
     addEventListener('pointermove', ev => {
       if (!csDrag) return;
-      let nt = Math.max(0, csDrag.startT + (ev.clientX - csDrag.startX) / csDrag.scale);
-      nt = Math.round(nt * 10) / 10;
+      const dx = (ev.clientX - csDrag.startX) / csDrag.scale;
+      if (csDrag.mode === 'resize') {
+        // drag the right grip to change the event's duration
+        const nd = csSnapT(Math.max(0.1, csDrag.startDur + dx));
+        if (Math.abs(nd - (csDrag.e.dur || 0)) > 1e-6) {
+          csDrag.moved = true; csDrag.e.dur = nd;
+          csDrag.blk.style.width = Math.max(16, nd * csDrag.scale) + 'px';
+          csDrag.blk.title = `${csDrag.e.type} — ${csDrag.e.t.toFixed(2)}s for ${nd}s`;
+        }
+        return;
+      }
+      const nt = csSnapT(Math.max(0, csDrag.startT + dx));
       if (Math.abs(nt - csDrag.e.t) > 1e-6) {
         csDrag.moved = true; csDrag.e.t = nt;
         csDrag.blk.style.left = (nt * csDrag.scale) + 'px';
@@ -2394,8 +2408,26 @@
     el('button', { class: 'tbtn play', onclick: () => startCsPreview(csCurrent) }, addRow, '▶ Preview');
     el('button', { class: 'tbtn', onclick: async () => { if (await save()) openPlay(); }, title: 'Save & run the whole cutscene inside the actual game' }, addRow, '▶ Playtest in game');
 
-    // ---- visual timeline (drag blocks horizontally to retime) ----
-    const SCALE = 64;            // px per second (roomy in the central view)
+    // ---- workflow toolbar (timeline 2.0): duplicate / delete / zoom / snap / total ----
+    const tools = el('div', { class: 'cstools' }, box);
+    el('button', { class: 'csTbtn', title: 'Duplicate the selected event (Ctrl+D)', onclick: csDuplicate }, tools, '⧉ Dup');
+    el('button', { class: 'csTbtn', title: 'Delete the selected event (Del)', onclick: csDeleteSel }, tools, '🗑 Del');
+    el('span', { class: 'csTsep' }, tools);
+    el('button', { class: 'csTbtn', title: 'Zoom the timeline out', onclick: () => csSetZoom(csZoom - 16) }, tools, '−');
+    el('span', { class: 'csTreadout' }, tools, csZoom + ' px/s');
+    el('button', { class: 'csTbtn', title: 'Zoom the timeline in', onclick: () => csSetZoom(csZoom + 16) }, tools, '+');
+    el('span', { class: 'csTsep' }, tools);
+    el('span', { class: 'csTlabel' }, tools, 'Snap');
+    const snapSel = el('select', { class: 'csTsnap', title: 'Grid that retiming / resizing snaps to' }, tools);
+    for (const [lbl, v] of [['off', 0], ['0.1s', 0.1], ['0.25s', 0.25], ['0.5s', 0.5], ['1s', 1]]) {
+      const o = el('option', { value: v }, snapSel, lbl);
+      if (Math.abs(csSnap - v) < 1e-6) o.selected = true;
+    }
+    snapSel.addEventListener('change', () => csSetSnap(snapSel.value));
+    el('span', { class: 'csTtotal' }, tools, '⏱ ' + csTotalDur().toFixed(2) + 's · ' + c.events.length + ' events');
+
+    // ---- visual timeline (drag blocks horizontally to retime; drag the right grip to resize) ----
+    const SCALE = csZoom;            // px per second (zoomable via the toolbar)
     const SCREEN = new Set(['fade', 'letterbox', 'blur', 'text', 'camera', 'cameraRestore', 'shakePulse', 'sfx', 'music', 'stinger', 'flash']);
     const total = Math.max(3, c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0)) + 1;
     const evs = c.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t);
@@ -2424,10 +2456,18 @@
         ev.preventDefault();
         csSel = i; refreshInspector();
         document.querySelectorAll('#csView .cstlblk.sel').forEach(b => b.classList.remove('sel')); blk.classList.add('sel');
-        csDrag = { e, blk, startX: ev.clientX, startT: e.t, scale: SCALE, moved: false };
+        csDrag = { e, blk, mode: 'move', startX: ev.clientX, startT: e.t, scale: SCALE, moved: false };
+      });
+      // right-edge grip: drag to change this event's duration
+      const grip = el('div', { class: 'cstlgrip', title: 'Drag to change duration' }, blk);
+      grip.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        csSel = i; refreshInspector();
+        document.querySelectorAll('#csView .cstlblk.sel').forEach(b => b.classList.remove('sel')); blk.classList.add('sel');
+        csDrag = { e, blk, mode: 'resize', startX: ev.clientX, startDur: e.dur || 0.2, scale: SCALE, moved: false };
       });
     }
-    el('div', { class: 'insNote', style: 'margin-top:10px' }, box, 'Drag a block sideways to retime it · click to edit its fields in the Inspector → · screen events are blue, protagonist events green.');
+    el('div', { class: 'insNote', style: 'margin-top:10px' }, box, 'Drag a block sideways to retime · drag its right edge to change duration · click to edit fields in the Inspector → · screen events blue, protagonist events green.');
   }
 
   function newCutscene() {
@@ -2446,6 +2486,42 @@
     };
     csCurrent = id; csSel = -1; markCsDirty(); refreshScenes(); refreshInspector();
   }
+
+  // ---- timeline 2.0 ops (duplicate / delete / nudge / zoom / snap / total) ----
+  function csTotalDur() {
+    const c = csCur(); if (!c || !c.events) return 0;
+    return c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0);
+  }
+  function csDuplicate() {
+    const c = csCur(); if (!c || csSel < 0 || !c.events[csSel]) return false;
+    const copy = JSON.parse(JSON.stringify(c.events[csSel]));
+    copy.t = +(copy.t + Math.max(0.1, copy.dur || 0.5)).toFixed(3);   // offset so it doesn't sit on top of the original
+    c.events.splice(csSel + 1, 0, copy);
+    csSel = csSel + 1;
+    markCsDirty(); refreshCsTab(); refreshScenes(); refreshInspector();
+    return true;
+  }
+  function csDeleteSel() {
+    const c = csCur(); if (!c || csSel < 0 || !c.events[csSel]) return false;
+    c.events.splice(csSel, 1);
+    csSel = Math.min(csSel, c.events.length - 1);
+    markCsDirty(); refreshCsTab(); refreshScenes(); refreshInspector();
+    return true;
+  }
+  function csNudge(dir) {
+    const c = csCur(); if (!c || csSel < 0 || !c.events[csSel]) return false;
+    const step = csSnap > 0 ? csSnap : 0.1;
+    const e = c.events[csSel];
+    e.t = Math.max(0, csSnapT(e.t + dir * step));
+    markCsDirty(); refreshCsTab(); refreshInspector();
+    return true;
+  }
+  function csSetZoom(px) {
+    csZoom = Math.max(24, Math.min(160, Math.round(px)));
+    if (tab === 'cutscene') refreshCsTab();
+    return csZoom;
+  }
+  function csSetSnap(v) { csSnap = +v || 0; if (tab === 'cutscene') refreshCsTab(); return csSnap; }
 
   const EASE_EVENTS = new Set(['fade', 'letterbox', 'blur', 'camera', 'cameraRestore']);
   const EASE_PRESETS = [['Linear', 'linear'], ['Ease In', 'inQuad'], ['Ease Out', 'outQuad'], ['Ease In-Out', 'inOutQuad'], ['Cubic In-Out', 'inOutCubic'], ['Back In', 'inBack'], ['Back Out', 'outBack'], ['Elastic Out', 'outElastic'], ['Custom curve', 'custom']];
@@ -3488,7 +3564,15 @@
       return;
     }
     if (tab === 'models') { if ((e.code === 'Delete' || e.code === 'Backspace') && modelSel >= 0) { e.preventDefault(); modelDeletePart(modelSel); } else if (e.code === 'KeyD' && e.ctrlKey && modelSel >= 0) { e.preventDefault(); modelDupPart(modelSel); } return; }
-    if (csMode || tab === 'cutscene') return; // cutscene editing: no level shortcuts
+    if (tab === 'cutscene') {
+      // timeline 2.0 shortcuts (selected event): Ctrl+D duplicate, Del delete, ←/→ nudge by snap step
+      if (e.code === 'KeyD' && e.ctrlKey) { e.preventDefault(); csDuplicate(); }
+      else if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); csDeleteSel(); }
+      else if (e.code === 'ArrowLeft') { e.preventDefault(); csNudge(-1); }
+      else if (e.code === 'ArrowRight') { e.preventDefault(); csNudge(1); }
+      return;
+    }
+    if (csMode) return; // cutscene editing in the Scenes panel: no level shortcuts
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
     if (e.ctrlKey && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) { e.preventDefault(); doRedo(); return; }
     if (e.ctrlKey && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
@@ -3642,6 +3726,11 @@
     logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
     logicAutoLayout: () => logicAutoLayout(), logicFrameAll: () => logicFrameAll(), logicDup: () => logicDuplicateSelected(), logicCam: () => logicCam,
     csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); },
+    // Cutscene timeline 2.0 hooks (tests / Companion): selection + retime ops on the current scene
+    csCur: () => csCur(), csCurId: () => csCurrent, csGetSel: () => csSel, csSetSel: i => { csSel = i; },
+    csDup: () => csDuplicate(), csDel: () => csDeleteSel(), csNudge: d => csNudge(d),
+    csZoom: v => (v === undefined ? csZoom : csSetZoom(v)), csSnap: v => (v === undefined ? csSnap : csSetSnap(v)),
+    csTotal: () => csTotalDur(),
     modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; },
     modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
     modelSyncPose: t => { modelTime = t; syncPoseFromClip(t); rebuildModelMeshes(); },
@@ -3717,7 +3806,7 @@
   // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
   // tools-core.js has loaded — it runs after editor.js in the script list.
   // #33 Hierarchy 2.0, #34 Asset browser 2.0, #31 Logic graph 2.0
-  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31); } catch (_) { } }, 0);
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39); } catch (_) { } }, 0);
 
   boot();
 })();

@@ -127,6 +127,20 @@
   .cstlblk.sel { outline:2px solid #ffd887; z-index:2; }
   .cstlblk.screen { background:#2f5a86; }
   .cstlblk.actor { background:#2f7d4f; }
+  /* cutscene timeline 2.0 grip + workflow toolbar */
+  .cstlgrip { position:absolute; right:0; top:0; width:6px; height:100%; cursor:ew-resize;
+    background:rgba(255,255,255,.18); border-radius:0 3px 3px 0; }
+  .cstlgrip:hover { background:rgba(255,216,135,.75); }
+  .cstools { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:0 8px 10px; }
+  .csTbtn { background:#1d1d24; color:#cfd2d6; border:1px solid #3c3c44; border-radius:3px;
+    padding:3px 9px; font-size:12px; cursor:pointer; }
+  .csTbtn:hover { background:#26262e; }
+  .csTbtn:disabled { opacity:.4; cursor:default; }
+  .csTsep { width:1px; height:18px; background:#33333c; margin:0 3px; }
+  .csTreadout { color:#9aa0a8; font-size:11px; min-width:46px; text-align:center; }
+  .csTlabel { color:#9aa0a8; font-size:11px; }
+  .csTsnap { background:#15151a; color:#cfd2d6; border:1px solid #3c3c44; border-radius:3px; padding:2px 4px; font-size:11px; }
+  .csTtotal { color:#9fd8b8; font-size:11px; margin-left:auto; }
 
   /* viewport */
   #viewportWrap { grid-area:viewport; position:relative; background:#000; min-width:0; min-height:0;
