@@ -695,18 +695,12 @@
 
   // spell tree: three spells (forward bolt / upward cry / downward dive), each with two tiers,
   // unlocked/empowered with Glimmer at a soul well.
-  Main.SPELL_TREE = [
-    { id: 'bolt', name: 'Soul Bolt', cast: 'Cast', tiers: ['', 'A bolt of soul flung forward.', 'Shade Soul — a greater, faster bolt.'], cost: [0, 0, 130] },
-    { id: 'scream', name: 'Wraith Cry', cast: 'Hold ↑ + Cast', tiers: ['Not yet learned.', 'Howling Wraiths — spirits burst upward.', 'Abyss Shriek — a greater, wider cry.'], cost: [0, 80, 170] },
-    { id: 'dive', name: 'Abyss Dive', cast: 'Hold ↓ + Cast (airborne)', tiers: ['Not yet learned.', 'Desolate Dive — slam down with a shockwave.', 'Descending Dark — a darker, wider dive.'], cost: [0, 110, 190] },
-    { id: 'ember', name: 'Ember Bolt', cast: 'attunes Soul Bolt', element: true, tiers: ['Soul Bolt carries no flame.', 'Ember Bolt — bolts set grass alight and sear foes over time.', 'Cinder Bolt — hotter still: bigger flames, longer burn & sear.'], cost: [0, 90, 160] },
-    { id: 'frost', name: 'Frost Bolt', cast: 'attunes Soul Bolt', element: true, tiers: ['Soul Bolt carries no chill.', 'Frost Bolt — snuffs fire, and freezes foes solid on hit.', 'Rime Bolt — a deeper, longer freeze.'], cost: [0, 90, 160] },
-    { id: 'gale', name: 'Gale Bolt', cast: 'attunes Soul Bolt', element: true, tiers: ['Soul Bolt carries no wind.', 'Gale Bolt — hurls foes back, fans fire and blows away gas.', 'Tempest Bolt — a fiercer gust.'], cost: [0, 110, 180] }
-  ];
+  // the spell tree lives in src/spells.js (G.Spells) so the editor can author it too
+  Main.SPELL_TREE = (G.Spells && G.Spells.TREE) || [];
   Main.spellIndex = 0;
   Main.spellLevel = id => { const s = G.save && G.save.spells; return s && s[id] != null ? s[id] : (id === 'bolt' ? 1 : 0); };
   Main.spellCost = id => { const t = Main.SPELL_TREE.find(s => s.id === id); const lvl = Main.spellLevel(id); return (t && lvl < 2) ? t.cost[lvl + 1] : 0; };
-  Main.ELEMENTS = ['ember', 'frost', 'gale'];
+  Main.ELEMENTS = (G.Spells && G.Spells.ELEMENTS) || ['ember', 'frost', 'gale'];
   // the Soul Bolt element you're attuned to (an Element you've learned), or null for plain
   Main.activeElement = () => {
     const sel = G.save && G.save.boltElement;
