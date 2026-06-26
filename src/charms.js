@@ -118,11 +118,13 @@
     const st = { hp: 5, nail: 1 + ((G.save && G.save.nailLevel) || 0), dashMul: 1, focusMul: 1, soulMul: 1 };
     for (const id of C.equipped()) { const c = byId[id]; if (c) addEffects(st, c.effects); }
     for (const s of SYNERGIES) if (s.need.every(id => C.isEquipped(id))) addEffects(st, s.effects);
-    p.maxHp = Math.max(1, st.hp);
-    p.nailDmg = st.nail;
+    // difficulty / accessibility mode tweaks the derived stats (integer-safe, all foes + bosses)
+    const D = G.Difficulty;
+    p.maxHp = Math.max(1, st.hp + (D ? D.maskBonus() : 0));
+    p.nailDmg = Math.max(1, st.nail + (D ? D.dmgBonus() : 0));
     p.dashCdMul = st.dashMul;
     p.focusMul = st.focusMul;
-    p.soulMul = st.soulMul;
+    p.soulMul = st.soulMul * (D ? D.soulMul() : 1);
     p.overcharmed = C.isOvercharmed();
     if (p.hp > p.maxHp) p.hp = p.maxHp;
   };

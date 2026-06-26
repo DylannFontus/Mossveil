@@ -8,7 +8,8 @@ const ROOT = path.resolve(__dirname, '..');
 const DATASETS = [
   { name: 'charms', global: 'CHARMS', srcs: ['src/charms.js'], pick: G => G.Charms.exportDefaults() },
   { name: 'sfx', global: 'SFX_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.sfxExportDefaults() },
-  { name: 'weather', global: 'WEATHER_DATA', srcs: ['src/weather.js'], pick: G => G.Weather.exportDefaults() }
+  { name: 'weather', global: 'WEATHER_DATA', srcs: ['src/weather.js'], pick: G => G.Weather.exportDefaults() },
+  { name: 'difficulty', global: 'DIFFICULTY_DATA', srcs: ['src/difficulty.js'], pick: G => G.Difficulty.exportDefaults() }
 ];
 
 function evalModule(srcs) {

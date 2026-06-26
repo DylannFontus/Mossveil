@@ -1,0 +1,28 @@
+// generated from data/difficulty.json - do not edit by hand (use the editor)
+window.G = window.G || {};
+G.DIFFICULTY_DATA = {
+ "default": "normal",
+ "modes": {
+  "normal": {
+   "name": "Normal",
+   "desc": "The intended challenge.",
+   "maskBonus": 0,
+   "dmgBonus": 0,
+   "soulMul": 1
+  },
+  "assist": {
+   "name": "Assist",
+   "desc": "Gentler: more masks, soul gathers faster, strikes hit harder.",
+   "maskBonus": 2,
+   "dmgBonus": 1,
+   "soulMul": 1.5
+  },
+  "steadfast": {
+   "name": "Steadfast",
+   "desc": "Harder: fewer masks, soul comes slower.",
+   "maskBonus": -1,
+   "dmgBonus": 0,
+   "soulMul": 0.85
+  }
+ }
+};
