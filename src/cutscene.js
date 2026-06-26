@@ -108,6 +108,18 @@
 
     shakePulse: { start(cs, ev) { G.FX.shake(ev.amp || 0.3, ev.dur || 0.4); } },
     sfx: { start(cs, ev) { G.Audio.sfx(ev.name || 'uiBell'); } },
+    // ---- audio cues (#24) — score + stings driven from the timeline ----
+    // crossfade the score to a track (blank = keep current) and/or set its intensity swell.
+    // intensity < 0 leaves the swell untouched; 0..1 sets it (0 fades the music out).
+    music: {
+      start(cs, ev) {
+        const M = G.Music; if (!M) return;
+        if (ev.track) M.setTrack(ev.track);
+        if (typeof ev.intensity === 'number' && ev.intensity >= 0) M.setIntensity(ev.intensity);
+      }
+    },
+    // one-shot musical sting layered over the score (boss / item / secret)
+    stinger: { start(cs, ev) { if (G.Audio && G.Audio.stinger) G.Audio.stinger(ev.name || 'item'); } },
     hold: {},
 
     // protagonist rises out of the earth — clip reveal + erupting debris + tremor

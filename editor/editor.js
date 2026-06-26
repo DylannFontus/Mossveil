@@ -50,6 +50,8 @@
     cameraRestore: { dur: 2.6, def: {}, fields: [], hint: 'dolly the camera back to the gameplay framing for a seamless handoff (put this last)' },
     shakePulse: { dur: 0.4, def: { amp: 0.3 }, fields: [['amp', 'num']], hint: 'one screen-shake burst' },
     sfx: { dur: 0.1, def: { name: 'chime' }, fields: [['name', 'text']], hint: 'play a sound (chime, rumble, quake, roar, bench...)' },
+    music: { dur: 0.1, def: { track: '', intensity: -1 }, fields: [['track', 'sel', () => ['', ...(G.Music ? G.Music.TRACK_IDS : [])]], ['intensity', 'num']], hint: 'crossfade the score to a track (blank = keep current); intensity 0–1 sets the swell, -1 = leave it' },
+    stinger: { dur: 0.1, def: { name: 'item' }, fields: [['name', 'sel', () => ['boss', 'item', 'secret']]], hint: 'one-shot musical sting over the score (boss / item / secret)' },
     riseFromGround: { dur: 10, def: { depth: 2.4 }, fields: [['depth', 'num']], hint: 'protagonist rises out of the earth (clip + debris + shake)' },
     wake: { dur: 1, def: {}, fields: [], hint: 'eyes open with a shudder' },
     stand: { dur: 5, def: {}, fields: [], hint: 'rise from crumpled to upright' },
@@ -2319,7 +2321,7 @@
 
     // ---- visual timeline (drag blocks horizontally to retime) ----
     const SCALE = 64;            // px per second (roomy in the central view)
-    const SCREEN = new Set(['fade', 'letterbox', 'blur', 'text', 'camera', 'cameraRestore', 'shakePulse', 'sfx', 'flash']);
+    const SCREEN = new Set(['fade', 'letterbox', 'blur', 'text', 'camera', 'cameraRestore', 'shakePulse', 'sfx', 'music', 'stinger', 'flash']);
     const total = Math.max(3, c.events.reduce((m, e) => Math.max(m, e.t + (e.dur || 0)), 0)) + 1;
     const evs = c.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.t - b.e.t);
     const laneEnds = [], lane = {};
@@ -2458,6 +2460,14 @@
       inp.value = ev[key] || '';
       inp.addEventListener('change', () => { ev[key] = inp.value; markCsDirty(); refreshScenes(); });
     };
+    const csSelect = (label, key, opts) => {
+      const r = el('div', { class: 'frow' }, body);
+      el('label', {}, r, label);
+      const sel = el('select', {}, r);
+      (typeof opts === 'function' ? opts() : opts).forEach(o => el('option', { value: o }, sel, o === '' ? '(keep)' : o));
+      sel.value = ev[key] !== undefined ? ev[key] : '';
+      sel.addEventListener('change', () => { ev[key] = sel.value; markCsDirty(); refreshScenes(); });
+    };
     const r0 = el('div', { class: 'frow' }, body);
     el('label', {}, r0, 'Type');
     const tsel = el('select', {}, r0);
@@ -2472,8 +2482,9 @@
     csNum('Start (t)', 't', 0.1);
     csNum('Duration', 'dur', 0.1);
     if (EASE_EVENTS.has(ev.type)) addEaseControl(body, ev);
-    for (const [key, kind] of spec.fields) {
+    for (const [key, kind, opts] of spec.fields) {
       if (kind === 'num') csNum(key, key, 0.1);
+      else if (kind === 'sel') csSelect(key, key, opts);
       else csText(key, key);
     }
     const btns = el('div', { class: 'frow', style: 'margin-top:10px' }, body);
