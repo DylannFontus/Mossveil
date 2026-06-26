@@ -2124,11 +2124,15 @@
     const c = new THREE.Color(pal.light || pal.glow || 0xffffff);
     const m = Math.max(c.r, c.g, c.b) || 1;
     c.multiplyScalar(1 / m);                                   // normalise to brightest channel
-    const tint = new THREE.Color(1, 1, 1).lerp(c, 0.16);       // a gentle wash, not a heavy cast
-    return {
+    const tintMix = (pal.grade && pal.grade.tintMix != null) ? pal.grade.tintMix : 0.16;
+    const tint = new THREE.Color(1, 1, 1).lerp(c, tintMix);    // a gentle wash, not a heavy cast
+    const g = {
       tint, exposure: 1.05, contrast: 1.05, saturation: 1.14,
       bloom: pal.rays ? 0.72 : 0.56, vignette: 0.46, grain: 0
     };
+    // per-biome authored grade override (Colour-grade editor) — only the keys provided
+    if (pal.grade) for (const k of ['exposure', 'contrast', 'saturation', 'bloom', 'vignette', 'grain', 'dof']) if (pal.grade[k] != null) g[k] = pal.grade[k];
+    return g;
   }
 
   W.load = function (id, spawnId) {
