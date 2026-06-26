@@ -17,6 +17,10 @@
   let musicStyle = 'score', musicTrack = 'gloom', musicSilenced = false, musicBiome = null;
   // ---- mixer buses (Edit ▸ Audio ▸ Mixer) : relative levels overlaid from data/mixer.js ----
   let musicBus = null, analyser = null;
+  // sidechain ducking (Edit ▸ Audio ▸ Ducking): a unity gain spliced into musicBus->master so a
+  // triggering SFX can momentarily dip the music (G.Sidechain controls it). Lazy — only inserted when
+  // an overlay actually ducks, so the default (inert) graph, and thus the music, is byte-identical.
+  let musicDuck = null;
   const DEFAULT_MIX = { music: 1, sfx: 1, ambient: 1 };
   let mix = Object.assign({}, DEFAULT_MIX);
   (function () { const d = G.MIXER_DATA; if (d) for (const k in DEFAULT_MIX) if (d[k] != null) mix[k] = +d[k]; })();
@@ -95,8 +99,23 @@
     ambBus.connect(master); ambBus.connect(verb);
     startAmbience();
     if (G.Music && G.Music.start) { musicBus = ctx.createGain(); musicBus.gain.value = mix.music; musicBus.connect(master); G.Music.start(ctx, musicBus, verb); G.Music.setTrack(musicTrack); }
+    // splice the sidechain duck node only when an overlay actually ducks — else the music graph (and so
+    // the soundtrack: which tracks per level, how they sound, every transition) is untouched.
+    if (G.Sidechain && !G.Sidechain.isInert()) duckInsert();
     applyMusicStyle();
     if (pendingReverb) { G.Audio.setReverb(pendingReverb.wet, pendingReverb.dur, pendingReverb.decay); pendingReverb = null; }
+  }
+
+  // insert a transparent (unity) gain between musicBus and master that G.Sidechain dips on a trigger.
+  // Idempotent; returns the node. Called lazily (boot when ducking is authored, or by the editor for a
+  // live audition), so when nothing ducks the original musicBus->master edge is the only thing present.
+  function duckInsert() {
+    if (!started || !musicBus || musicDuck) return musicDuck;
+    musicDuck = ctx.createGain(); musicDuck.gain.value = 1;
+    try { musicBus.disconnect(master); } catch (e) { }
+    musicBus.connect(musicDuck); musicDuck.connect(master);
+    if (G.Sidechain) G.Sidechain.attach(ctx, musicDuck);
+    return musicDuck;
   }
 
   // switch between the composed score and the classic drones: fade the drones, start/stop G.Music
@@ -316,7 +335,10 @@
   }
   // per-play SFX variation (pitch/gain wobble) authored in the Randomization-pools editor
   // (data/sfxvar.js); inert by default -> varySpec returns the spec untouched (byte-identical).
-  function playSpec(layers, name) { (G.SfxVar ? G.SfxVar.varySpec(layers || [], name) : (layers || [])).forEach(playLayer); }
+  function playSpec(layers, name) {
+    if (name && musicDuck && G.Sidechain) G.Sidechain.trigger(name);   // music ducking (only when the node is spliced i.e. active)
+    (G.SfxVar ? G.SfxVar.varySpec(layers || [], name) : (layers || [])).forEach(playLayer);
+  }
   const makePlayer = (layers, name) => () => playSpec(layers, name);
 
   // the live set: a player fn per name, plus the source specs (for the editor)
@@ -342,6 +364,9 @@
     sfxPlaySpec(layers, name) { if (started) playSpec(layers, name); },   // audition an unsaved spec live (name => its variation pool)
     // read-only test hook: the exact layer spec one play of `name` would feed the synths (variation applied)
     _varied: (name, rng) => (G.SfxVar ? G.SfxVar.varySpec(SFX_SPECS[name], name, rng) : SFX_SPECS[name]),
+    // ---- sidechain ducking (Edit ▸ Audio ▸ Ducking) ----
+    _duckInsert: () => duckInsert(),   // editor: splice + attach the duck node for a live audition
+    _duckNode: () => musicDuck,        // test hook: null unless ducking is active (graph then unchanged)
     // ---- mixer (Edit ▸ Audio ▸ Mixer) ----
     setMix(partial) {
       Object.assign(mix, partial || {});
