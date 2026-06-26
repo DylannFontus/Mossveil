@@ -427,7 +427,10 @@
   };
 
   // ============================ BOSS CONFIGS (15) ============================
-  const CFG = B.CONFIGS = {
+  // Built-in boss roster (the FALLBACK). Externalised to data/bosses.js (window.G.BOSS_DATA),
+  // authored by the Boss designer. Move names (leap/slash/rain/volley/ring/summon/spikes/swoop/orbs/
+  // burrow) and rigs (beetle/mantis/moth/serpent/golem) stay in code; configs compose them as data.
+  const DEFAULT_CFG = {
     mossSovereign: { name: 'MOSS SOVEREIGN', rig: 'beetle', mode: 'ground', hp: 30, scale: 1, colors: { body: 0x18231c, accent: 0x2e5238, accent2: 0x3f7048, bone: 0xd8d2c0, glow: 0x9fffc0 }, moves: ['leap', 'slash'], moves2: ['leap', 'slash', 'rain'] },
     thornbackAlpha: { name: 'THORNBACK ALPHA', rig: 'beetle', mode: 'ground', hp: 26, scale: 0.9, colors: { body: 0x1c2415, accent: 0x47602a, accent2: 0x5e7e34, bone: 0xc8c0a0, glow: 0xcfe87a }, moves: ['slash', 'spikes'], moves2: ['slash', 'spikes', 'leap'] },
     sporefather: { name: 'SPOREFATHER', rig: 'beetle', mode: 'ground', hp: 34, scale: 1.15, colors: { body: 0x261622, accent: 0x6a3458, accent2: 0x8a4670, bone: 0xe0c8d4, glow: 0xff9ad8 }, moves: ['rain', 'summon'], moves2: ['rain', 'summon', 'ring'], minion: 'sporeling' },
@@ -444,10 +447,8 @@
     tidemaw: { name: 'TIDEMAW', rig: 'serpent', mode: 'fly', hp: 30, scale: 1, colors: { body: 0x0c2a30, accent: 0x1e5a62, accent2: 0x2a7e84, bone: 0xd0ecE4 & 0xffffff, glow: 0x8ae8e0 }, moves: ['swoop', 'volley'], moves2: ['swoop', 'volley', 'orbs'] },
     veilserpentYssa: { name: 'VEILSERPENT YSSA', rig: 'serpent', mode: 'fly', hp: 28, scale: 0.95, colors: { body: 0x180f2a, accent: 0x3c2a62, accent2: 0x523a86, bone: 0xe0d4f0, glow: 0xc9a0ff }, moves: ['swoop', 'ring'], moves2: ['swoop', 'ring', 'rain'] }
   };
-  B.LIST = Object.keys(CFG).map(id => ({ id, label: CFG[id].name }));
-
   // boss epithets shown under the name on the cinematic name card
-  const EPITHETS = B.EPITHETS = {
+  const DEFAULT_EPITHETS = {
     mossSovereign: 'Warden of the Green Tomb', thornbackAlpha: 'First of the Bramble',
     sporefather: 'He Who Seeds the Dark', cindershell: 'Ember of the Deep Forge',
     marshfiend: 'Drowned King of the Mire', gloomTyrant: 'Sovereign of the Blue Hollow',
@@ -457,6 +458,49 @@
     auricSentinel: 'The Gilded Eye', tidemaw: 'Hunger of the Tides',
     veilserpentYssa: 'She Who Coils the Veil'
   };
+
+  // ---- boss roster data overlay (data/bosses.js -> G.BOSS_DATA) ----
+  const BOSS_COLOR_KEYS = ['body', 'accent', 'accent2', 'bone', 'glow'];
+  const bossToNum = v => typeof v === 'string' ? (parseInt(v.replace('#', ''), 16) || 0) : (v | 0);
+  let CFG = B.CONFIGS = {}, EPITHETS = B.EPITHETS = {};
+  function normCfg(c) {
+    const colors = {}; const sc = (c.colors || {});
+    BOSS_COLOR_KEYS.forEach(k => colors[k] = bossToNum(sc[k] != null ? sc[k] : 0xffffff));
+    const o = {
+      name: c.name || 'BOSS', rig: RIGS[c.rig] ? c.rig : 'beetle', mode: c.mode === 'fly' ? 'fly' : 'ground',
+      hp: +c.hp || 30, scale: +c.scale || 1, colors,
+      moves: (Array.isArray(c.moves) && c.moves.length ? c.moves : ['leap', 'slash']).filter(m => MOVES[m]),
+      moves2: (Array.isArray(c.moves2) && c.moves2.length ? c.moves2 : c.moves || ['leap', 'slash', 'rain']).filter(m => MOVES[m])
+    };
+    if (c.minion) o.minion = c.minion;
+    if (c.speed2) o.speed2 = +c.speed2;
+    if (!o.moves.length) o.moves = ['slash'];
+    if (!o.moves2.length) o.moves2 = o.moves.slice();
+    return o;
+  }
+  function serCfg(c) {
+    const colors = {}; BOSS_COLOR_KEYS.forEach(k => colors[k] = '#' + ((c.colors[k] >>> 0) & 0xffffff).toString(16).padStart(6, '0'));
+    const o = { name: c.name, rig: c.rig, mode: c.mode, hp: c.hp, scale: c.scale, colors, moves: c.moves.slice(), moves2: c.moves2.slice() };
+    if (c.minion) o.minion = c.minion; if (c.speed2) o.speed2 = c.speed2;
+    return o;
+  }
+  function applyBossData(data) {
+    const d = data || G.BOSS_DATA || null;
+    CFG = {}; for (const id in DEFAULT_CFG) CFG[id] = normCfg(DEFAULT_CFG[id]);
+    EPITHETS = Object.assign({}, DEFAULT_EPITHETS);
+    if (d) {
+      if (d.configs) for (const id in d.configs) CFG[id] = normCfg(d.configs[id]);
+      if (d.epithets) Object.assign(EPITHETS, d.epithets);
+    }
+    if (!CFG.mossSovereign) CFG.mossSovereign = normCfg(DEFAULT_CFG.mossSovereign);
+    B.CONFIGS = CFG; B.EPITHETS = EPITHETS;
+    B.LIST = Object.keys(CFG).map(id => ({ id, label: CFG[id].name }));
+    B.RIG_NAMES = Object.keys(RIGS); B.MOVE_NAMES = Object.keys(MOVES);
+  }
+  B.applyBossData = applyBossData;
+  B.exportBossDefaults = () => { const cfgs = {}; for (const id in DEFAULT_CFG) cfgs[id] = serCfg(normCfg(DEFAULT_CFG[id])); return { configs: cfgs, epithets: Object.assign({}, DEFAULT_EPITHETS) }; };
+  B.exportBossCurrent = () => { const cfgs = {}; for (const id in CFG) cfgs[id] = serCfg(CFG[id]); return { configs: cfgs, epithets: Object.assign({}, EPITHETS) }; };
+  applyBossData();
 
   // ============================ PREVIEW (for the editor) ============================
   B.preview = typeId => {
