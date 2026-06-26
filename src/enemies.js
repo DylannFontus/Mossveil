@@ -1073,8 +1073,9 @@
     return ent.group;
   };
 
-  // Hunter's Journal lore, keyed by type id
-  E.BESTIARY = {
+  // Hunter's Journal lore, keyed by type id. Externalised to data/bestiary.js (G.BESTIARY_DATA),
+  // authored by the in-editor Journal / bestiary editor; these are the fallback.
+  const DEFAULT_BESTIARY = {
     tumblebug: 'An armoured roller that trundles the old paths. Knock it and it rights itself, ever stubborn.',
     gnatling: 'Winged and quick to anger. It harries wanderers who stray into the dark.',
     bulbil: 'A rooted maw that spits seed-shot. Patient, and never hungry for long.',
@@ -1090,6 +1091,17 @@
     hookworm: 'Burrows and surfaces, surfaces and burrows. The ground itself is its ambush.',
     sentine: 'An unsleeping eye that fixes wanderers in its beam. It has watched a long time.'
   };
+  let BESTIARY_LORE = {};
+  function applyBestiaryData(data) {
+    const d = data || G.BESTIARY_DATA || null;
+    BESTIARY_LORE = Object.assign({}, DEFAULT_BESTIARY);
+    if (d && d.lore) for (const k in d.lore) if (d.lore[k] != null) BESTIARY_LORE[k] = d.lore[k];
+    E.BESTIARY = BESTIARY_LORE;
+  }
+  E.applyBestiaryData = applyBestiaryData;
+  E.exportBestiaryDefaults = () => ({ lore: Object.assign({}, DEFAULT_BESTIARY) });
+  E.exportBestiaryCurrent = () => ({ lore: Object.assign({}, BESTIARY_LORE) });
+  applyBestiaryData();
 
   // bosses live in bosses.js
   E.spawnBoss = (typeId, x, y, gates, saveKey, hurtBox) => G.Bosses.spawn(typeId, x, y, gates, saveKey, hurtBox);
