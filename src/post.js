@@ -365,7 +365,7 @@
     if (g.tint !== undefined) target.tint.set(g.tint);
   };
   // grade smoothing rate (per second); raise for snappy room loads, lower for slow fades
-  Post.gradeRate = 3;
+  Post.gradeRate = (G.PostFX ? G.PostFX.gradeRate() : 3);   // default; data/poststack.js (room loads may override)
   Post.setGradeRate = r => { Post.gradeRate = r > 0 ? r : 3; };
   Post.lighting = true;       // dynamic 2D lights (Settings toggle)
   Post.lightStrength = 1;     // 0..1 — overall strength of the lighting effect (tuning)
@@ -374,14 +374,17 @@
   Post.shadowSoft = 11;       // penumbra hardness (higher = sharper shadows)
   Post.debugLight = 0;        // 1 = show light term, 2 = show gameplay gate (dev only)
   Post.tonemap = 1;           // 0 = none, 1 = ACES (filmic), 2 = AgX (modern)
-  Post.ssao = 0.6;            // screen-space ambient occlusion strength (0 disables)
+  Post.ssao = (G.PostFX ? G.PostFX.ssao() : 0.6);            // ambient occlusion strength (0 disables; data/poststack.js)
   Post.motion = 0.6;          // camera motion-blur strength (0 disables)
   // user graphics toggles (Settings menu): master 0..1 multipliers per effect
   Post.fx = { bloom: 1, dof: 1, reflections: 1, aberr: 1, vignette: 1 };
   Post.setFX = function (o) { if (!o) return; for (const k in o) if (k in Post.fx) Post.fx[k] = o[k]; };
-  // transient hit/landing feedback: a chromatic-aberration spike (+ optional flash)
-  Post.punch = function (amt) { aberr = Math.min(2.5, aberr + (amt || 0.6)); };
-  Post.flash = function (amt, color) { flash = Math.max(flash, amt || 0.4); if (color !== undefined) flashCol.set(color); };
+  // transient hit/landing feedback: a chromatic-aberration spike (+ optional flash). Tuning in
+  // data/poststack.js (G.PostFX) so the editor can author the impact feel; literal fallback unchanged.
+  Post.punch = function (amt) { aberr = Math.min(G.PostFX ? G.PostFX.aberrMax() : 2.5, aberr + (amt || (G.PostFX ? G.PostFX.aberrDefault() : 0.6))); };
+  Post.flash = function (amt, color) { flash = Math.max(flash, amt || (G.PostFX ? G.PostFX.flashDefault() : 0.4)); if (color !== undefined) flashCol.set(color); };
+  Post._aberr = () => aberr;   // test hooks (read-only)
+  Post._flash = () => flash;
 
   function drawQuad(mat, rt, noClear) {
     quad.material = mat;
@@ -401,7 +404,7 @@
     for (const p of ['exposure', 'contrast', 'saturation', 'bloom', 'vignette', 'grain', 'dof'])
       grade[p] += (target[p] - grade[p]) * k;
     grade.tint.lerp(target.tint, k);
-    aberr *= Math.max(0, 1 - dt * 6); flash *= Math.max(0, 1 - dt * 5);
+    aberr *= Math.max(0, 1 - dt * (G.PostFX ? G.PostFX.aberrDecay() : 6)); flash *= Math.max(0, 1 - dt * (G.PostFX ? G.PostFX.flashDecay() : 5));
 
     const lowQ = Post.quality === 'low';
     const dofOn = !lowQ && grade.dof > 0.01 && Post.fx.dof > 0.01;

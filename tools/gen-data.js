@@ -21,7 +21,8 @@ const DATASETS = [
   { name: 'loadout', global: 'LOADOUT_DATA', srcs: ['src/loadout.js'], pick: G => G.Loadout.exportDefaults() },
   { name: 'credits', global: 'CREDITS_DATA', srcs: ['src/credits.js'], pick: G => G.Credits.exportDefaults() },
   { name: 'saves', global: 'SAVES_DATA', srcs: ['src/saves.js'], pick: G => G.Saves.exportDefaults() },
-  { name: 'camera', global: 'CAMERA_DATA', srcs: ['src/camera.js'], pick: G => G.Cam.exportDefaults() }
+  { name: 'camera', global: 'CAMERA_DATA', srcs: ['src/camera.js'], pick: G => G.Cam.exportDefaults() },
+  { name: 'poststack', global: 'POSTFX_DATA', srcs: ['src/poststack.js'], pick: G => G.PostFX.exportDefaults() }
 ];
 
 function evalModule(srcs) {

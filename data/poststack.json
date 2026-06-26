@@ -1,0 +1,9 @@
+{
+ "gradeRate": 3,
+ "ssao": 0.6,
+ "aberrMax": 2.5,
+ "aberrDefault": 0.6,
+ "aberrDecay": 6,
+ "flashDefault": 0.4,
+ "flashDecay": 5
+}
