@@ -98,12 +98,15 @@
   function drawHud(dt) {
     const p = G.player;
     if (!p) return;
+    const HS = G.HUD ? G.HUD.soul() : { x: 64, y: 64, r: 30, fillTop: '#eef8ff', fillBot: '#9fcfe0' };
+    const HM = G.HUD ? G.HUD.masks() : { x: 122, y: 52, spacing: 38, size: 13, color: '#e9e4d4' };
+    const HG = G.HUD ? G.HUD.glimmer() : { x: 38, y: 110, dotR: 6, textX: 52, textY: 111, dotColor: '#ffe28a', textColor: 'rgba(240,230,200,0.92)', fontSize: 16 };
     maskFlash = Math.max(0, maskFlash - dt);
     healFlash = Math.max(0, healFlash - dt);
     lowHpPulse += dt * 5;
 
     // soul orb
-    const ox = 64, oy = 64, or_ = 30;
+    const ox = HS.x, oy = HS.y, or_ = HS.r;
     let soulShown = p.soul;
     if (p.focusing) soulShown = Math.max(0, p.soul - (p.focusT / 0.85) * 33);
     const frac = soulShown / 99;
@@ -115,7 +118,7 @@
     cx.beginPath(); cx.arc(ox, oy, or_ - 2.5, 0, U.TAU); cx.clip();
     const lvl = oy + (or_ - 2.5) - frac * 2 * (or_ - 2.5);
     const sg = cx.createLinearGradient(0, lvl, 0, oy + or_);
-    sg.addColorStop(0, '#eef8ff'); sg.addColorStop(1, '#9fcfe0');
+    sg.addColorStop(0, HS.fillTop); sg.addColorStop(1, HS.fillBot);
     cx.fillStyle = sg;
     cx.fillRect(ox - or_, lvl + Math.sin(G.time * 3) * 1.5, or_ * 2, or_ * 2);
     if (frac > 0) {
@@ -137,16 +140,16 @@
 
     // masks
     for (let i = 0; i < p.maxHp; i++) {
-      const mx = 122 + i * 38, my = 52;
+      const mx = HM.x + i * HM.spacing, my = HM.y;
       const alive = i < p.hp;
-      let s = 13;
-      if (alive && i === p.hp - 1 && maskFlash > 0) s = 13 + maskFlash * 6;
-      if (alive && healFlash > 0 && i === p.hp - 1) s = 13 + Math.sin(healFlash * 10) * 4;
+      let s = HM.size;
+      if (alive && i === p.hp - 1 && maskFlash > 0) s = HM.size + maskFlash * 6;
+      if (alive && healFlash > 0 && i === p.hp - 1) s = HM.size + Math.sin(healFlash * 10) * 4;
       cx.save();
       if (p.hp === 1 && alive) cx.globalAlpha = 0.7 + Math.sin(lowHpPulse) * 0.3;
       maskPath(mx, my, s);
       if (alive) {
-        cx.fillStyle = '#e9e4d4';
+        cx.fillStyle = HM.color;
         cx.shadowColor = 'rgba(233,228,212,0.7)';
         cx.shadowBlur = 8;
         cx.fill();
@@ -169,11 +172,11 @@
     const glim = G.Main.glimmer ? G.Main.glimmer() : 0;
     cx.save();
     cx.textAlign = 'left'; cx.textBaseline = 'middle';
-    cx.beginPath(); cx.arc(38, 110, 6, 0, U.TAU);
-    cx.fillStyle = '#ffe28a'; cx.shadowColor = 'rgba(255,226,138,0.7)'; cx.shadowBlur = 8; cx.fill();
+    cx.beginPath(); cx.arc(HG.x, HG.y, HG.dotR, 0, U.TAU);
+    cx.fillStyle = HG.dotColor; cx.shadowColor = 'rgba(255,226,138,0.7)'; cx.shadowBlur = 8; cx.fill();
     cx.shadowBlur = 0;
-    cx.fillStyle = 'rgba(240,230,200,0.92)'; cx.font = `16px ${serif}`;
-    cx.fillText(String(glim), 52, 111);
+    cx.fillStyle = HG.textColor; cx.font = `${HG.fontSize}px ${serif}`;
+    cx.fillText(String(glim), HG.textX, HG.textY);
     cx.restore();
   }
 

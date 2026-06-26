@@ -1,0 +1,28 @@
+// generated from data/hud.json - do not edit by hand (use the editor)
+window.G = window.G || {};
+G.HUD_DATA = {
+ "soul": {
+  "x": 64,
+  "y": 64,
+  "r": 30,
+  "fillTop": "#eef8ff",
+  "fillBot": "#9fcfe0"
+ },
+ "masks": {
+  "x": 122,
+  "y": 52,
+  "spacing": 38,
+  "size": 13,
+  "color": "#e9e4d4"
+ },
+ "glimmer": {
+  "x": 38,
+  "y": 110,
+  "dotR": 6,
+  "textX": 52,
+  "textY": 111,
+  "dotColor": "#ffe28a",
+  "textColor": "rgba(240,230,200,0.92)",
+  "fontSize": 16
+ }
+};
