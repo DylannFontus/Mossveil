@@ -3028,8 +3028,46 @@
     g.links = g.links.filter(l => l.from !== logicSel && l.to !== logicSel);
     logicSel = null; markDirty(); refreshInspector();
   }
+  // Logic graph 2.0 — duplicate the selected node (links aren't copied; offset so it's visible)
+  function logicDuplicateSelected() {
+    const g = graphOf(); if (!g || logicSel == null) return;
+    const src = g.nodes.find(n => n.id === logicSel); if (!src) return;
+    let mid = 0; for (const n of g.nodes) mid = Math.max(mid, n.id || 0);
+    const copy = JSON.parse(JSON.stringify(src)); copy.id = mid + 1; copy.x += 24; copy.y += 24;
+    g.nodes.push(copy); logicSel = copy.id; markDirty(); refreshInspector();
+  }
+  // Logic graph 2.0 — tidy the graph into left-to-right columns by flow depth (longest path from roots)
+  function logicAutoLayout() {
+    const g = graphOf(); if (!g || !g.nodes.length) return;
+    const byId = {}; g.nodes.forEach(n => byId[n.id] = n);
+    const depth = {}; g.nodes.forEach(n => depth[n.id] = 0);
+    let changed = true, guard = 0;                      // iterate to longest-path; guard caps any cycles
+    while (changed && guard++ < g.nodes.length + 4) {
+      changed = false;
+      for (const l of g.links) { if (!byId[l.from] || !byId[l.to]) continue; if (depth[l.to] < depth[l.from] + 1) { depth[l.to] = depth[l.from] + 1; changed = true; } }
+    }
+    const cols = {}; g.nodes.forEach(n => (cols[depth[n.id]] = cols[depth[n.id]] || []).push(n));
+    const COLW = NODE_W + 70, ROWGAP = 22;
+    Object.keys(cols).sort((a, b) => a - b).forEach(d => { let y = 0; cols[d].forEach(n => { n.x = (+d) * COLW; n.y = y; y += nodeH(n) + ROWGAP; }); });
+    markDirty();
+  }
+  // Logic graph 2.0 — frame every node in view (zoom-to-fit)
+  function logicFrameAll() {
+    const g = graphOf(); if (!g || !g.nodes.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of g.nodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x + NODE_W); y1 = Math.max(y1, n.y + nodeH(n)); }
+    const bw = Math.max(1, x1 - x0) + 90, bh = Math.max(1, y1 - y0) + 90;
+    const cw = logicCanvas.width || 800, ch = logicCanvas.height || 600;
+    logicCam.zoom = Math.max(0.4, Math.min(2.2, Math.min(cw / bw, ch / bh)));
+    logicCam.x = (x0 + x1) / 2; logicCam.y = (y0 + y1) / 2;
+  }
   function buildLogicPalette() {
     const pal = $('logicPalette'); pal.innerHTML = '';
+    const bar = el('div', { class: 'logicTools' }, pal);
+    const mkT = (label, title, fn) => { const b = el('button', { title }, bar, label); b.addEventListener('click', fn); };
+    mkT('⤢ Fit', 'Frame all nodes (F)', () => logicFrameAll());
+    mkT('▥ Tidy', 'Auto-layout the graph by flow', () => { if (graphOf() && graphOf().nodes.length && confirm('Re-arrange all nodes into a tidy left-to-right layout?')) { logicAutoLayout(); logicFrameAll(); } });
+    mkT('⧉ Dup', 'Duplicate selected node (Ctrl+D)', () => logicDuplicateSelected());
     const groups = [['event', 'Events'], ['cond', 'Conditions'], ['action', 'Actions']];
     for (const [gk, glabel] of groups) {
       el('div', { class: 'plabel' }, pal, glabel);
@@ -3443,7 +3481,12 @@
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
     if (e.ctrlKey && e.code === 'KeyS') { e.preventDefault(); save(); return; }
     if (typing) return;
-    if (tab === 'logic') { if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); logicDeleteSelected(); } return; }
+    if (tab === 'logic') {
+      if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); logicDeleteSelected(); }
+      else if (e.code === 'KeyD' && e.ctrlKey) { e.preventDefault(); logicDuplicateSelected(); }
+      else if (e.code === 'KeyF' && !e.ctrlKey) { e.preventDefault(); logicFrameAll(); }
+      return;
+    }
     if (tab === 'models') { if ((e.code === 'Delete' || e.code === 'Backspace') && modelSel >= 0) { e.preventDefault(); modelDeletePart(modelSel); } else if (e.code === 'KeyD' && e.ctrlKey && modelSel >= 0) { e.preventDefault(); modelDupPart(modelSel); } return; }
     if (csMode || tab === 'cutscene') return; // cutscene editing: no level shortcuts
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
@@ -3597,6 +3640,7 @@
     logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
     logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
+    logicAutoLayout: () => logicAutoLayout(), logicFrameAll: () => logicFrameAll(), logicDup: () => logicDuplicateSelected(), logicCam: () => logicCam,
     csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); },
     modelAdd: s => modelAdd(s), modelDoc: () => modelDoc, modelSave: () => saveModel(), modelSetSel: i => { modelSel = i; },
     modelRebuild: () => rebuildModelMeshes(), modelRig: () => modelRig, modelSetClip: c => { modelClip = c; },
@@ -3672,8 +3716,8 @@
 
   // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
   // tools-core.js has loaded — it runs after editor.js in the script list.
-  // #33 Hierarchy 2.0, #34 Asset browser 2.0
-  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34); } catch (_) { } }, 0);
+  // #33 Hierarchy 2.0, #34 Asset browser 2.0, #31 Logic graph 2.0
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31); } catch (_) { } }, 0);
 
   boot();
 })();
