@@ -29,7 +29,8 @@ const DATASETS = [
   { name: 'sfxvar', global: 'SFXVAR_DATA', srcs: ['src/sfxvar.js'], pick: G => G.SfxVar.exportDefaults() },
   { name: 'sidechain', global: 'SIDECHAIN_DATA', srcs: ['src/sidechain.js'], pick: G => G.Sidechain.exportDefaults() },
   { name: 'synth', global: 'SYNTH_DATA', srcs: ['src/synth.js'], pick: G => G.Synth.exportDefaults() },
-  { name: 'combat', global: 'COMBAT_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.combatExportDefaults() }
+  { name: 'combat', global: 'COMBAT_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.combatExportDefaults() },
+  { name: 'parallax', global: 'PARALLAX_DATA', srcs: ['src/parallax.js'], pick: G => G.Parallax.exportDefaults() }
 ];
 
 function evalModule(srcs) {

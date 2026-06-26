@@ -575,31 +575,43 @@
     grp.add(new THREE.Mesh(new THREE.ShapeGeometry(U.splineShape(pts), 16), mat));
   }
 
-  function buildLayer(group, def, pal, z, rng) {
-    const margin = (-z) * 0.9 + 14;
+  // fallback silhouette-shape coefficients (used only if src/parallax.js failed to load); these are
+  // the exact literals the old buildLayer used, so the look is identical with or without the overlay.
+  const PX_SHAPE = {
+    marginBase: 14, marginPer: 0.9, baseYBase: 1.2, baseYPer: 0.1, scaleBase: 1, scalePer: 0.05,
+    humpBase: 3.2, humpPer: 0.22, topYPer: 0.12, hangChance: 0.55, stalactiteChance: 0.35,
+    hangGapMin: 3, hangGapMax: 9, hangScaleMin: 0.7, hangScaleMax: 1.6,
+    standGapMin: 4, standGapMax: 11, standScaleMin: 0.8, standScaleMax: 2
+  };
+  // L = { z, density, scale } parallax layer (G.Parallax overlay; density/scale of 1 = byte-identical)
+  function buildLayer(group, def, pal, L, rng) {
+    const z = L.z, dens = L.density || 1, lscale = L.scale || 1;
+    const S = G.Parallax ? G.Parallax.shape() : PX_SHAPE;
+    const margin = (-z) * S.marginPer + S.marginBase;
     const x0 = -margin, x1 = def.w + margin;
     const lay = new THREE.Group();
     lay.position.z = z;
+    lay.userData.pxLayer = z;   // inert tag: marks this as a parallax silhouette layer (for the editor/test)
     const mat = new THREE.MeshBasicMaterial({ color: pal.sil, fog: true, side: THREE.DoubleSide });
-    const baseY = 1.2 - (-z) * 0.1;
-    const ss = 1 + (-z) * 0.05;
-    silHumps(lay, mat, x0, x1, baseY, 3.2 + (-z) * 0.22, rng);
-    const topY = def.h - 1 + (-z) * 0.12;
+    const baseY = S.baseYBase - (-z) * S.baseYPer;
+    const ss = (S.scaleBase + (-z) * S.scalePer) * lscale;
+    silHumps(lay, mat, x0, x1, baseY, S.humpBase + (-z) * S.humpPer, rng);
+    const topY = def.h - 1 + (-z) * S.topYPer;
     const hang = pal.deco.filter(d => W.DECOR_KINDS.hanging.includes(d));
     let x = x0 + rng() * 6;
     while (x < x1) {
-      const kind = hang.length && rng() < 0.55 ? U_pick(hang, rng) : (rng() < 0.35 ? 'stalactite' : null);
-      if (kind && SIL[kind]) SIL[kind](lay, mat, x, topY, U.lerp(0.7, 1.6, rng()) * ss, rng);
-      x += U.lerp(3, 9, rng());
+      const kind = hang.length && rng() < S.hangChance ? U_pick(hang, rng) : (rng() < S.stalactiteChance ? 'stalactite' : null);
+      if (kind && SIL[kind]) SIL[kind](lay, mat, x, topY, U.lerp(S.hangScaleMin, S.hangScaleMax, rng()) * ss, rng);
+      x += U.lerp(S.hangGapMin, S.hangGapMax, rng()) / dens;
     }
     const stand = pal.deco.filter(d => W.DECOR_KINDS.standing.includes(d) && d !== 'hump');
     x = x0 + rng() * 5;
     while (x < x1) {
       if (stand.length) {
         const d = stand[(rng() * stand.length) | 0];
-        SIL[d](lay, mat, x, baseY + rng() * 2, U.lerp(0.8, 2, rng()) * ss, rng);
+        SIL[d](lay, mat, x, baseY + rng() * 2, U.lerp(S.standScaleMin, S.standScaleMax, rng()) * ss, rng);
       }
-      x += U.lerp(4, 11, rng());
+      x += U.lerp(S.standGapMin, S.standGapMax, rng()) / dens;
     }
     group.add(lay);
   }
@@ -2242,17 +2254,17 @@
       new THREE.PlaneGeometry(def.w + 260, def.h + 200),
       new THREE.MeshBasicMaterial({ map: gradientTex(pal.bgTop, pal.bgBottom, pal.light), fog: false })
     );
-    bgPlane.position.set(def.w / 2, def.h / 2, -80);
+    bgPlane.position.set(def.w / 2, def.h / 2, G.Parallax ? G.Parallax.skyZ() : -80);
     group.add(bgPlane);
     const wall = new THREE.Mesh(
       new THREE.PlaneGeometry(def.w + 170, def.h + 120),
       new THREE.MeshBasicMaterial({ map: wallTex(pal, rng), fog: true })
     );
-    wall.position.set(def.w / 2, def.h / 2, -48);
+    wall.position.set(def.w / 2, def.h / 2, G.Parallax ? G.Parallax.wallZ() : -48);
     group.add(wall);
-    buildLayer(group, def, pal, -30, rng);
-    buildLayer(group, def, pal, -18, rng);
-    buildLayer(group, def, pal, -9, rng);
+    const pxLayers = G.Parallax ? G.Parallax.layers()
+      : [{ z: -30, density: 1, scale: 1 }, { z: -18, density: 1, scale: 1 }, { z: -9, density: 1, scale: 1 }];
+    for (const L of pxLayers) buildLayer(group, def, pal, L, rng);
 
     // light pools
     {
