@@ -178,6 +178,8 @@
     const c = G.camera && G.camera.position;
     const cx = c ? c.x : x, cy = c ? c.y : (y || 0);
     const dx = x - cx, dy = (y || 0) - cy;
+    // positional falloff/pan authored in the Positional-audio editor (data/positional.js); literal fallback
+    if (G.Positional) return { gain: G.Positional.gainFor(G.Positional.distOf(dx, dy)), pan: G.Positional.panFor(dx) };
     const dist = Math.abs(dx) + Math.abs(dy) * 0.5;
     return { gain: Math.max(0.04, Math.min(1, 1 / (1 + Math.pow(dist / 9, 2)))), pan: Math.max(-1, Math.min(1, dx / 14)) };
   }
@@ -357,6 +359,7 @@
     setAmb(params) { applyAmbData(params || AMB); },      // audition unsaved ambience params live
     // master VU level 0..1 (RMS of the time-domain signal at the master bus)
     meterLevel() { if (!analyser) return 0; const a = new Uint8Array(analyser.fftSize); analyser.getByteTimeDomainData(a); let s = 0; for (let i = 0; i < a.length; i++) { const v = (a[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / a.length) * 3); },
+    _spatial: (x, y) => spatial(x, y),   // read-only test hook: positional gain/pan for a world point
     setArea(root) { areaRoot = root; if (started) retune(); },
     setBoss(on) {
       bossOn = on;

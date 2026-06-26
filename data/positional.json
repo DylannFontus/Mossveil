@@ -1,0 +1,7 @@
+{
+ "minGain": 0.04,
+ "refDist": 9,
+ "falloffPow": 2,
+ "panWidth": 14,
+ "yWeight": 0.5
+}
