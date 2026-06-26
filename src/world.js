@@ -271,14 +271,27 @@
   W.exportBiomeCurrent = () => { const o = {}; for (const id in PAL) o[id] = serPalette(PAL[id]); return { palettes: o }; };
   applyBiomeData();
 
-  // per-biome reverb character [wet, tail-seconds, decay] — big stone halls ring, forges are dry
-  const REVERB = W.REVERB = {
+  // per-biome reverb character [wet, tail-seconds, decay] — big stone halls ring, forges are dry.
+  // Externalised to data/reverb.js (window.G.REVERB_DATA), authored by the Reverb / space editor.
+  const DEFAULT_REVERB = {
     _default: [0.40, 2.4, 2.6],
     verdant: [0.34, 2.2, 2.4], gloom: [0.46, 2.8, 2.6], warm: [0.40, 2.4, 2.6],
     city: [0.50, 3.2, 2.8], tombs: [0.52, 3.4, 3.0], archive: [0.48, 3.0, 2.6],
     forge: [0.30, 1.6, 2.0], mine: [0.42, 2.2, 2.4], village: [0.28, 1.8, 2.2],
     garden: [0.24, 1.5, 2.2]
   };
+  let REVERB = W.REVERB = {};
+  function applyReverbData(data) {
+    const d = data || G.REVERB_DATA || null;
+    REVERB = {}; for (const k in DEFAULT_REVERB) REVERB[k] = DEFAULT_REVERB[k].slice();
+    if (d && d.reverb) for (const k in d.reverb) if (Array.isArray(d.reverb[k])) REVERB[k] = d.reverb[k].slice();
+    if (!REVERB._default) REVERB._default = [0.40, 2.4, 2.6];
+    W.REVERB = REVERB;
+  }
+  W.applyReverbData = applyReverbData;
+  W.exportReverbDefaults = () => { const o = {}; for (const k in DEFAULT_REVERB) o[k] = DEFAULT_REVERB[k].slice(); return { reverb: o }; };
+  W.exportReverbCurrent = () => { const o = {}; for (const k in REVERB) o[k] = REVERB[k].slice(); return { reverb: o }; };
+  applyReverbData();
   // (re)apply the current room's default reverb — also used to revert when leaving a reverb zone
   function applyRoomReverb() {
     if (!G.Audio || !G.Audio.setReverb || !G.room) return;
