@@ -2,16 +2,29 @@
 (function () {
   const U = G.U;
 
-  // tuning
-  const RUN = 8.8, ACC = 90, DEC = 75, AIR_ACC = 60;
-  const G_UP = 44, G_DOWN = 62, FALL_MAX = -21;
-  const JUMP_V = 18, JUMP_CUT = 0.42, COYOTE = 0.1, BUFFER = 0.13;
-  const WALL_SLIDE = -3.4, WJ_X = 9.8, WJ_Y = 15.5, WALL_LOCK = 0.14;
-  const DASH_V = 23, DASH_T = 0.16, DASH_CD = 0.45;
-  const ATK_CD = 0.36, ATK_ACTIVE0 = 0.02, ATK_ACTIVE1 = 0.13, POGO_V = 14.5;
-  const WIND_GROUND = 4.5, WIND_AIR = 13;    // weather wind push (gentle underfoot, stronger midair)
+  // tuning — defaults overlaid from data/player.js (window.G.PLAYER_DATA.tune), authored by the
+  // Player feel / loadout editor. The const names below are unchanged, so all movement/combat code
+  // is untouched; only the VALUES become editable. (Empty overlay == identical to the old literals.)
+  const TUNE_DEFAULTS = {
+    run: 8.8, acc: 90, dec: 75, airAcc: 60,
+    gUp: 44, gDown: 62, fallMax: -21,
+    jumpV: 18, jumpCut: 0.42, coyote: 0.1, buffer: 0.13,
+    wallSlide: -3.4, wjX: 9.8, wjY: 15.5, wallLock: 0.14,
+    dashV: 23, dashT: 0.16, dashCd: 0.45,
+    atkCd: 0.36, pogoV: 14.5,
+    windGround: 4.5, windAir: 13,
+    maxHp: 5, soulMax: 99, soulHit: 12, focusCost: 33, focusTime: 0.85, spellCost: 33
+  };
+  const TUNE = Object.assign({}, TUNE_DEFAULTS, (G.PLAYER_DATA && G.PLAYER_DATA.tune) || {});
+  const RUN = TUNE.run, ACC = TUNE.acc, DEC = TUNE.dec, AIR_ACC = TUNE.airAcc;
+  const G_UP = TUNE.gUp, G_DOWN = TUNE.gDown, FALL_MAX = TUNE.fallMax;
+  const JUMP_V = TUNE.jumpV, JUMP_CUT = TUNE.jumpCut, COYOTE = TUNE.coyote, BUFFER = TUNE.buffer;
+  const WALL_SLIDE = TUNE.wallSlide, WJ_X = TUNE.wjX, WJ_Y = TUNE.wjY, WALL_LOCK = TUNE.wallLock;
+  const DASH_V = TUNE.dashV, DASH_T = TUNE.dashT, DASH_CD = TUNE.dashCd;
+  const ATK_CD = TUNE.atkCd, ATK_ACTIVE0 = 0.02, ATK_ACTIVE1 = 0.13, POGO_V = TUNE.pogoV;
+  const WIND_GROUND = TUNE.windGround, WIND_AIR = TUNE.windAir;    // weather wind push (gentle underfoot, stronger midair)
   const ART_CHARGE = 0.55;   // hold attack this long to ready a Great Slash (nail art)
-  const MAX_HP = 5, SOUL_MAX = 99, SOUL_HIT = 12, FOCUS_COST = 33, FOCUS_TIME = 0.85, SPELL_COST = 33;
+  const MAX_HP = TUNE.maxHp, SOUL_MAX = TUNE.soulMax, SOUL_HIT = TUNE.soulHit, FOCUS_COST = TUNE.focusCost, FOCUS_TIME = TUNE.focusTime, SPELL_COST = TUNE.spellCost;
   const INVULN = 1.3;
 
   function buildRig(p) {
@@ -819,5 +832,5 @@
     });
   }
 
-  G.Player = { create, MAX_HP, SOUL_MAX, FOCUS_COST, cinePose, cineClip, hurtRect };
+  G.Player = { create, MAX_HP, SOUL_MAX, FOCUS_COST, cinePose, cineClip, hurtRect, tuneDefaults: () => Object.assign({}, TUNE_DEFAULTS), tune: () => Object.assign({}, TUNE) };
 })();
