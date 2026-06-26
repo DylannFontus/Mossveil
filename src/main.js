@@ -136,8 +136,10 @@
 
   // ---------------- settings ----------------
   const SETTINGS_KEY = 'mossveil-settings';
-  // schema drives the menu, the adjust logic, and the saved keys
-  const SETTINGS_DEFS = [
+  // schema drives the menu, the adjust logic, and the saved keys. Externalised to data/settings.js
+  // (G.Settings) so the editor can author labels / order / visibility / option lists / defaults; the
+  // key-specific apply logic below stays here. Literal fallback keeps the game running without it.
+  const SETTINGS_DEFS = (G.Settings && G.Settings.defs) ? G.Settings.defs() : [
     { key: 'controls', label: 'Controls / key bindings', type: 'action' },
     { key: 'volume', label: 'Sound volume', type: 'slider' },
     { key: 'soundtrack', label: 'Soundtrack', type: 'cycle', opts: ['Score', 'Classic'] },
@@ -154,7 +156,7 @@
     { key: 'motionblur', label: 'Motion blur', type: 'toggle' },
     { key: 'vignette', label: 'Vignette', type: 'toggle' }
   ];
-  G.settings = { volume: 0.8, soundtrack: 'Score', shake: true, rumble: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
+  G.settings = (G.Settings && G.Settings.defaults) ? G.Settings.defaults() : { volume: 0.8, soundtrack: 'Score', shake: true, rumble: true, quality: 'high', tonemap: 'ACES', lighting: true, bloom: true, dof: true, reflections: true, weather: true, aberration: true, motionblur: true, vignette: true };
   const fmtSetting = d => {
     if (d.type === 'action') return '▶';
     const v = G.settings[d.key];
@@ -188,7 +190,7 @@
     const d = SETTINGS_DEFS[Main.settingsIndex]; if (!d) return;
     if (d.type === 'action') { if (dir > 0 && d.key === 'controls') openControls(); return; }
     const s = G.settings;
-    if (d.type === 'slider') s[d.key] = U.clamp(+(s[d.key] + dir * 0.1).toFixed(2), 0, 1);
+    if (d.type === 'slider') s[d.key] = U.clamp(+(s[d.key] + dir * (d.step || 0.1)).toFixed(2), (d.min != null ? d.min : 0), (d.max != null ? d.max : 1));
     else if (d.type === 'cycle') s[d.key] = d.opts[(d.opts.indexOf(s[d.key]) + dir + d.opts.length) % d.opts.length];
     else s[d.key] = !s[d.key];
     applySettings(); saveSettings(); G.Audio.sfx('clink');
