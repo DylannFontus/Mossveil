@@ -23,6 +23,8 @@
   let lastWorld = { x: 0, y: 0 };
   let hierFilter = '';          // Hierarchy 2.0: live text filter
   let hierCollapsed = {};       // Hierarchy 2.0: { groupKey: true } collapsed groups
+  let insFilter = '';           // Inspector 2.0: field-row text filter (persisted across re-renders)
+  let insClip = null;           // Inspector 2.0: copied properties { kind, type, data }
   let prefabs = {};             // name -> captured cluster
   try { prefabs = JSON.parse(localStorage.getItem('mossveil-ed-prefabs')) || {}; } catch (e) { }
   try { clipboard = JSON.parse(localStorage.getItem('mossveil-ed-clip')) || null; } catch (e) { }
@@ -1045,6 +1047,57 @@
     return out;
   }
 
+  // ---- Inspector 2.0: copy / paste properties between same-type objects + field filter ----
+  // spatial / identity keys that should NOT travel when copying an object's "settings"
+  const INS_SKIP = new Set(['x', 'y', 'oid', 'rot', 'rect', 'side', 'x0', 'x1', 'active']);
+  // the comparison "type" for paste-compatibility: prop/enemy use their type field, every zone is interchangeable
+  function insClipType(it) { return it.kind === 'zone' ? 'zone' : (it.ref.type || it.kind); }
+  function insCopyProps() {
+    const it = selectedItem();
+    if (!it || (it.kind !== 'prop' && it.kind !== 'enemy' && it.kind !== 'zone')) return false;
+    const src = it.ref, data = {};
+    for (const k in src) if (!INS_SKIP.has(k)) data[k] = JSON.parse(JSON.stringify(src[k]));
+    insClip = { kind: it.kind, type: insClipType(it), data };
+    return true;
+  }
+  function insCanPaste() {
+    const it = selectedItem();
+    return !!(insClip && it && it.kind === insClip.kind && insClipType(it) === insClip.type);
+  }
+  function insPasteProps() {
+    if (!insCanPaste()) return false;
+    pushUndo();
+    const dst = selectedItem().ref;
+    for (const k in insClip.data) dst[k] = JSON.parse(JSON.stringify(insClip.data[k]));
+    queueRebuild(); markDirty(); refreshInspector();
+    return true;
+  }
+  // toggle field rows by label substring, in place (no re-render → keeps the filter input focused)
+  function applyInsFilter() {
+    const body = $('insBody'); if (!body) return;
+    const q = insFilter.trim().toLowerCase();
+    body.querySelectorAll('.hgroup, .insNote').forEach(e => { e.style.display = q ? 'none' : ''; });
+    body.querySelectorAll('.frow').forEach(r => {
+      if (r.classList.contains('insTools')) return;
+      const lab = r.querySelector('label');
+      if (!q || !lab) { r.style.display = ''; return; }   // label-less rows (action buttons) always stay
+      r.style.display = lab.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+  // the per-object toolbar: field filter + copy/paste-props (rendered at the top of the object inspector)
+  function insToolbar(body) {
+    const bar = el('div', { class: 'insTools' }, body);
+    const f = el('input', { type: 'text', class: 'insFilter', placeholder: '🔍 filter fields…' }, bar);
+    f.value = insFilter;
+    f.addEventListener('input', () => { insFilter = f.value; applyInsFilter(); });
+    const cp = el('button', { class: 'insTbtn', title: 'Copy this object’s settings (Ctrl+Shift+C)' }, bar, '⧉ Copy');
+    cp.addEventListener('click', () => { if (insCopyProps()) refreshInspector(); });
+    const pa = el('button', { class: 'insTbtn', title: 'Paste settings onto this object (Ctrl+Shift+V)' }, bar, '📋 Paste');
+    pa.disabled = !insCanPaste();
+    pa.addEventListener('click', () => insPasteProps());
+    if (insClip) el('span', { class: 'insClipTag', title: 'On the property clipboard' }, bar, 'clip: ' + insClip.type);
+  }
+
   function refreshInspector() {
     if (csMode) return refreshCsInspector();
     const body = $('insBody');
@@ -1118,6 +1171,7 @@
     }
     const p = it.ref;
     el('div', { class: 'insNote' }, body, `${it.kind.toUpperCase()} — ${p.type || (it.kind === 'zone' ? 'transition' : '') || it.key || ''}`);
+    if (it.kind === 'prop' || it.kind === 'enemy' || it.kind === 'zone') insToolbar(body);
     // Active toggle — works for every placeable object (prop/decor/light/boss/marker/enemy/portal).
     // When off, the object isn't built into the game (it doesn't show or work). A Set-active
     // trigger can flip it on/off at runtime. Shown dimmed with "(off)" in the viewport.
@@ -1567,6 +1621,7 @@
     const btns = el('div', { class: 'frow', style: 'margin-top:10px' }, body);
     el('button', { class: 'tbtn', onclick: duplicateSelected }, btns, 'Duplicate');
     el('button', { class: 'tbtn dangerBtn', onclick: deleteSelected }, btns, 'Delete');
+    applyInsFilter();   // Inspector 2.0: re-apply any active field filter after a full re-render
   }
 
   function resizeLevel(nw, nh) {
@@ -3573,6 +3628,9 @@
       return;
     }
     if (csMode) return; // cutscene editing in the Scenes panel: no level shortcuts
+    // Inspector 2.0 — copy/paste an object's SETTINGS (distinct from Ctrl+C/V which copy whole objects)
+    if (e.ctrlKey && e.shiftKey && e.code === 'KeyC') { e.preventDefault(); if (insCopyProps()) refreshInspector(); return; }
+    if (e.ctrlKey && e.shiftKey && e.code === 'KeyV') { e.preventDefault(); insPasteProps(); return; }
     if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); doUndo(); return; }
     if (e.ctrlKey && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) { e.preventDefault(); doRedo(); return; }
     if (e.ctrlKey && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
@@ -3725,6 +3783,9 @@
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
     logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
     logicAutoLayout: () => logicAutoLayout(), logicFrameAll: () => logicFrameAll(), logicDup: () => logicDuplicateSelected(), logicCam: () => logicCam,
+    // Inspector 2.0 hooks (tests / Companion): copy/paste-props + the field filter
+    insCopy: () => insCopyProps(), insPaste: () => insPasteProps(), insCanPaste: () => insCanPaste(),
+    insClip: () => insClip, insSetFilter: s => { insFilter = s || ''; applyInsFilter(); }, insFilterVal: () => insFilter,
     csSelect: (id, idx) => { csMode = true; csCurrent = id; csSel = idx; refreshCsTab(); refreshInspector(); },
     // Cutscene timeline 2.0 hooks (tests / Companion): selection + retime ops on the current scene
     csCur: () => csCur(), csCurId: () => csCurrent, csGetSel: () => csSel, csSetSel: i => { csSel = i; },
@@ -3806,7 +3867,7 @@
   // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
   // tools-core.js has loaded — it runs after editor.js in the script list.
   // #33 Hierarchy 2.0, #34 Asset browser 2.0, #31 Logic graph 2.0
-  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39); } catch (_) { } }, 0);
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39, 32); } catch (_) { } }, 0);
 
   boot();
 })();

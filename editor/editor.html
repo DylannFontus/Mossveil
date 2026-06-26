@@ -243,6 +243,16 @@
   .frow input[type=color] { width:42px; height:24px; padding:0; border:1px solid #3c3c44; background:none; }
   .insNote { color:var(--txt2); font-size:11px; margin:6px 0; line-height:1.5; }
   .dangerBtn { background:#6b2f2f; border-color:#6b2f2f; }
+  /* inspector 2.0 — per-object toolbar (field filter + copy/paste settings) */
+  .insTools { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin:2px 0 9px;
+    padding-bottom:8px; border-bottom:1px solid #2a2a32; }
+  .insFilter { flex:1; min-width:90px; background:var(--bg0); color:var(--txt); border:1px solid #3c3c44;
+    border-radius:3px; padding:4px 6px; font:12px "Segoe UI", sans-serif; }
+  .insTbtn { background:#1d1d24; color:#cfd2d6; border:1px solid #3c3c44; border-radius:3px;
+    padding:4px 8px; font-size:11px; cursor:pointer; white-space:nowrap; }
+  .insTbtn:hover { background:#26262e; }
+  .insTbtn:disabled { opacity:.4; cursor:default; }
+  .insClipTag { color:#9fd8b8; font-size:10px; width:100%; }
 
   /* assets */
   #assets { grid-area:assets; background:var(--bg1); border-top:1px solid var(--line);
