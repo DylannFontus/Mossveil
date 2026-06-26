@@ -85,7 +85,7 @@
   const serif = (G.Theme && G.Theme.font) ? G.Theme.font('body') : 'Georgia, "Times New Roman", serif';
   const ICON_DEF = { glimmer: '✦', diamond: '◆', diamondOutline: '◇', check: '✓' };
   const icon = name => (G.Theme && G.Theme.icon) ? G.Theme.icon(name) : (ICON_DEF[name] || '');
-  const SLOT_VIEW = 5;   // number of save slots shown on the slots screen
+  const SLOT_VIEW = (G.Saves ? G.Saves.slotCount() : 5);   // number of save slots shown (data/saves.js)
 
   function maskPath(x, y, s) {
     cx.beginPath();
@@ -590,15 +590,15 @@
         cx.fillStyle = sel ? 'rgba(6,18,14,0.72)' : 'rgba(170,195,182,0.75)'; cx.font = `13px ${serif}`;
         cx.fillText(info.detail, tx, y + 47);
         cx.fillStyle = sel ? 'rgba(6,18,14,0.6)' : 'rgba(140,165,153,0.6)'; cx.font = `italic 12px ${serif}`;
-        cx.fillText('rested ' + info.when, tx, y + 64);
+        cx.fillText((G.Saves ? G.Saves.label('restedPrefix') : 'rested ') + info.when, tx, y + 64);
         const tbx = x0 + bw - 28, tbox = 34;
         drawTrashIcon(tbx, y + 24, 17, sel ? 'rgba(70,20,18,0.9)' : 'rgba(180,150,148,0.6)');
         G.UI.slotTrashButtons.push({ x: tbx - tbox / 2, y, w: tbox, h: bh, index: i });
       } else {
         cx.fillStyle = sel ? '#06120e' : 'rgba(150,170,160,0.6)'; cx.font = `italic 20px ${serif}`;
-        cx.fillText('— empty vessel —', tx, y + bh / 2 - 4);
+        cx.fillText(G.Saves ? G.Saves.label('emptyTitle') : '— empty vessel —', tx, y + bh / 2 - 4);
         cx.fillStyle = sel ? 'rgba(6,18,14,0.6)' : 'rgba(150,180,165,0.5)'; cx.font = `13px ${serif}`;
-        cx.fillText('begin a new journey here', tx, y + bh / 2 + 18);
+        cx.fillText(G.Saves ? G.Saves.label('emptySub') : 'begin a new journey here', tx, y + bh / 2 + 18);
       }
       cx.textBaseline = 'alphabetic';
       G.UI.slotButtons.push({ x: x0, y, w: bw, h: bh, index: i });

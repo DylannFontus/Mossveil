@@ -7,7 +7,7 @@
   const SAVE_KEY = 'mossveil-save-v1';     // legacy single-save key (migrated on boot)
   const SLOT_PREFIX = 'mossveil-slot-';     // per-slot keys: mossveil-slot-0 .. -4
   const ACTIVE_KEY = 'mossveil-active-slot';
-  const SLOT_COUNT = 5;
+  const SLOT_COUNT = (G.Saves ? G.Saves.slotCount() : 5);   // how many save slots (1..5; data/saves.js)
 
   let camX = 0, camY = 0, camLead = 0, zoomPunch = 0;
   let titleDrift = 0;
@@ -93,13 +93,15 @@
     const d = slot.data || {};
     const roomId = d.bench ? d.bench.room : 'steps';
     const def = G.LEVELS[roomId];
-    const place = (def && def.title) ? def.title : 'The Awakening';
+    const place = (def && def.title) ? def.title : (G.Saves ? G.Saves.label('newGamePlace') : 'The Awakening');
     let bosses = 0;
     if (d.bosses) for (const k in d.bosses) { if (d.bosses[k]) bosses++; }
     else if (d.bossDead) bosses = 1;
     const parts = [];
-    if (d.wings) parts.push('Moth Wings');
-    parts.push(bosses + (bosses === 1 ? ' boss felled' : ' bosses felled'));
+    if (d.wings) parts.push(G.Saves ? G.Saves.label('wings') : 'Moth Wings');
+    parts.push(bosses + (bosses === 1
+      ? (G.Saves ? G.Saves.label('bossSingular') : ' boss felled')
+      : (G.Saves ? G.Saves.label('bossPlural') : ' bosses felled')));
     return { place, detail: parts.join('  ·  '), when: relTime(slot.updatedAt) };
   };
   function relTime(ms) {

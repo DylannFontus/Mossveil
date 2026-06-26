@@ -19,7 +19,8 @@ const DATASETS = [
   { name: 'drops', global: 'DROPS_DATA', srcs: ['src/drops.js'], pick: G => G.Drops.exportDefaults() },
   { name: 'settings', global: 'SETTINGS_DATA', srcs: ['src/settings.js'], pick: G => G.Settings.exportDefaults() },
   { name: 'loadout', global: 'LOADOUT_DATA', srcs: ['src/loadout.js'], pick: G => G.Loadout.exportDefaults() },
-  { name: 'credits', global: 'CREDITS_DATA', srcs: ['src/credits.js'], pick: G => G.Credits.exportDefaults() }
+  { name: 'credits', global: 'CREDITS_DATA', srcs: ['src/credits.js'], pick: G => G.Credits.exportDefaults() },
+  { name: 'saves', global: 'SAVES_DATA', srcs: ['src/saves.js'], pick: G => G.Saves.exportDefaults() }
 ];
 
 function evalModule(srcs) {
