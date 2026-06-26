@@ -82,6 +82,7 @@
 
   Main.persist = () => {
     if (G.activeSlot == null) return;            // title backdrop / editor preview: nothing to write
+    if (G.Achievements) G.Achievements.check();  // award any newly-earned achievements before saving
     const prev = readSlot(G.activeSlot);
     writeSlot(G.activeSlot, G.save, prev && prev.createdAt);
   };
