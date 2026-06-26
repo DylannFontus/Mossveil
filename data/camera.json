@@ -1,0 +1,15 @@
+{
+ "followX": 6.5,
+ "followY": 5.5,
+ "lookAhead": 2.1,
+ "lookVelFactor": 0.16,
+ "lookVelMax": 2.2,
+ "lookSpring": 3,
+ "vBias": 1.2,
+ "vVelFactor": 0.07,
+ "vClampDown": -1.4,
+ "vClampUp": 0.7,
+ "punchMax": 3.2,
+ "punchEase": 9,
+ "punchDefault": 0.8
+}

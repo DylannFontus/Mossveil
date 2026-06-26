@@ -814,7 +814,7 @@
 
   function snapCamera() {
     const p = G.player;
-    const c = clampCam(p.body.x, p.body.y + 1.2);
+    const c = clampCam(p.body.x, p.body.y + (G.Cam ? G.Cam.vBias() : 1.2));
     camX = c.x; camY = c.y;
   }
 
@@ -835,20 +835,21 @@
       camY = U.damp(camY, c.y, 0.6, rdt);
     } else if (p) {
       // springy look-ahead: lead the camera toward where the player is heading/facing
-      const leadTarget = p.facing * 2.1 + U.clamp(p.body.vx * 0.16, -2.2, 2.2);
-      camLead = U.damp(camLead, leadTarget, 3, rdt);
+      const M = G.Cam;
+      const leadTarget = p.facing * (M ? M.lookAhead() : 2.1) + U.clamp(p.body.vx * (M ? M.lookVelFactor() : 0.16), -(M ? M.lookVelMax() : 2.2), (M ? M.lookVelMax() : 2.2));
+      camLead = U.damp(camLead, leadTarget, M ? M.lookSpring() : 3, rdt);
       const lookX = p.body.x + camLead;
-      const lookY = p.body.y + 1.2 + U.clamp(p.body.vy * 0.07, -1.4, 0.7);
+      const lookY = p.body.y + (M ? M.vBias() : 1.2) + U.clamp(p.body.vy * (M ? M.vVelFactor() : 0.07), (M ? M.vClampDown() : -1.4), (M ? M.vClampUp() : 0.7));
       const c = clampCam(lookX, lookY);
-      camX = U.damp(camX, c.x, 6.5, rdt);
-      camY = U.damp(camY, c.y, 5.5, rdt);
+      camX = U.damp(camX, c.x, M ? M.followX() : 6.5, rdt);
+      camY = U.damp(camY, c.y, M ? M.followY() : 5.5, rdt);
     }
-    zoomPunch = U.damp(zoomPunch, 0, 9, rdt);    // ease the punch back out
+    zoomPunch = U.damp(zoomPunch, 0, G.Cam ? G.Cam.punchEase() : 9, rdt);    // ease the punch back out
     const sh = G.FX.camOffset();
     G.camera.position.set(camX + sh.x, camY + sh.y, CAM_Z - zoomPunch);
   }
   // a quick camera "kick" (zoom-in) for impacts — hits, hard landings, dashes
-  Main.camPunch = amt => { zoomPunch = Math.min(3.2, zoomPunch + (amt || 0.8)); };
+  Main.camPunch = amt => { zoomPunch = Math.min(G.Cam ? G.Cam.punchMax() : 3.2, zoomPunch + (amt || (G.Cam ? G.Cam.punchDefault() : 0.8))); };
 
   // ---------------- main loop ----------------
   function loop(t) {

@@ -20,7 +20,8 @@ const DATASETS = [
   { name: 'settings', global: 'SETTINGS_DATA', srcs: ['src/settings.js'], pick: G => G.Settings.exportDefaults() },
   { name: 'loadout', global: 'LOADOUT_DATA', srcs: ['src/loadout.js'], pick: G => G.Loadout.exportDefaults() },
   { name: 'credits', global: 'CREDITS_DATA', srcs: ['src/credits.js'], pick: G => G.Credits.exportDefaults() },
-  { name: 'saves', global: 'SAVES_DATA', srcs: ['src/saves.js'], pick: G => G.Saves.exportDefaults() }
+  { name: 'saves', global: 'SAVES_DATA', srcs: ['src/saves.js'], pick: G => G.Saves.exportDefaults() },
+  { name: 'camera', global: 'CAMERA_DATA', srcs: ['src/camera.js'], pick: G => G.Cam.exportDefaults() }
 ];
 
 function evalModule(srcs) {
