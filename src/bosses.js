@@ -191,16 +191,51 @@
 
   const RIGS = { beetle: rigBeetle, mantis: rigMantis, moth: rigMoth, serpent: rigSerpent, golem: rigGolem };
 
+  // ============================ MOVE PARAMETERS (#10 — Attack/move editor) ============================
+  // Every tunable number a move's start()/run() reads lives here so the FEEL of each attack
+  // (telegraph, damage, projectile counts / speeds / spread, leap power, …) is authorable in the
+  // editor without code. Overlay: data/moves.js -> G.MOVES_DATA; an empty overlay is byte-identical.
+  // (Authoring NEW move TYPES still needs code — the start/run behaviours are bespoke.)
+  const DEFAULT_MOVE_P = {
+    leap: { tele: 0.5, power: 17, track: 1.05 },
+    slash: { tele: 0.45, dmg: 1, reach: 1.9, w: 2.4, h: 2.6, speed: 10.5, dur: 0.5 },
+    rain: { tele: 0.7, drops: 6, spacing: 2.2, grav: 12, speed: 2 },
+    volley: { tele: 0.5, count: 3, spread: 0.22, speed: 10 },
+    ring: { tele: 0.6, count: 10, speed: 7 },
+    summon: { tele: 0.8, count: 2, cap: 4 },
+    spikes: { tele: 0.55, columns: 3, spacing: 2.5, dmg: 1 },
+    swoop: { tele: 0.4, speed: 15, dur: 1.0 },
+    orbs: { tele: 0.6, count: 3, speed: 3, homing: 9, maxSpeed: 5.5 },
+    burrow: { tele: 0.45, rise: 14, dmg: 1 }
+  };
+  // editor schema: per move, the fields to expose with label + sane slider range
+  const MOVE_SCHEMA = {
+    leap: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['power', 'Jump power', 8, 26, 0.5], ['track', 'Aim tracking', 0, 2, 0.05]],
+    slash: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['dmg', 'Damage', 0, 4, 1], ['reach', 'Reach', 0.8, 4, 0.1], ['w', 'Hit width', 0.8, 5, 0.1], ['h', 'Hit height', 0.8, 5, 0.1], ['speed', 'Lunge speed', 0, 18, 0.5], ['dur', 'Duration (s)', 0.2, 1.2, 0.05]],
+    rain: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['drops', 'Drops', 1, 16, 1], ['spacing', 'Spacing', 0.8, 4, 0.1], ['grav', 'Fall gravity', 4, 24, 1]],
+    volley: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['count', 'Bolts', 1, 11, 1], ['spread', 'Spread (rad)', 0, 0.8, 0.02], ['speed', 'Bolt speed', 4, 18, 0.5]],
+    ring: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['count', 'Bolts', 4, 24, 1], ['speed', 'Bolt speed', 3, 14, 0.5]],
+    summon: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['count', 'Minions / cast', 1, 5, 1], ['cap', 'Room cap', 1, 8, 1]],
+    spikes: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['columns', 'Columns', 1, 7, 1], ['spacing', 'Spacing', 1, 5, 0.1], ['dmg', 'Damage', 0, 4, 1]],
+    swoop: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['speed', 'Dive speed', 6, 26, 0.5], ['dur', 'Duration (s)', 0.4, 2, 0.05]],
+    orbs: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['count', 'Orbs', 1, 7, 1], ['speed', 'Launch speed', 1, 8, 0.5], ['homing', 'Homing', 0, 18, 0.5], ['maxSpeed', 'Max speed', 2, 10, 0.5]],
+    burrow: [['tele', 'Telegraph (s)', 0.1, 1.5, 0.05], ['rise', 'Erupt power', 8, 22, 0.5], ['dmg', 'Damage', 0, 4, 1]]
+  };
+  const MOVE_P = JSON.parse(JSON.stringify(DEFAULT_MOVE_P));
+  function applyMoveData(d) {
+    for (const id in DEFAULT_MOVE_P) MOVE_P[id] = Object.assign({}, DEFAULT_MOVE_P[id], (d && d[id]) || {});
+  }
+
   // ============================ MOVE LIBRARY ============================
   // each move: { tele: seconds, start(bs), run(bs,dt) -> true when finished }
   const MOVES = {
     leap: {
       tele: 0.5,
       start(bs) {
-        const p = G.player, b = bs.body;
-        const vy = 17, t = (2 * vy) / 50;
+        const p = G.player, b = bs.body, mp = MOVE_P.leap;
+        const vy = mp.power, t = (2 * vy) / 50;
         b.vy = vy;
-        b.vx = U.clamp((((p ? p.body.x : b.x) - b.x) / t) * 1.05, -15, 15);
+        b.vx = U.clamp((((p ? p.body.x : b.x) - b.x) / t) * mp.track, -15, 15);
         bs.noGravity = false;
         G.Audio.sfx('dash');
       },
@@ -223,12 +258,12 @@
     },
     slash: {
       tele: 0.45,
-      start(bs) { bs.mv.t = 0.5; bs.mv.s1 = bs.mv.s2 = false; G.Audio.sfx('swing'); },
+      start(bs) { bs.mv.t = MOVE_P.slash.dur; bs.mv.s1 = bs.mv.s2 = false; G.Audio.sfx('swing'); },
       run(bs, dt) {
-        const b = bs.body, p = G.player;
-        b.vx = bs.dir * 10.5 * (bs.fly ? 0.9 : 1);
+        const b = bs.body, p = G.player, mp = MOVE_P.slash;
+        b.vx = bs.dir * mp.speed * (bs.fly ? 0.9 : 1);
         bs.mv.t -= dt;
-        const el = 0.5 - bs.mv.t;
+        const el = mp.dur - bs.mv.t;
         if (el > 0.12 && !bs.mv.s1) {
           bs.mv.s1 = true;
           G.FX.slash(b.x + bs.dir * 1.8, b.y + 0.4, bs.dir > 0 ? -0.4 : Math.PI + 0.4, true, bs.cfg.colors.glow);
@@ -238,9 +273,9 @@
           G.FX.slash(b.x + bs.dir * 1.9, b.y + 0.7, bs.dir > 0 ? 0.4 : Math.PI - 0.4, true, bs.cfg.colors.glow);
         }
         if (U.chance(dt * 28)) G.FX.ghost(bs.silGeo, b.x, b.y + 0.6, bs.dir, bs.cfg.colors.glow, 0.25);
-        if (p && !p.dead && p.invulnT <= 0) {
-          const hz = { x: b.x + bs.dir * 1.9, y: b.y + 0.3, w: 2.4, h: 2.6 };
-          if (U.overlap(hz, p.body)) p.damage(1, b.x);
+        if (p && !p.dead && p.invulnT <= 0 && mp.dmg > 0) {
+          const hz = { x: b.x + bs.dir * mp.reach, y: b.y + 0.3, w: mp.w, h: mp.h };
+          if (U.overlap(hz, p.body)) p.damage(mp.dmg, b.x);
         }
         if (bs.mv.t <= 0 || (bs.dir > 0 && b.wallR) || (bs.dir < 0 && b.wallL)) { b.vx = 0; return true; }
         return false;
@@ -251,11 +286,12 @@
       start(bs) {
         G.Audio.sfx('roar');
         const px = G.player && !G.player.dead ? G.player.body.x : bs.body.x;
-        for (let i = 0; i < 6; i++) {
-          const sx = U.clamp(px + (i - 2.5) * 2.2 + U.rand(-0.8, 0.8), 4, G.room.w - 4);
+        const mp = MOVE_P.rain, n = mp.drops, c = (n - 1) / 2;
+        for (let i = 0; i < n; i++) {
+          const sx = U.clamp(px + (i - c) * mp.spacing + U.rand(-0.8, 0.8), 4, G.room.w - 4);
           G.Enemies.spawnProjectile({
-            x: sx, y: G.room.h - 4 - U.rand(0, 2), vx: U.rand(-0.5, 0.5), vy: -2,
-            grav: 12, r: 0.3, color: bs.cfg.colors.glow, friendly: false, life: 5
+            x: sx, y: G.room.h - 4 - U.rand(0, 2), vx: U.rand(-0.5, 0.5), vy: -mp.speed,
+            grav: mp.grav, r: 0.3, color: bs.cfg.colors.glow, friendly: false, life: 5
           });
         }
         G.FX.burst('spore', bs.body.x, bs.body.y + 2, { n: 16, color: bs.cfg.colors.glow });
@@ -270,9 +306,10 @@
         const tx = p && !p.dead ? p.body.x : b.x + bs.dir * 5;
         const ty = p && !p.dead ? p.body.y + 0.4 : b.y;
         const base = Math.atan2(ty - b.y - 0.8, tx - b.x);
-        for (let i = -1; i <= 1; i++) {
-          const a = base + i * 0.22;
-          G.Enemies.spawnProjectile({ x: b.x + Math.cos(a), y: b.y + 0.8 + Math.sin(a), vx: Math.cos(a) * 10, vy: Math.sin(a) * 10, r: 0.27, color: bs.cfg.colors.glow, friendly: false, life: 3 });
+        const mp = MOVE_P.volley, n = mp.count, c = (n - 1) / 2;
+        for (let i = 0; i < n; i++) {
+          const a = base + (i - c) * mp.spread;
+          G.Enemies.spawnProjectile({ x: b.x + Math.cos(a), y: b.y + 0.8 + Math.sin(a), vx: Math.cos(a) * mp.speed, vy: Math.sin(a) * mp.speed, r: 0.27, color: bs.cfg.colors.glow, friendly: false, life: 3 });
         }
         G.Audio.sfx('spell');
         bs.mv.t = 0.35;
@@ -282,10 +319,10 @@
     ring: {
       tele: 0.6,
       start(bs) {
-        const b = bs.body, n = 10;
+        const b = bs.body, mp = MOVE_P.ring, n = mp.count;
         for (let i = 0; i < n; i++) {
           const a = (i / n) * U.TAU;
-          G.Enemies.spawnProjectile({ x: b.x + Math.cos(a) * 0.8, y: b.y + 0.8 + Math.sin(a) * 0.8, vx: Math.cos(a) * 7, vy: Math.sin(a) * 7, r: 0.24, color: bs.cfg.colors.glow, friendly: false, life: 2.5 });
+          G.Enemies.spawnProjectile({ x: b.x + Math.cos(a) * 0.8, y: b.y + 0.8 + Math.sin(a) * 0.8, vx: Math.cos(a) * mp.speed, vy: Math.sin(a) * mp.speed, r: 0.24, color: bs.cfg.colors.glow, friendly: false, life: 2.5 });
         }
         G.Audio.sfx('roar');
         G.FX.ring(b.x, b.y + 0.8, { r1: 3, life: 0.4, color: bs.cfg.colors.glow, alpha: 0.7 });
@@ -297,9 +334,10 @@
       tele: 0.8,
       start(bs) {
         const alive = G.room.entities.filter(e => e.isEnemy && e.alive && e !== bs).length;
-        if (alive < 4) {
-          for (let i = 0; i < 2; i++) {
-            const ent = G.Enemies.make(bs.cfg.minion || 'sporeling', bs.body.x + (i ? 2 : -2), bs.body.y + 1.5);
+        const mp = MOVE_P.summon, n = mp.count, c = (n - 1) / 2;
+        if (alive < mp.cap) {
+          for (let i = 0; i < n; i++) {
+            const ent = G.Enemies.make(bs.cfg.minion || 'sporeling', bs.body.x + (i - c) * 4, bs.body.y + 1.5);
             if (ent) {
               G.Enemies._addToRoom(ent);
               G.FX.burst('spore', ent.body.x, ent.body.y, { n: 8, color: bs.cfg.colors.glow });
@@ -316,7 +354,9 @@
       start(bs) {
         const p = G.player;
         const px = p && !p.dead ? p.body.x : bs.body.x;
-        bs.mv.cols = [px - 2.5, px, px + 2.5].map(x => U.clamp(x, 3, G.room.w - 3));
+        const mp = MOVE_P.spikes, n = mp.columns, c = (n - 1) / 2;
+        bs.mv.cols = [];
+        for (let j = 0; j < n; j++) bs.mv.cols.push(U.clamp(px + (j - c) * mp.spacing, 3, G.room.w - 3));
         bs.mv.t = 0.55;
         bs.mv.fired = false;
         bs.mv.cols.forEach(x => {
@@ -341,8 +381,8 @@
               G.FX.p(true, { x: x + U.rand(-0.4, 0.4), y: gy + U.rand(0, 0.5), vx: U.rand(-1, 1), vy: U.rand(6, 13), life: U.rand(0.3, 0.5), size: U.rand(0.25, 0.5), color: bs.cfg.colors.glow });
             G.FX.ring(x, gy + 1, { r1: 1.6, life: 0.3, color: bs.cfg.colors.glow, alpha: 0.6 });
             const p = G.player;
-            if (p && !p.dead && p.invulnT <= 0 && Math.abs(p.body.x - x) < 0.9 && p.body.y - gy < 3 && p.body.y > gy - 1)
-              p.damage(1, x + 0.01);
+            if (p && !p.dead && p.invulnT <= 0 && MOVE_P.spikes.dmg > 0 && Math.abs(p.body.x - x) < 0.9 && p.body.y - gy < 3 && p.body.y > gy - 1)
+              p.damage(MOVE_P.spikes.dmg, x + 0.01);
           }
         }
         return bs.mv.fired && bs.mv.t <= 0;
@@ -355,8 +395,9 @@
         const tx = p && !p.dead ? p.body.x : b.x, ty = p && !p.dead ? p.body.y + 0.3 : b.y - 4;
         const dx = tx - b.x, dy = ty - b.y;
         const d = Math.hypot(dx, dy) || 1;
-        b.vx = (dx / d) * 15; b.vy = (dy / d) * 15;
-        bs.mv.t = 1.0;
+        const mp = MOVE_P.swoop;
+        b.vx = (dx / d) * mp.speed; b.vy = (dy / d) * mp.speed;
+        bs.mv.t = mp.dur;
         bs.noGravity = true;
         G.Audio.sfx('dash');
       },
@@ -372,13 +413,13 @@
     orbs: {
       tele: 0.6,
       start(bs) {
-        const b = bs.body;
-        for (let i = 0; i < 3; i++) {
+        const b = bs.body, mp = MOVE_P.orbs;
+        for (let i = 0; i < mp.count; i++) {
           const a = U.rand(0, U.TAU);
           G.Enemies.spawnProjectile({
             x: b.x + Math.cos(a) * 1.2, y: b.y + 0.8 + Math.sin(a) * 1.2,
-            vx: Math.cos(a) * 3, vy: Math.sin(a) * 3, r: 0.3,
-            color: bs.cfg.colors.glow, friendly: false, life: 4.5, homing: 9, maxSpeed: 5.5
+            vx: Math.cos(a) * mp.speed, vy: Math.sin(a) * mp.speed, r: 0.3,
+            color: bs.cfg.colors.glow, friendly: false, life: 4.5, homing: mp.homing, maxSpeed: mp.maxSpeed
           });
         }
         G.Audio.sfx('spell');
@@ -409,13 +450,13 @@
           if (bs.mv.t <= 0) {
             bs.mv.phase = 'rise'; bs.mv.t = 0.4;
             bs.rig.group.visible = true;
-            b.vy = 14;
+            b.vy = MOVE_P.burrow.rise;
             G.Audio.sfx('roar');
             G.FX.shake(0.3, 0.3);
             G.FX.burst('land', b.x, b.y - bs.halfH);
             G.FX.ring(b.x, b.y, { r1: 3, life: 0.35, color: bs.cfg.colors.glow, alpha: 0.6 });
-            if (p && !p.dead && p.invulnT <= 0 && Math.abs(p.body.x - b.x) < 1.6 && Math.abs(p.body.y - b.y) < 3)
-              p.damage(1, b.x + 0.01);
+            if (p && !p.dead && p.invulnT <= 0 && MOVE_P.burrow.dmg > 0 && Math.abs(p.body.x - b.x) < 1.6 && Math.abs(p.body.y - b.y) < 3)
+              p.damage(MOVE_P.burrow.dmg, b.x + 0.01);
           }
         } else {
           if (bs.mv.t <= 0 && b.onGround) return true;
@@ -501,6 +542,16 @@
   B.exportBossDefaults = () => { const cfgs = {}; for (const id in DEFAULT_CFG) cfgs[id] = serCfg(normCfg(DEFAULT_CFG[id])); return { configs: cfgs, epithets: Object.assign({}, DEFAULT_EPITHETS) }; };
   B.exportBossCurrent = () => { const cfgs = {}; for (const id in CFG) cfgs[id] = serCfg(CFG[id]); return { configs: cfgs, epithets: Object.assign({}, EPITHETS) }; };
   applyBossData();
+
+  // ---- move parameters (#10) ----
+  B.applyMoveData = applyMoveData;
+  B.exportMoveDefaults = () => JSON.parse(JSON.stringify(DEFAULT_MOVE_P));
+  B.exportMoveCurrent = () => JSON.parse(JSON.stringify(MOVE_P));
+  B.MOVE_PARAMS = () => MOVE_P;
+  B.MOVE_SCHEMA = MOVE_SCHEMA;
+  // which bosses (by id+label) use a given move in either phase
+  B.movesUsedBy = id => B.LIST.filter(b => { const c = CFG[b.id]; return c && ((c.moves || []).includes(id) || (c.moves2 || []).includes(id)); });
+  applyMoveData(G.MOVES_DATA);
 
   // ============================ PREVIEW (for the editor) ============================
   B.preview = typeId => {
@@ -594,7 +645,7 @@
     const p = G.player;
     if (p && !p.dead) bs.dir = p.body.x < bs.body.x ? -1 : 1;
     bs.state = 'tele';
-    bs.t = MOVES[id].tele / (bs.phase === 2 ? (bs.cfg.speed2 || 1.25) : 1);
+    bs.t = MOVE_P[id].tele / (bs.phase === 2 ? (bs.cfg.speed2 || 1.25) : 1);
     bs.move = id;
     bs.mv = {};
     // telegraph: a warning pulse so the attack reads before it lands
