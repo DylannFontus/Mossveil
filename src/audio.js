@@ -15,6 +15,11 @@
   let sfxTarget = null;
   // 'score' = the composed G.Music engine; 'classic' = the original drones + generative plucks
   let musicStyle = 'score', musicTrack = 'gloom', musicSilenced = false, musicBiome = null;
+  // ---- mixer buses (Edit ▸ Audio ▸ Mixer) : relative levels overlaid from data/mixer.js ----
+  let musicBus = null, analyser = null;
+  const DEFAULT_MIX = { music: 1, sfx: 1, ambient: 1 };
+  let mix = Object.assign({}, DEFAULT_MIX);
+  (function () { const d = G.MIXER_DATA; if (d) for (const k in DEFAULT_MIX) if (d[k] != null) mix[k] = +d[k]; })();
 
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
@@ -32,16 +37,17 @@
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain(); master.gain.value = masterLevel();
     master.connect(ctx.destination);
+    analyser = ctx.createAnalyser(); analyser.fftSize = 256; master.connect(analyser);   // master VU meter tap
     verb = ctx.createConvolver(); verb.buffer = impulse(2.4, 2.6);
     verbGain = ctx.createGain(); verbGain.gain.value = 0.4;
     verb.connect(verbGain); verbGain.connect(master);
-    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9;
+    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9 * mix.sfx;
     sfxBus.connect(master); sfxBus.connect(verb);
     sfxTarget = sfxBus;
-    ambBus = ctx.createGain(); ambBus.gain.value = 0.05;   // gentler ambient bed (less invasive)
+    ambBus = ctx.createGain(); ambBus.gain.value = 0.05 * mix.ambient;   // gentler ambient bed (less invasive)
     ambBus.connect(master); ambBus.connect(verb);
     startAmbience();
-    if (G.Music && G.Music.start) { G.Music.start(ctx, master, verb); G.Music.setTrack(musicTrack); }
+    if (G.Music && G.Music.start) { musicBus = ctx.createGain(); musicBus.gain.value = mix.music; musicBus.connect(master); G.Music.start(ctx, musicBus, verb); G.Music.setTrack(musicTrack); }
     applyMusicStyle();
     if (pendingReverb) { G.Audio.setReverb(pendingReverb.wet, pendingReverb.dur, pendingReverb.decay); pendingReverb = null; }
   }
@@ -284,6 +290,20 @@
     sfxApplyData: d => applySfxData(d),
     sfxSpec: name => clone(SFX_SPECS[name] || []),
     sfxPlaySpec(layers) { if (started) playSpec(layers); },   // audition an unsaved spec live
+    // ---- mixer (Edit ▸ Audio ▸ Mixer) ----
+    setMix(partial) {
+      Object.assign(mix, partial || {});
+      if (!started) return;
+      const t = ctx.currentTime;
+      if (sfxBus) sfxBus.gain.setTargetAtTime(0.9 * mix.sfx, t, 0.05);
+      if (ambBus) ambBus.gain.setTargetAtTime(0.05 * mix.ambient, t, 0.05);
+      if (musicBus) musicBus.gain.setTargetAtTime(mix.music, t, 0.05);
+    },
+    applyMixData(d) { if (d) for (const k in DEFAULT_MIX) if (d[k] != null) mix[k] = +d[k]; G.Audio.setMix({}); },
+    mixExportDefaults: () => Object.assign({}, DEFAULT_MIX),
+    mixExportCurrent: () => Object.assign({}, mix),
+    // master VU level 0..1 (RMS of the time-domain signal at the master bus)
+    meterLevel() { if (!analyser) return 0; const a = new Uint8Array(analyser.fftSize); analyser.getByteTimeDomainData(a); let s = 0; for (let i = 0; i < a.length; i++) { const v = (a[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / a.length) * 3); },
     setArea(root) { areaRoot = root; if (started) retune(); },
     setBoss(on) {
       bossOn = on;
