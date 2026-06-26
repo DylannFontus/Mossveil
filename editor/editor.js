@@ -21,6 +21,8 @@
   let marquee = null;           // rubber-band box {x0,y0,x1,y1} in world coords
   let clipboard = null;         // copied cluster {items,ox,oy}
   let lastWorld = { x: 0, y: 0 };
+  let hierFilter = '';          // Hierarchy 2.0: live text filter
+  let hierCollapsed = {};       // Hierarchy 2.0: { groupKey: true } collapsed groups
   let prefabs = {};             // name -> captured cluster
   try { prefabs = JSON.parse(localStorage.getItem('mossveil-ed-prefabs')) || {}; } catch (e) { }
   try { clipboard = JSON.parse(localStorage.getItem('mossveil-ed-clip')) || null; } catch (e) { }
@@ -1568,30 +1570,74 @@
   }
 
   // ---------------- hierarchy ----------------
+  // Hierarchy 2.0 — icon per object kind/type for quick visual scanning
+  const HIER_ICONS = { enemy: '☠', spawn: '⚑', zone: '⛬',
+    npc: '🗣', door: '🚪', lever: '🎚', plate: '⏺', breakable: '🧱', charmPickup: '💠', powerup: '✦',
+    bossTrigger: '☠', cutsceneTrigger: '🎬', textTrigger: '💬', setActiveTrigger: '🔀', lookTrigger: '👁',
+    audio: '🔊', windzone: '🌬', spiketrap: '⚊', platform: '▭', crusher: '⬇', conveyor: '➡', fallfloor: '▱',
+    mire: '🟤', pool: '💧', gas: '☁', bioflora: '🌿', decor: '🌾', custom: '◆' };
+  const hierIcon = (kind, p) => kind === 'prop' ? (HIER_ICONS[p.type] || '▦') : (HIER_ICONS[kind] || '•');
   function refreshHierarchy() {
     const h = $('hierarchy');
     h.innerHTML = '';
     const L = lvl();
     if (!L) return;
     const item = selectedItem();
-    const mk = (label, kind, i, key) => {
+
+    // ---- toolbar: live filter + collapse/expand all (no full re-render on type → no focus loss) ----
+    const bar = el('div', { class: 'hbar' }, h);
+    const f = el('input', { type: 'text', placeholder: 'Filter objects…', value: hierFilter }, bar);
+    el('button', { title: 'Collapse all', onclick: () => { ['prop', 'enemy', 'zone', 'spawn'].forEach(g => hierCollapsed[g] = true); refreshHierarchy(); } }, bar, '⊟');
+    el('button', { title: 'Expand all', onclick: () => { hierCollapsed = {}; refreshHierarchy(); } }, bar, '⊞');
+
+    const groups = {};   // groupKey -> { headerEl, rows:[{el, text}] }
+    const mk = (kind, i, key, ico, label) => {
       const isSel = item && item.kind === kind && (kind === 'spawn' ? item.key === key : item.i === i);
-      const d = el('div', { class: 'hitem' + (isSel ? ' sel' : '') }, null, label);
+      const d = el('div', { class: 'hitem' + (isSel ? ' sel' : '') });
+      el('span', { class: 'hico' }, d, ico);
+      el('span', { class: 'hlabel' }, d, label);
+      const focusIt = () => { sel = kind === 'spawn' ? { kind, key } : { kind, i }; multi = []; const it2 = selectedItem(); if (it2) { camX = it2.kind === 'zone' && it2.ref.rect ? it2.ref.rect.x : it2.ref.x; camY = (it2.ref.y !== undefined ? it2.ref.y : (it2.ref.rect ? it2.ref.rect.y : camY)); } };
+      const frame = el('span', { class: 'hact', title: 'Frame in view' }, d, '🎯');
+      frame.addEventListener('click', ev => { ev.stopPropagation(); focusIt(); refreshHierarchy(); refreshInspector(); });
+      const del = el('span', { class: 'hact del', title: 'Delete' }, d, '✕');
+      del.addEventListener('click', ev => { ev.stopPropagation(); sel = kind === 'spawn' ? { kind, key } : { kind, i }; multi = []; deleteSelected(); });
       d.addEventListener('click', () => { sel = kind === 'spawn' ? { kind, key } : { kind, i }; multi = []; refreshHierarchy(); refreshInspector(); });
-      d.addEventListener('dblclick', () => {
-        const it2 = selectedItem();
-        if (it2) { camX = it2.kind === 'zone' && it2.ref.rect ? it2.ref.rect.x : it2.ref.x; camY = (it2.ref.y !== undefined ? it2.ref.y : (it2.ref.rect ? it2.ref.rect.y : camY)); }
-      });
+      d.addEventListener('dblclick', () => { focusIt(); });
       return d;
     };
-    el('div', { class: 'hgroup' }, h, `Props (${(L.props || []).length})`);
-    (L.props || []).forEach((p, i) => h.appendChild(mk(`${p.type}${p.kind ? ':' + p.kind : ''}${p.boss ? ':' + p.boss : ''}  (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`, 'prop', i)));
-    el('div', { class: 'hgroup' }, h, `Enemies (${(L.enemies || []).length})`);
-    (L.enemies || []).forEach((e, i) => h.appendChild(mk(`${e.type}  (${e.x.toFixed(0)}, ${e.y.toFixed(0)})`, 'enemy', i)));
-    el('div', { class: 'hgroup' }, h, `Transitions (${(L.transitions || []).length})`);
-    (L.transitions || []).forEach((t, i) => h.appendChild(mk(`${t.rect ? 'portal' : t.side} → ${t.to} @${t.spawn}`, 'zone', i)));
-    el('div', { class: 'hgroup' }, h, `Spawn points (${Object.keys(L.spawns || {}).length})`);
-    Object.keys(L.spawns || {}).forEach(k => h.appendChild(mk(`spawn "${k}"  (${L.spawns[k].x.toFixed(0)}, ${L.spawns[k].y.toFixed(0)})`, 'spawn', null, k)));
+    const addGroup = (key, title, rows) => {
+      const collapsed = !!hierCollapsed[key];
+      const head = el('div', { class: 'hgroup' + (collapsed ? ' collapsed' : '') }, h);
+      el('span', { class: 'htri' }, head, '▾');
+      el('span', {}, head, title);
+      const cnt = el('span', { class: 'hcount' }, head, String(rows.length));
+      head.addEventListener('click', () => { hierCollapsed[key] = !hierCollapsed[key]; refreshHierarchy(); });
+      const g = groups[key] = { head, cnt, total: rows.length, rows: [] };
+      rows.forEach(r => { const d = mk(r.kind, r.i, r.key, r.ico, r.label); d.style.display = collapsed ? 'none' : ''; h.appendChild(d); g.rows.push({ el: d, text: (r.label + ' ' + r.ico).toLowerCase(), collapsed }); });
+    };
+
+    addGroup('prop', 'Props', (L.props || []).map((p, i) => ({ kind: 'prop', i, ico: hierIcon('prop', p), label: `${p.type}${p.kind ? ':' + p.kind : ''}${p.boss ? ':' + p.boss : ''}  (${p.x.toFixed(0)}, ${p.y.toFixed(0)})` })));
+    addGroup('enemy', 'Enemies', (L.enemies || []).map((e, i) => ({ kind: 'enemy', i, ico: hierIcon('enemy', e), label: `${e.type}  (${e.x.toFixed(0)}, ${e.y.toFixed(0)})` })));
+    addGroup('zone', 'Transitions', (L.transitions || []).map((t, i) => ({ kind: 'zone', i, ico: hierIcon('zone', t), label: `${t.rect ? 'portal' : t.side} → ${t.to} @${t.spawn}` })));
+    addGroup('spawn', 'Spawn points', Object.keys(L.spawns || {}).map(k => ({ kind: 'spawn', key: k, ico: hierIcon('spawn'), label: `spawn "${k}"  (${L.spawns[k].x.toFixed(0)}, ${L.spawns[k].y.toFixed(0)})` })));
+
+    // ---- live filtering: toggle row visibility + group counts in place (keeps input focus) ----
+    function applyFilter() {
+      const q = hierFilter.trim().toLowerCase();
+      let anyShown = false;
+      for (const key in groups) {
+        const g = groups[key]; let shown = 0;
+        g.rows.forEach(r => { const match = !q || r.text.includes(q); r.el.dataset.match = match ? '1' : '0'; r.el.style.display = (match && !hierCollapsed[key]) ? '' : 'none'; if (match) shown++; });
+        g.cnt.textContent = q ? (shown + '/' + g.total) : String(g.total);
+        g.head.style.display = (q && !shown) ? 'none' : '';
+        if (shown) anyShown = true;
+      }
+      let empty = h.querySelector('.hempty');
+      if (q && !anyShown) { if (!empty) { empty = el('div', { class: 'hempty' }, h, 'No objects match the filter.'); } }
+      else if (empty) empty.remove();
+    }
+    f.addEventListener('input', () => { hierFilter = f.value; applyFilter(); });
+    applyFilter();
   }
 
   // ---------------- levels panel ----------------
@@ -3591,6 +3637,10 @@
       }
     }
   };
+
+  // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
+  // tools-core.js has loaded — it runs after editor.js in the script list.  (#33 Hierarchy 2.0)
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33); } catch (_) { } }, 0);
 
   boot();
 })();
