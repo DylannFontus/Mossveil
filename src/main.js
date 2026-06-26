@@ -1075,6 +1075,7 @@
       else if (Main.state === 'prologue') G.Prologue.update(dt);
       else if (Main.state !== 'title' && Main.state !== 'prologue' && G.player) G.player.update(dt);
       G.FX.update(dt);
+      if (G.Decals) G.Decals.update(dt);   // fade lingering ground marks (#72)
     }
     // adaptive music: only count enemies that can actually SEE the player (line of sight within
     // the vicinity), so aggro stops once nothing is engaging — not merely when something is near.

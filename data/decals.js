@@ -1,0 +1,80 @@
+// generated from data/decals.json - do not edit by hand (use the editor)
+window.G = window.G || {};
+G.DECALS_DATA = {
+ "enabled": true,
+ "cap": 60,
+ "scale": 1,
+ "kinds": {
+  "scorch": {
+   "tex": "scorch",
+   "color": 1709072,
+   "size": 1.6,
+   "sizeVar": 0.4,
+   "alpha": 0.62,
+   "life": 13,
+   "fadeIn": 0.18,
+   "fadeOut": 3.5,
+   "rot": "random",
+   "blend": "normal",
+   "yOff": -0.1
+  },
+  "ash": {
+   "tex": "stain",
+   "color": 2763312,
+   "size": 1.25,
+   "sizeVar": 0.5,
+   "alpha": 0.42,
+   "life": 9,
+   "fadeIn": 0.18,
+   "fadeOut": 2.6,
+   "rot": "random",
+   "blend": "normal",
+   "yOff": 0
+  },
+  "scuff": {
+   "tex": "scuff",
+   "color": 6972248,
+   "size": 1.5,
+   "sizeVar": 0.35,
+   "alpha": 0.34,
+   "life": 3.6,
+   "fadeIn": 0.04,
+   "fadeOut": 1.3,
+   "rot": "flat",
+   "blend": "normal",
+   "yOff": -0.12
+  },
+  "crater": {
+   "tex": "crack",
+   "color": 1183253,
+   "size": 3.4,
+   "sizeVar": 0.25,
+   "alpha": 0.7,
+   "life": 22,
+   "fadeIn": 0.2,
+   "fadeOut": 4.5,
+   "rot": "random",
+   "blend": "normal",
+   "yOff": -0.1
+  },
+  "splat": {
+   "tex": "splat",
+   "color": 7317562,
+   "size": 1.15,
+   "sizeVar": 0.45,
+   "alpha": 0.55,
+   "life": 11,
+   "fadeIn": 0.04,
+   "fadeOut": 3,
+   "rot": "random",
+   "blend": "normal",
+   "yOff": 0
+  }
+ },
+ "events": {
+  "enemyDeath": "scorch",
+  "bossDeath": "crater",
+  "playerLand": "scuff",
+  "fireballHit": "ash"
+ }
+};

@@ -53,6 +53,7 @@
       G.FX.ring(ent.body.x, ent.body.y + 0.2, { r1: 1.8, life: 0.3, color: 0xdfffe8, alpha: 0.5 });
       if (G.Main.dropGlimmer && !ent.noLoot) G.Main.dropGlimmer(ent.body.x, ent.body.y + 0.3, G.Drops ? G.Drops.roll(ent.type) : 2 + (Math.random() * 3 | 0));
       if (G.Main.recordKill && !ent.noLoot) G.Main.recordKill(ent.type);   // fills the Hunter's Journal
+      if (G.Decals) G.Decals.emit('enemyDeath', ent.body.x, ent.body.y - 0.4);   // lingering scorch/residue (#72)
       if (ent.onDeath) ent.onDeath();
       return true;
     }
@@ -880,7 +881,7 @@
           if (G.Fire && G.Fire.fanAt) G.Fire.fanAt(b.x, b.y, Math.sign(b.vx) || 1, 2.0);
           for (const e of G.room.entities) if (e.flammableGas && e.gust && U.overlap(b, e.body)) e.gust();
         }
-        if (G.Physics.rectVsSolids(b)) { this.pop(); return; }
+        if (G.Physics.rectVsSolids(b)) { if (this.friendly && G.Decals) G.Decals.emit('fireballHit', b.x, b.y); this.pop(); return; }   // splatter on the wall (#72)
         if (this.friendly) {
           for (const e of G.room.entities) {
             if (e.isEnemy && e.alive && U.overlap(b, e.body)) {

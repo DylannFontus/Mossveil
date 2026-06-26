@@ -628,6 +628,7 @@
     if (G.FX.slowMo) G.FX.slowMo(0.25, 1.6);          // dramatic slow-motion finish
     G.FX.shake(0.6, 1.1);
     G.FX.burst('death', bs.body.x, bs.body.y + 1);
+    if (G.Decals) G.Decals.emit('bossDeath', bs.body.x, bs.body.y - (bs.halfH || 1));   // scorched crater (#72)
     G.FX.ring(bs.body.x, bs.body.y + 1, { r1: 7, life: 0.6, color: bs.cfg.colors.glow, alpha: 0.8 });
     G.FX.ring(bs.body.x, bs.body.y + 1, { r1: 11, life: 0.9, color: 0xffffff, alpha: 0.5 });
     G.Audio.setBoss(false);

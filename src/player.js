@@ -567,6 +567,7 @@
         p.stretch = 0.72 - impact * 0.12;
         if (impact > 0.28) {        // landing kicks up dust, scaled by impact (no screen shake/jolt)
           G.FX.burst('dust', b.x, b.y - 0.6, { n: Math.round(5 + impact * 8) });
+          if (G.Decals) G.Decals.emit('playerLand', b.x, b.y - 0.62, { scale: 0.8 + impact * 0.6 });   // scuff mark (#72)
         }
       }
       // running kicks up leaves on grass — ash on scorched ground
