@@ -661,6 +661,7 @@
     x = +x.toFixed(2); y = +y.toFixed(2);
     const a = placing;
     if (a.cat === 'none') { setPlacing(null); return; }
+    recordRecent(a);                       // track for the "recently used" strip (Asset browser 2.0)
     // prefab: stamp a saved cluster of objects
     if (a.cat === 'prefab') { stampPrefab(a.prefab, x, y); if (!keepPlacing) setPlacing(null); queueRebuild(); refreshHierarchy(); refreshInspector(); return; }
     // building generator: stamp a procedural Victorian building (walls/floors as tiles + furniture as props)
@@ -1903,10 +1904,31 @@
     tabs.innerHTML = '';
     for (const c of ASSET_CATS) {
       const t = el('div', { class: 'ptab' + (assetCat === c.id ? ' on' : '') }, tabs, c.label);
+      let n = 0; try { n = (assetListFor(c.id) || []).length; } catch (e) { }
+      if (n) el('span', { class: 'ptabn' }, t, String(n));     // live item count per category (Asset browser 2.0)
       t.addEventListener('click', () => { assetCat = c.id; refreshAssets(); });
     }
     const body = $('assetBody');
     body.innerHTML = '';
+    // recently-used strip (cross-category) — quick re-arm of the assets you place most (Asset browser 2.0)
+    const recents = assetFavOnly ? [] : recentAssets();
+    if (recents.length) {
+      const strip = el('div', { class: 'recentStrip' }, body);
+      const hd = el('div', { class: 'recentHd' }, strip);
+      el('span', {}, hd, 'Recent');
+      const clr = el('span', { class: 'recentClr', title: 'Clear recent list' }, hd, '✕');
+      clr.addEventListener('click', () => { assetRecent = []; saveRecent(); refreshAssets(); });
+      const chips = el('div', { class: 'recentChips' }, strip);
+      for (const r of recents) {
+        const a = r.a;
+        const chip = el('div', { class: 'recentChip' + (placing && placing.label === a.label ? ' on' : ''), title: a.label }, chips);
+        const url = assetThumb(a);
+        if (url) el('img', { src: url, style: 'width:26px;height:26px;object-fit:contain' }, chip);
+        else el('span', { class: 'rico' }, chip, a.ico || '◆');
+        el('span', { class: 'rnm' }, chip, a.label);
+        chip.addEventListener('click', () => { assetCat = r.cat; setPlacing(placing && placing.label === a.label ? null : a); });
+      }
+    }
     if (assetCat === 'prefabs') {
       const save = el('div', { class: 'asset', style: 'border-style:dashed' }, body);
       el('div', { class: 'ico' }, save, '＋');
@@ -1953,6 +1975,13 @@
   try { assetFavs = JSON.parse(localStorage.getItem('mossveil-ed-favs')) || {}; } catch (e) { assetFavs = {}; }
   function saveFavs() { try { localStorage.setItem('mossveil-ed-favs', JSON.stringify(assetFavs)); } catch (e) { } }
   function assetKey(a) { return a.cat + ':' + a.id + ':' + (a.kind || a.boss || a.model || a.prefab || a.label || ''); }
+  // Asset browser 2.0 — recently-used assets (cross-category quick re-place)
+  let assetRecent = [];
+  try { assetRecent = JSON.parse(localStorage.getItem('mossveil-ed-recent')) || []; } catch (e) { assetRecent = []; }
+  function saveRecent() { try { localStorage.setItem('mossveil-ed-recent', JSON.stringify(assetRecent)); } catch (e) { } }
+  function recordRecent(a) { if (!a || a.cat === 'none') return; const k = assetKey(a); assetRecent = [k, ...assetRecent.filter(x => x !== k)].slice(0, 14); saveRecent(); }
+  function resolveRecent(key) { for (const c of ASSET_CATS) { let list; try { list = assetListFor(c.id); } catch (e) { continue; } const a = list.find(x => assetKey(x) === key); if (a) return { a, cat: c.id }; } return null; }
+  function recentAssets() { return assetRecent.map(resolveRecent).filter(Boolean); }
   function setPlacing(a) {
     placing = a;
     if (a) tool = 'select';
@@ -3559,6 +3588,9 @@
     savePrefabAs: (n) => savePrefab(n), playUrl: () => playUrl(),
     // prefab library store for the Prefab 2.0 manager: mutate get(), then persist() to save + refresh the asset browser
     prefabsAPI: { get: () => prefabs, persist: () => { try { localStorage.setItem('mossveil-ed-prefabs', JSON.stringify(prefabs)); } catch (e) { } refreshAssets(); } },
+    // Asset browser 2.0: the recently-used assets, and a place-armed-asset hook (used by tests / Companion)
+    recents: () => recentAssets().map(r => r.a),
+    placeArmedAt: (x, y) => { if (placing) placeAsset(x, y); },
     openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
     pickAt: (x, y) => pickAt(x, y),
     retileAll: () => retileWholeLevel(),
@@ -3639,8 +3671,9 @@
   };
 
   // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
-  // tools-core.js has loaded — it runs after editor.js in the script list.  (#33 Hierarchy 2.0)
-  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33); } catch (_) { } }, 0);
+  // tools-core.js has loaded — it runs after editor.js in the script list.
+  // #33 Hierarchy 2.0, #34 Asset browser 2.0
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34); } catch (_) { } }, 0);
 
   boot();
 })();

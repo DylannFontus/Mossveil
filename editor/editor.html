@@ -97,6 +97,20 @@
   .hitem .hact:hover { color:#fff; }
   .hitem .hact.del:hover { color:#ff7a6a; }
   .hempty { padding:10px 12px; color:var(--txt2); font-size:12px; }
+  .ptabn { margin-left:5px; font-size:10px; opacity:.6; background:var(--bg3); border-radius:8px; padding:0 5px; }
+  .ptab.on .ptabn { opacity:.85; }
+  .recentStrip { width:100%; border-bottom:1px solid var(--line); padding:4px 6px 8px; margin-bottom:4px; }
+  .recentHd { display:flex; align-items:center; font-size:10px; text-transform:uppercase; letter-spacing:1px;
+    color:var(--txt2); margin:2px 2px 5px; }
+  .recentHd .recentClr { margin-left:auto; cursor:pointer; padding:0 4px; }
+  .recentHd .recentClr:hover { color:#ff7a6a; }
+  .recentChips { display:flex; gap:5px; flex-wrap:wrap; }
+  .recentChip { display:flex; align-items:center; gap:5px; max-width:140px; padding:3px 7px 3px 4px; cursor:pointer;
+    background:var(--bg2); border:1px solid var(--line); border-radius:13px; }
+  .recentChip:hover { background:var(--bg3); }
+  .recentChip.on { outline:1px solid var(--acc); }
+  .recentChip .rico { width:20px; text-align:center; }
+  .recentChip .rnm { font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .lvlitem { padding:6px 10px; cursor:pointer; border-bottom:1px solid #202024; }
   .lvlitem:hover { background:var(--bg2); }
   .lvlitem.cur { background:#2c4663; }
