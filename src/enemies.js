@@ -1039,7 +1039,7 @@
     skimmer: mkSkimmer, sporeling: mkSporeling, mortarbug: mkMortarbug, blastcap: mkBlastcap,
     hookworm: mkHookworm, sentine: mkSentine
   };
-  E.TYPES = [
+  const BASE_TYPES = [
     { id: 'tumblebug', label: 'Tumblebug (walker)' },
     { id: 'gnatling', label: 'Gnatling (chasing flier)' },
     { id: 'bulbil', label: 'Bulbil (spitter plant)' },
@@ -1055,8 +1055,25 @@
     { id: 'hookworm', label: 'Hookworm (burrower)' },
     { id: 'sentine', label: 'Sentine (turret eye)' }
   ];
+  // A library of reusable custom enemy types (named behaviour specs) authored by the Enemy designer,
+  // overlaid from data/enemies-lib.js (G.ENEMY_LIB). They join E.TYPES so they're placeable like any
+  // enemy, and spawn through the proven mkBehaviorEnemy with their saved spec.
+  let ENEMY_LIB = {};
+  E.TYPES = BASE_TYPES.slice();
+  function applyEnemyLib(data) {
+    const d = data || G.ENEMY_LIB || null;
+    ENEMY_LIB = {};
+    if (d && d.enemies) for (const id in d.enemies) ENEMY_LIB[id] = d.enemies[id];
+    E.TYPES = BASE_TYPES.concat(Object.keys(ENEMY_LIB).map(id => ({ id, label: (ENEMY_LIB[id].name || id) + ' (custom)', lib: true })));
+  }
+  E.applyEnemyLib = applyEnemyLib;
+  E.exportLibDefaults = () => ({ enemies: {} });
+  E.exportLibCurrent = () => ({ enemies: JSON.parse(JSON.stringify(ENEMY_LIB)) });
+  E.libSpec = id => ENEMY_LIB[id] ? ENEMY_LIB[id].spec : null;
+  applyEnemyLib();
   E.make = (type, x, y, def) => {
     if (type === 'custom') return mkBehaviorEnemy(x, y, (def && def.spec) || {});
+    if (ENEMY_LIB[type]) return mkBehaviorEnemy(x, y, ENEMY_LIB[type].spec || {});
     const mk = MAKERS[type];
     return mk ? mk(x, y) : null;
   };
