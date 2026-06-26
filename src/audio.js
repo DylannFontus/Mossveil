@@ -72,6 +72,55 @@
     drone: [['vol', 'Level', 0, 0.12, 0.002], ['mult', 'Pitch ×', 0.25, 2, 0.05]]
   };
 
+  // ---- combat stem (Edit ▸ Audio ▸ Combat #81) : the classic-style driving groove that swells with
+  // danger — a consonant pad bed + an arpeggio + kick + hat, all routed through the combat bus and scaled
+  // by the live "intensity". ONLY audible in the 'classic' soundtrack style (the composed score returns
+  // before this code). Overlaid from data/combat.js (G.COMBAT_DATA); a default overlay is byte-identical. ----
+  const DEFAULT_COMBAT = {
+    busLevel: 0.22,                       // combat-bus gain = intensity × busLevel
+    gate: 0.12,                           // the groove starts once intensity exceeds this
+    stepSlow: 0.20, stepFast: 0.13,       // step interval at 0 vs full intensity (quickens as it heats up)
+    pad: { level: 0.28, cutoff: 900, q: 0.6, type: 'triangle', rootMult: 0.5, fifthMult: 0.75 },
+    arp: { pattern: [1, 1.5, 2, 3, 2, 1.5], type: 'triangle', t: 0.13, volBase: 0.05, volInt: 0.11, attack: 0.004 },
+    kick: { every: 4, type: 'sine', f0: 92, f1: 46, t: 0.13, volBase: 0.10, volInt: 0.12 },
+    hat: { f0: 4200, f1: 6500, t: 0.04, volBase: 0.02, volInt: 0.04, q: 0.7 }
+  };
+  let combat = JSON.parse(JSON.stringify(DEFAULT_COMBAT));
+  let padG = null, padLp = null;          // live combat-pad nodes (level + filter); set in init, pushed by setCombat
+  function applyCombatData(d) {
+    combat = JSON.parse(JSON.stringify(DEFAULT_COMBAT));
+    const C = (v, lo, hi, dv) => { v = +v; return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : dv; };
+    if (d) {
+      if (d.busLevel != null) combat.busLevel = C(d.busLevel, 0, 1, combat.busLevel);
+      if (d.gate != null) combat.gate = C(d.gate, 0, 1, combat.gate);
+      if (d.stepSlow != null) combat.stepSlow = C(d.stepSlow, 0.02, 2, combat.stepSlow);
+      if (d.stepFast != null) combat.stepFast = C(d.stepFast, 0.02, 2, combat.stepFast);
+      const P = d.pad; if (P) { if (P.level != null) combat.pad.level = C(P.level, 0, 1, combat.pad.level); if (P.cutoff != null) combat.pad.cutoff = C(P.cutoff, 50, 8000, combat.pad.cutoff); if (P.q != null) combat.pad.q = C(P.q, 0.1, 8, combat.pad.q); if (typeof P.type === 'string') combat.pad.type = P.type; if (P.rootMult != null) combat.pad.rootMult = C(P.rootMult, 0.1, 4, combat.pad.rootMult); if (P.fifthMult != null) combat.pad.fifthMult = C(P.fifthMult, 0.1, 4, combat.pad.fifthMult); }
+      const Ar = d.arp; if (Ar) { if (typeof Ar.type === 'string') combat.arp.type = Ar.type; if (Ar.t != null) combat.arp.t = C(Ar.t, 0.02, 1, combat.arp.t); if (Ar.volBase != null) combat.arp.volBase = C(Ar.volBase, 0, 0.6, combat.arp.volBase); if (Ar.volInt != null) combat.arp.volInt = C(Ar.volInt, 0, 0.6, combat.arp.volInt); if (Ar.attack != null) combat.arp.attack = C(Ar.attack, 0, 0.2, combat.arp.attack); if (Array.isArray(Ar.pattern)) { const p = Ar.pattern.map(Number).filter(n => isFinite(n) && n > 0); if (p.length) combat.arp.pattern = p; } }
+      const K = d.kick; if (K) { if (K.every != null) combat.kick.every = Math.max(1, Math.round(+K.every) || 4); if (typeof K.type === 'string') combat.kick.type = K.type; if (K.f0 != null) combat.kick.f0 = C(K.f0, 20, 4000, combat.kick.f0); if (K.f1 != null) combat.kick.f1 = C(K.f1, 20, 4000, combat.kick.f1); if (K.t != null) combat.kick.t = C(K.t, 0.02, 1, combat.kick.t); if (K.volBase != null) combat.kick.volBase = C(K.volBase, 0, 0.6, combat.kick.volBase); if (K.volInt != null) combat.kick.volInt = C(K.volInt, 0, 0.6, combat.kick.volInt); }
+      const H = d.hat; if (H) { if (H.f0 != null) combat.hat.f0 = C(H.f0, 200, 12000, combat.hat.f0); if (H.f1 != null) combat.hat.f1 = C(H.f1, 200, 12000, combat.hat.f1); if (H.t != null) combat.hat.t = C(H.t, 0.01, 0.5, combat.hat.t); if (H.volBase != null) combat.hat.volBase = C(H.volBase, 0, 0.4, combat.hat.volBase); if (H.volInt != null) combat.hat.volInt = C(H.volInt, 0, 0.4, combat.hat.volInt); if (H.q != null) combat.hat.q = C(H.q, 0.1, 8, combat.hat.q); }
+    }
+    applyCombatLive();
+  }
+  function applyCombatLive() {
+    if (!started || !ctx) return;
+    const t = ctx.currentTime;
+    if (padG) padG.gain.setTargetAtTime(combat.pad.level, t, 0.2);
+    if (padLp) { padLp.frequency.setTargetAtTime(combat.pad.cutoff, t, 0.2); padLp.Q.setTargetAtTime(combat.pad.q, t, 0.2); }
+    if (combatPad) { combatPad.a.type = combat.pad.type; combatPad.b.type = combat.pad.type; }
+    retune();
+  }
+  applyCombatData(G.COMBAT_DATA);
+  // the exact step the groove would schedule at a given intensity + step index (read-only test hook)
+  function combatStepSpec(inten, step) {
+    const c = combat, ARP = c.arp.pattern, note = ARP[step % ARP.length];
+    const out = { interval: c.stepSlow - inten * (c.stepSlow - c.stepFast), busGain: inten * c.busLevel, gate: c.gate,
+      arp: { type: c.arp.type, f0: areaRoot * note, t: c.arp.t, vol: c.arp.volBase + inten * c.arp.volInt, a: c.arp.attack } };
+    if (step % c.kick.every === 0) out.kick = { type: c.kick.type, f0: c.kick.f0, f1: c.kick.f1, t: c.kick.t, vol: c.kick.volBase + inten * c.kick.volInt };
+    else if (step % 2 === 1) out.hat = { f0: c.hat.f0, f1: c.hat.f1, t: c.hat.t, vol: c.hat.volBase + inten * c.hat.volInt, q: c.hat.q };
+    return out;
+  }
+
   function impulse(dur, decay) {
     const rate = ctx.sampleRate, len = rate * dur;
     const buf = ctx.createBuffer(2, len, rate);
@@ -173,10 +222,10 @@
     // silent until danger swells it. Upbeat rather than tense.
     combatGain = ctx.createGain(); combatGain.gain.value = 0;
     combatGain.connect(master); combatGain.connect(verb);
-    const padA = ctx.createOscillator(); padA.type = 'triangle';
-    const padB = ctx.createOscillator(); padB.type = 'triangle';
-    const padLp = ctx.createBiquadFilter(); padLp.type = 'lowpass'; padLp.frequency.value = 900; padLp.Q.value = 0.6;
-    const padG = ctx.createGain(); padG.gain.value = 0.28;            // quieter bed; the arpeggio carries it
+    const padA = ctx.createOscillator(); padA.type = combat.pad.type;
+    const padB = ctx.createOscillator(); padB.type = combat.pad.type;
+    padLp = ctx.createBiquadFilter(); padLp.type = 'lowpass'; padLp.frequency.value = combat.pad.cutoff; padLp.Q.value = combat.pad.q;
+    padG = ctx.createGain(); padG.gain.value = combat.pad.level;      // quieter bed; the arpeggio carries it
     padA.connect(padLp); padB.connect(padLp); padLp.connect(padG); padG.connect(combatGain);
     padA.start(); padB.start();
     combatPad = { a: padA, b: padB };
@@ -187,8 +236,8 @@
     if (!droneNodes.length) return;
     droneNodes.forEach(n => n.o.frequency.setTargetAtTime(areaRoot * n.mult, ctx.currentTime, 2.5));
     if (combatPad) {                                   // root + a (consonant) fifth above it
-      combatPad.a.frequency.setTargetAtTime(areaRoot * 0.5, ctx.currentTime, 2);
-      combatPad.b.frequency.setTargetAtTime(areaRoot * 0.75, ctx.currentTime, 2);
+      combatPad.a.frequency.setTargetAtTime(areaRoot * combat.pad.rootMult, ctx.currentTime, 2);
+      combatPad.b.frequency.setTargetAtTime(areaRoot * combat.pad.fifthMult, ctx.currentTime, 2);
     }
   }
 
@@ -386,6 +435,13 @@
     ambParams: () => AMB,
     ambSchema: () => AMB_SCHEMA,
     setAmb(params) { applyAmbData(params || AMB); },      // audition unsaved ambience params live
+    // ---- combat stem (Edit ▸ Audio ▸ Combat #81) : the classic-style driving groove ----
+    combatApplyData: d => applyCombatData(d),             // also pushes pad level/filter live
+    combatExportDefaults: () => JSON.parse(JSON.stringify(DEFAULT_COMBAT)),
+    combatExportCurrent: () => JSON.parse(JSON.stringify(combat)),
+    combatParams: () => combat,
+    setCombat(params) { applyCombatData(params || combat); },   // audition unsaved combat params live
+    _combatStep: (inten, step) => combatStepSpec(inten, step),  // read-only test hook: the scheduled step
     // master VU level 0..1 (RMS of the time-domain signal at the master bus)
     meterLevel() { if (!analyser) return 0; const a = new Uint8Array(analyser.fftSize); analyser.getByteTimeDomainData(a); let s = 0; for (let i = 0; i < a.length; i++) { const v = (a[i] - 128) / 128; s += v * v; } return Math.min(1, Math.sqrt(s / a.length) * 3); },
     _spatial: (x, y) => spatial(x, y),   // read-only test hook: positional gain/pan for a world point
@@ -546,7 +602,7 @@
         return;
       }
       // ---- classic style: drones + generative plucks + a combat groove ----
-      if (combatGain) combatGain.gain.value = intensity * 0.22;
+      if (combatGain) combatGain.gain.value = intensity * combat.busLevel;
       dripT -= dt;
       if (dripT <= 0) { dripT = 2.5 + Math.random() * 7; SFX.drop(); }
       pluckT -= dt;
@@ -561,17 +617,17 @@
       }
       // combat groove: an upbeat driving arpeggio (root–fifth–octave) + a kick on the downbeat,
       // quickening with intensity. Routed through the combat bus so it only sounds while engaged.
-      if (intensity > 0.12 && !bossOn) {
+      if (intensity > combat.gate && !bossOn) {
         combatPulseT -= dt;
         if (combatPulseT <= 0) {
-          combatPulseT = 0.2 - intensity * 0.07;       // ~8th→16th notes as it heats up
+          combatPulseT = combat.stepSlow - intensity * (combat.stepSlow - combat.stepFast);   // ~8th→16th notes as it heats up
           const prev = sfxTarget; sfxTarget = combatGain;
           try {
-            const ARP = [1, 1.5, 2, 3, 2, 1.5];          // root, fifth, octave, fifth-above… (major, energetic)
+            const ARP = combat.arp.pattern;              // root, fifth, octave, fifth-above… (major, energetic)
             const note = ARP[combatStep % ARP.length];
-            tone({ type: 'triangle', f0: areaRoot * note, t: 0.13, vol: 0.05 + intensity * 0.11, a: 0.004 });
-            if (combatStep % 4 === 0) tone({ type: 'sine', f0: 92, f1: 46, t: 0.13, vol: 0.10 + intensity * 0.12 });   // kick
-            else if (combatStep % 2 === 1) noiseHit({ f0: 4200, f1: 6500, t: 0.04, vol: 0.02 + intensity * 0.04, ftype: 'highpass', q: 0.7 });  // hat
+            tone({ type: combat.arp.type, f0: areaRoot * note, t: combat.arp.t, vol: combat.arp.volBase + intensity * combat.arp.volInt, a: combat.arp.attack });
+            if (combatStep % combat.kick.every === 0) tone({ type: combat.kick.type, f0: combat.kick.f0, f1: combat.kick.f1, t: combat.kick.t, vol: combat.kick.volBase + intensity * combat.kick.volInt });   // kick
+            else if (combatStep % 2 === 1) noiseHit({ f0: combat.hat.f0, f1: combat.hat.f1, t: combat.hat.t, vol: combat.hat.volBase + intensity * combat.hat.volInt, ftype: 'highpass', q: combat.hat.q });  // hat
             combatStep++;
           } finally { sfxTarget = prev; }
         }
