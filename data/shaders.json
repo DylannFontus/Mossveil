@@ -1,0 +1,210 @@
+{
+ "enabled": true,
+ "active": "",
+ "graphs": {
+  "vignette-pulse": {
+   "name": "Vignette pulse",
+   "blend": "normal",
+   "opacity": 1,
+   "out": "out",
+   "nodes": {
+    "r1": {
+     "type": "radial",
+     "x": 40,
+     "y": 40,
+     "props": {
+      "cx": 0.5,
+      "cy": 0.5,
+      "scale": 1
+     },
+     "ins": {}
+    },
+    "e1": {
+     "type": "smooth",
+     "x": 250,
+     "y": 40,
+     "props": {
+      "e0": 0.45,
+      "e1": 1
+     },
+     "ins": {
+      "a": "r1"
+     }
+    },
+    "tm": {
+     "type": "time",
+     "x": 40,
+     "y": 180,
+     "props": {
+      "speed": 1.5
+     },
+     "ins": {}
+    },
+    "pl": {
+     "type": "sine",
+     "x": 250,
+     "y": 180,
+     "props": {
+      "freq": 1,
+      "phase": 0
+     },
+     "ins": {
+      "a": "tm"
+     }
+    },
+    "am": {
+     "type": "mul",
+     "x": 460,
+     "y": 110,
+     "props": {
+      "gain": 0.55
+     },
+     "ins": {
+      "a": "e1",
+      "b": "pl"
+     }
+    },
+    "col": {
+     "type": "color",
+     "x": 460,
+     "y": 260,
+     "props": {
+      "r": 0.02,
+      "g": 0,
+      "b": 0.05
+     },
+     "ins": {}
+    },
+    "out": {
+     "type": "output",
+     "x": 680,
+     "y": 180,
+     "props": {},
+     "ins": {
+      "rgb": "col",
+      "alpha": "am"
+     }
+    }
+   }
+  },
+  "scanlines": {
+   "name": "Scanlines",
+   "blend": "normal",
+   "opacity": 1,
+   "out": "out",
+   "nodes": {
+    "w1": {
+     "type": "wave",
+     "x": 40,
+     "y": 60,
+     "props": {
+      "axis": 1,
+      "freq": 140,
+      "speed": 0,
+      "phase": 0
+     },
+     "ins": {}
+    },
+    "om": {
+     "type": "oneminus",
+     "x": 260,
+     "y": 60,
+     "props": {},
+     "ins": {
+      "a": "w1"
+     }
+    },
+    "am": {
+     "type": "mul",
+     "x": 460,
+     "y": 60,
+     "props": {
+      "gain": 0.16
+     },
+     "ins": {
+      "a": "om",
+      "b": "om"
+     }
+    },
+    "col": {
+     "type": "color",
+     "x": 260,
+     "y": 220,
+     "props": {
+      "r": 0,
+      "g": 0,
+      "b": 0
+     },
+     "ins": {}
+    },
+    "out": {
+     "type": "output",
+     "x": 680,
+     "y": 140,
+     "props": {},
+     "ins": {
+      "rgb": "col",
+      "alpha": "am"
+     }
+    }
+   }
+  },
+  "dream-fog": {
+   "name": "Dream fog",
+   "blend": "additive",
+   "opacity": 1,
+   "out": "out",
+   "nodes": {
+    "f1": {
+     "type": "fbm",
+     "x": 40,
+     "y": 60,
+     "props": {
+      "scale": 3,
+      "octaves": 4,
+      "speed": 0.05
+     },
+     "ins": {}
+    },
+    "cz": {
+     "type": "colorize",
+     "x": 280,
+     "y": 40,
+     "props": {
+      "r0": 0.08,
+      "g0": 0.16,
+      "b0": 0.2,
+      "r1": 0.5,
+      "g1": 0.78,
+      "b1": 0.85
+     },
+     "ins": {
+      "t": "f1"
+     }
+    },
+    "am": {
+     "type": "mul",
+     "x": 280,
+     "y": 230,
+     "props": {
+      "gain": 0.22
+     },
+     "ins": {
+      "a": "f1",
+      "b": "f1"
+     }
+    },
+    "out": {
+     "type": "output",
+     "x": 560,
+     "y": 130,
+     "props": {},
+     "ins": {
+      "rgb": "cz",
+      "alpha": "am"
+     }
+    }
+   }
+  }
+ }
+}

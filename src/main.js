@@ -1102,6 +1102,7 @@
 
     if (G.Post && G.Post.enabled) G.Post.render(rdt);
     else G.renderer.render(G.scene, G.camera);
+    if (G.Shaders) G.Shaders.renderOverlay(rdt);   // authored fullscreen shader-graph overlay (#78)
     G.UI.draw(rdt);
     I.update();
     if (G.Profiler) G.Profiler.tick();

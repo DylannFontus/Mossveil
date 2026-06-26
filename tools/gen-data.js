@@ -31,7 +31,8 @@ const DATASETS = [
   { name: 'synth', global: 'SYNTH_DATA', srcs: ['src/synth.js'], pick: G => G.Synth.exportDefaults() },
   { name: 'combat', global: 'COMBAT_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.combatExportDefaults() },
   { name: 'parallax', global: 'PARALLAX_DATA', srcs: ['src/parallax.js'], pick: G => G.Parallax.exportDefaults() },
-  { name: 'decals', global: 'DECALS_DATA', srcs: ['src/decals.js'], pick: G => G.Decals.exportDefaults() }
+  { name: 'decals', global: 'DECALS_DATA', srcs: ['src/decals.js'], pick: G => G.Decals.exportDefaults() },
+  { name: 'shaders', global: 'SHADERS_DATA', srcs: ['src/shaders.js'], pick: G => G.Shaders.exportDefaults() }
 ];
 
 function evalModule(srcs) {
