@@ -11,6 +11,11 @@
   let nextTime = 0, step = 0;
   let gen = null;                                     // current track's voice bus — per-track crossfades live here, NOT on the master
   const LOOK = 0.14;                                  // schedule this far ahead (s)
+  // transition timings (track swaps, boss enter/exit, resume, hard stop) live in data/musicfx.js
+  // (G.MusicFX); MFX(key) reads them with a byte-identical literal fallback.
+  const _MFXDEF = { trackSwapOut: 0.32, trackSwapIn: 0.28, bossStopFade: 0.16, bossSilence: 0.85, bossInFade: 0.18, bossOutFade: 0.3, biomeReturnFade: 0.9, resumeFade: 0.3, pauseFastFade: 0.18 };
+  const MFX = k => (G.MusicFX && G.MusicFX.dur) ? G.MusicFX.dur(k) : _MFXDEF[k];
+  M._fade = MFX;   // test hook
 
   const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10], DOR = [0, 2, 3, 5, 7, 9, 10], PHR = [0, 1, 3, 5, 7, 8, 10],
     PENT = [0, 3, 5, 7, 10], LYD = [0, 2, 4, 6, 7, 9, 11], HARM = [0, 2, 3, 5, 7, 8, 11], WHOLE = [0, 2, 4, 6, 8, 10], LOC = [0, 1, 3, 5, 6, 8, 10];
@@ -211,7 +216,7 @@
   M.setTrack = id => {                                 // swap themes cleanly: old voices fade out & are freed, new fade in
     if (!id || !TRACKS[id] || id === trackId) return;
     if (!playing || !ctx) { trackId = id; track = TRACKS[id]; return; }
-    swapGen(0.32, 0.28);                               // old theme out < 0.35s; master untouched so it can't bleed back
+    swapGen(MFX('trackSwapOut'), MFX('trackSwapIn'));  // old theme out < 0.35s; master untouched so it can't bleed back
     trackId = id; track = TRACKS[id]; step = 0; lead = 0; nextTime = ctx.currentTime + 0.04;
   };
   M.setIntensity = v => { intensity = Math.max(0, Math.min(1, v || 0)); };
@@ -220,15 +225,15 @@
   M.startBoss = () => {
     if (!ctx) return;
     bossOn = true; bossReturn = trackId; playing = false;
-    retireGen(0.16);                                   // the biome theme hard-stops -> a beat of dread (master stays put)
+    retireGen(MFX('bossStopFade'));                    // the biome theme hard-stops -> a beat of dread (master stays put)
     setTimeout(() => {                                 // ~0.85s of silence (the boss roar/stinger swells), then the theme
       if (!bossOn || !ctx) return;
       trackId = 'boss'; track = TRACKS.boss; step = 0; lead = 0; nextTime = ctx.currentTime + 0.05; playing = true;
-      gen = makeGen(); const now = ctx.currentTime;
-      gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + 0.18);
-      gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + 0.18);
+      gen = makeGen(); const now = ctx.currentTime; const bin = MFX('bossInFade');
+      gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + bin);
+      gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + bin);
       busDry.gain.cancelScheduledValues(now); busDry.gain.setTargetAtTime(0.95, now, 0.1); busWet.gain.setTargetAtTime(0.6, now, 0.1);
-    }, 850);
+    }, MFX('bossSilence') * 1000);
   };
   // boss beaten: fade the boss theme out, bring the biome theme back in
   M.endBoss = (biomeId) => {
@@ -238,20 +243,21 @@
     busDry.gain.cancelScheduledValues(now); busDry.gain.setTargetAtTime(0.9, now, 0.4); busWet.gain.setTargetAtTime(0.6, now, 0.4);
     if (!playing) {                                    // boss died during the dread silence
       trackId = id; track = TRACKS[id] || track; step = 0; lead = 0; nextTime = now + 0.05; playing = true;
-      gen = makeGen();
-      gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + 0.9);
-      gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + 0.9);
+      gen = makeGen(); const bret = MFX('biomeReturnFade');
+      gen.d.gain.setValueAtTime(0.0001, now); gen.d.gain.linearRampToValueAtTime(1, now + bret);
+      gen.w.gain.setValueAtTime(0.0001, now); gen.w.gain.linearRampToValueAtTime(1, now + bret);
       return;
     }
-    swapGen(0.3, 0.9);                                 // boss theme out, biome fades back in
+    swapGen(MFX('bossOutFade'), MFX('biomeReturnFade'));  // boss theme out, biome fades back in
     trackId = id; track = TRACKS[id] || track; step = 0; lead = 0; nextTime = now + 0.05;
   };
   M.resume = () => {                                  // fade the music in (e.g. on boss death / after a cutscene)
     if (!ctx || playing) return; playing = true; nextTime = ctx.currentTime + 0.06; step = 0;
     if (!gen) gen = makeGen();
     const now = ctx.currentTime;
-    gen.d.gain.cancelScheduledValues(now); gen.d.gain.setValueAtTime(Math.max(0.0001, gen.d.gain.value), now); gen.d.gain.linearRampToValueAtTime(1, now + 0.3);
-    gen.w.gain.cancelScheduledValues(now); gen.w.gain.setValueAtTime(Math.max(0.0001, gen.w.gain.value), now); gen.w.gain.linearRampToValueAtTime(1, now + 0.3);
+    const rf = MFX('resumeFade');
+    gen.d.gain.cancelScheduledValues(now); gen.d.gain.setValueAtTime(Math.max(0.0001, gen.d.gain.value), now); gen.d.gain.linearRampToValueAtTime(1, now + rf);
+    gen.w.gain.cancelScheduledValues(now); gen.w.gain.setValueAtTime(Math.max(0.0001, gen.w.gain.value), now); gen.w.gain.linearRampToValueAtTime(1, now + rf);
     busDry.gain.cancelScheduledValues(now);
     busDry.gain.setTargetAtTime(0.9, now, 0.9); busWet.gain.setTargetAtTime(0.6, now, 0.9);
   };
@@ -261,8 +267,9 @@
     if (!ctx || !playing) return; playing = false; const now = ctx.currentTime;
     busDry.gain.cancelScheduledValues(now); busWet.gain.cancelScheduledValues(now);
     if (fast) {
-      busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + 0.18);
-      busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + 0.18);
+      const pf = MFX('pauseFastFade');
+      busDry.gain.setValueAtTime(Math.max(0.0001, busDry.gain.value), now); busDry.gain.linearRampToValueAtTime(0.0001, now + pf);
+      busWet.gain.setValueAtTime(Math.max(0.0001, busWet.gain.value), now); busWet.gain.linearRampToValueAtTime(0.0001, now + pf);
     } else { busDry.gain.setTargetAtTime(0.0001, now, 0.6); busWet.gain.setTargetAtTime(0.0001, now, 0.6); }
   };
   // ---- live preview for the Music editor: audition an unsaved track definition ----

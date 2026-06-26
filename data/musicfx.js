@@ -1,0 +1,13 @@
+// generated from data/musicfx.json - do not edit by hand (use the editor)
+window.G = window.G || {};
+G.MUSICFX_DATA = {
+ "trackSwapOut": 0.32,
+ "trackSwapIn": 0.28,
+ "bossStopFade": 0.16,
+ "bossSilence": 0.85,
+ "bossInFade": 0.18,
+ "bossOutFade": 0.3,
+ "biomeReturnFade": 0.9,
+ "resumeFade": 0.3,
+ "pauseFastFade": 0.18
+};
