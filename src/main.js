@@ -624,7 +624,7 @@
     if (Main.persist) Main.persist();
   };
   Main.spendGlimmer = n => { if (Main.glimmer() >= n) { G.save.glimmer -= n; Main.persist(); return true; } return false; };
-  Main.charmPrice = id => { const c = G.Charms.get(id); return c ? c.cost * 60 : 0; };
+  Main.charmPrice = id => { const c = G.Charms.get(id); return c ? (G.Economy ? G.Economy.charmPrice(c.cost) : c.cost * 60) : 0; };
 
   // ---------------- bench hub / fast-travel / vendor ----------------
   Main.benchIndex = 0;
@@ -679,9 +679,9 @@
   Main.benchSelect = benchSelect; Main.travelTo = travelTo; Main.shopBuy = shopBuy;
 
   // nailsmith: forge the nail (a Glimmer sink that raises base nail damage)
-  Main.NAIL_MAX = 4;
+  Main.NAIL_MAX = (G.Economy ? G.Economy.nailMax() : 4);
   Main.nailLevel = () => (G.save && G.save.nailLevel) || 0;
-  Main.nailCost = lvl => 60 * (lvl + 1);                // 60, 120, 180, 240
+  Main.nailCost = lvl => (G.Economy ? G.Economy.nailCost(lvl) : 60 * (lvl + 1));   // default 60,120,180,240
   Main.forgeNail = () => {
     const lvl = Main.nailLevel();
     if (lvl >= Main.NAIL_MAX) { G.UI.toast('The nail is fully forged.'); return; }
@@ -734,7 +734,7 @@
     Main.state = 'dead';
     G.UI.resetDeathText();
     G.Audio.setBoss(false);
-    G.player.soul = Math.floor(G.player.soul / 2);
+    G.player.soul = Math.floor(G.player.soul * (G.Economy ? G.Economy.soulKeptOnDeath() : 0.5));
     // drop a shade where you fell, holding the Glimmer you lose — reclaim it by destroying the shade
     const carried = Main.glimmer();
     if (carried > 0 && G.room) {

@@ -12,7 +12,8 @@ const DATASETS = [
   { name: 'difficulty', global: 'DIFFICULTY_DATA', srcs: ['src/difficulty.js'], pick: G => G.Difficulty.exportDefaults() },
   { name: 'achievements', global: 'ACHIEVEMENTS_DATA', srcs: ['src/achievements.js'], pick: G => G.Achievements.exportDefaults() },
   { name: 'quests', global: 'QUESTS_DATA', srcs: ['src/quests.js'], pick: G => G.Quests.exportDefaults() },
-  { name: 'ambience', global: 'AMBIENCE_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.ambExportDefaults() }
+  { name: 'ambience', global: 'AMBIENCE_DATA', srcs: ['src/audio.js'], pick: G => G.Audio.ambExportDefaults() },
+  { name: 'economy', global: 'ECONOMY_DATA', srcs: ['src/economy.js'], pick: G => G.Economy.exportDefaults() }
 ];
 
 function evalModule(srcs) {

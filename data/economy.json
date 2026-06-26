@@ -1,0 +1,10 @@
+{
+ "charmPriceMul": 60,
+ "nailCosts": [
+  60,
+  120,
+  180,
+  240
+ ],
+ "soulKeptOnDeath": 0.5
+}
