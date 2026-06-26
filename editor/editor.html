@@ -358,11 +358,14 @@
     <button class="tbtn tool" data-tool="oneway" title="Paint one-way platforms (3)">▭ One-way</button>
     <button class="tbtn tool" data-tool="spike" title="Paint spikes (4)">▲ Spikes</button>
     <button class="tbtn tool" data-tool="erase" title="Erase tiles (5)">⌫ Erase</button>
-    <select id="brushShape" class="tsel" title="Brush shape for tile tools">
+    <select id="brushShape" class="tsel" title="Brush shape for tile tools · Alt+click any tile to eyedrop its material">
       <option value="pencil">✏ Pencil</option>
       <option value="line">／ Line</option>
       <option value="rect">▭ Rect</option>
+      <option value="orect">▢ Outline</option>
+      <option value="ellipse">◯ Ellipse</option>
       <option value="fill">🪣 Fill</option>
+      <option value="replace">⇄ Replace</option>
     </select>
     <select id="brushSize" class="tsel" title="Brush size (pencil / line)">
       <option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option>
@@ -370,6 +373,7 @@
     <select id="terrainMat" class="tsel" title="Solid terrain material"></select>
     <button class="tbtn" id="btnSmooth" title="Paint the curvy (smooth) variant — mixes freely with hard blocks">～ Curvy</button>
     <button class="tbtn" id="btnAutotile" title="Auto-tile: exposed terrain edges become smooth, buried interior stays hard — updates as you paint/erase. Shift+click = retile the whole level now.">⊞ Auto</button>
+    <button class="tbtn" id="btnMirror" title="Mirror X: every paint is mirrored across the level's vertical centre (great for symmetric rooms)">⇋ Mirror</button>
     <span class="tsep"></span>
     <button class="tbtn" id="btnSnap" title="Snap objects to half-tiles">Snap</button>
     <button class="tbtn" id="btnGizmos" title="Show object gizmos (G)">Gizmos</button>

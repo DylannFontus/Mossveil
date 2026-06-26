@@ -11,10 +11,11 @@
   let tool = 'select';
   let tab = 'scene';            // 'scene' | 'map'
   let snap = true, gizmos = true, scatter = false;
-  let brushSize = 1, brushShape = 'pencil', paintStart = null;   // tile brush: pencil|rect|line|fill
+  let brushSize = 1, brushShape = 'pencil', paintStart = null;   // tile brush: pencil|line|rect|orect|ellipse|fill|replace
   let terrainMat = '#';          // solid-tile material char (see G.World.TERRAIN_MATS)
   let terrainSmooth = false;     // paint the curvy (smooth) variant of the material
   let autoTile = false;          // rule-tile: auto smooth/hard by neighbours while painting
+  let mirrorX = false;           // Terrain 2.0: mirror every paint across the level's vertical centre
   let dirty = false;
   let sel = null;               // {kind:'prop'|'enemy'|'zone'|'spawn', i | key}
   let multi = [];               // additional multi-selection (array of sel descriptors)
@@ -490,6 +491,8 @@
     }
     const w = mouseWorld(e);
     lastWorld = w;
+    // Terrain 2.0 — Alt+click eyedrops the tile under the cursor (works with any tool, even while placing)
+    if (e.altKey) { const st = worldToTile(w.x, w.y); eyedropAt(st.c, st.r); refreshToolbar(); return; }
     if (placing) { placeAsset(w.x, w.y); return; }
     if (tool === 'select') {
       const hit = pickAt(w.x, w.y);
@@ -516,8 +519,9 @@
     } else {
       const st = worldToTile(w.x, w.y);
       if (brushShape === 'fill') { pushUndo(); floodFill(st.c, st.r); needsRebuild = true; }
-      else if (brushShape === 'rect' || brushShape === 'line') { paintStart = st; painting = true; }   // preview now, commit on release
-      else { pushUndo(); painting = true; paintAt(w); }                                                // freehand pencil
+      else if (brushShape === 'replace') { pushUndo(); replaceTiles(st.c, st.r); needsRebuild = true; }   // swap all matching tiles
+      else if (isDragShape(brushShape)) { paintStart = st; painting = true; }                            // preview now, commit on release
+      else { pushUndo(); painting = true; paintAt(w); }                                                  // freehand pencil
     }
   });
   addEventListener('pointermove', e => {
@@ -552,8 +556,8 @@
       } else { const it = selectedItem(); if (it) { it.ref.x = nx; it.ref.y = ny; } }
       queueRebuild();
       refreshInspector();
-    } else if (painting && brushShape !== 'rect' && brushShape !== 'line') paintAt(w);
-    // rect/line just track the end (lastWorld) and draw a preview in the overlay
+    } else if (painting && !isDragShape(brushShape)) paintAt(w);
+    // drag shapes (rect/outline/ellipse/line) just track the end (lastWorld) and draw a preview in the overlay
   });
   function endPointer(e) {
     pointers.delete(e.pointerId);
@@ -572,10 +576,13 @@
         }
         marquee = null;
       }
-      if (painting && paintStart && (brushShape === 'rect' || brushShape === 'line')) {
+      if (painting && paintStart && isDragShape(brushShape)) {
         pushUndo();
         const endT = worldToTile(lastWorld.x, lastWorld.y), ch = paintCh();
-        if (brushShape === 'rect') fillRectTiles(paintStart, endT, ch); else lineTiles(paintStart, endT, ch);
+        if (brushShape === 'rect') fillRectTiles(paintStart, endT, ch);
+        else if (brushShape === 'orect') outlineRectTiles(paintStart, endT, ch);
+        else if (brushShape === 'ellipse') ellipseTiles(paintStart, endT, ch);
+        else lineTiles(paintStart, endT, ch);
       }
       paintStart = null;
       if (dragging || painting) { dragging = null; painting = false; needsRebuild = true; }
@@ -637,16 +644,58 @@
     for (let r = 0; r < L.h; r++) for (let c = 0; c < L.w; c++) autotileAt(c, r);
     tool = pt; autoTile = pa; queueRebuild();
   }
+  // Terrain 2.0 — which brush shapes are click-drag (preview now, commit on release) vs instant
+  const isDragShape = s => s === 'rect' || s === 'line' || s === 'orect' || s === 'ellipse';
+  // mirror-aware tile set: writes (c,r) and, when Mirror X is on, the column reflected across the level centre
+  function pSet(c, r, ch) { setTile(c, r, ch); if (mirrorX) { const L = lvl(); if (L) setTile(L.w - 1 - c, r, ch); } }
+  // autotile a region and (when mirroring) its reflection
+  function autotileRegionM(c0, r0, c1, r1) {
+    autotileRegion(c0, r0, c1, r1);
+    if (mirrorX) { const L = lvl(); if (L) autotileRegion(L.w - 1 - c1, r0, L.w - 1 - c0, r1); }
+  }
   function brushStamp(c, r, ch) {                 // a brushSize×brushSize square
     const h0 = Math.floor((brushSize - 1) / 2);
-    for (let dy = 0; dy < brushSize; dy++) for (let dx = 0; dx < brushSize; dx++) setTile(c - h0 + dx, r - h0 + dy, ch);
-    autotileRegion(c - h0, r - h0, c - h0 + brushSize - 1, r - h0 + brushSize - 1);
+    for (let dy = 0; dy < brushSize; dy++) for (let dx = 0; dx < brushSize; dx++) pSet(c - h0 + dx, r - h0 + dy, ch);
+    autotileRegionM(c - h0, r - h0, c - h0 + brushSize - 1, r - h0 + brushSize - 1);
   }
   function paintAt(w) { const t = worldToTile(w.x, w.y); brushStamp(t.c, t.r, paintCh()); }
   function fillRectTiles(a, b, ch) {
     const c0 = Math.min(a.c, b.c), c1 = Math.max(a.c, b.c), r0 = Math.min(a.r, b.r), r1 = Math.max(a.r, b.r);
-    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) setTile(c, r, ch);
-    autotileRegion(c0, r0, c1, r1);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) pSet(c, r, ch);
+    autotileRegionM(c0, r0, c1, r1);
+  }
+  function outlineRectTiles(a, b, ch) {            // border tiles only (hollow rectangle)
+    const c0 = Math.min(a.c, b.c), c1 = Math.max(a.c, b.c), r0 = Math.min(a.r, b.r), r1 = Math.max(a.r, b.r);
+    for (let c = c0; c <= c1; c++) { pSet(c, r0, ch); pSet(c, r1, ch); }
+    for (let r = r0; r <= r1; r++) { pSet(c0, r, ch); pSet(c1, r, ch); }
+    autotileRegionM(c0, r0, c1, r1);
+  }
+  function ellipseTiles(a, b, ch) {                // filled ellipse inscribed in the drag bbox
+    const c0 = Math.min(a.c, b.c), c1 = Math.max(a.c, b.c), r0 = Math.min(a.r, b.r), r1 = Math.max(a.r, b.r);
+    const cx = (c0 + c1) / 2, cy = (r0 + r1) / 2, rx = Math.max(0.5, (c1 - c0) / 2 + 0.5), ry = Math.max(0.5, (r1 - r0) / 2 + 0.5);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const nx = (c - cx) / rx, ny = (r - cy) / ry; if (nx * nx + ny * ny <= 1) pSet(c, r, ch); }
+    autotileRegionM(c0, r0, c1, r1);
+  }
+  function replaceTiles(sc, sr) {                  // swap EVERY tile in the level matching the clicked one
+    const L = lvl(), ch = paintCh(), target = tileCh(sc, sr);
+    if (target === ch) return;
+    for (let r = 0; r < L.h; r++) for (let c = 0; c < L.w; c++) if (tileCh(c, r) === target) setTile(c, r, ch);
+    if (autoTile && (tool === 'solid' || tool === 'erase')) autotileRegion(0, 0, L.w - 1, L.h - 1);
+  }
+  function eyedropAt(c, r) {                        // pick the tile under the cursor → active tool + material
+    const ch = tileCh(c, r);
+    if (ch === ' ') tool = 'erase';
+    else if (ch === '=') tool = 'oneway';
+    else if (ch === '^') tool = 'spike';
+    else if (isSolidTerrain(ch)) {
+      const fam = (G.World.HARD_CHAR && G.World.HARD_CHAR[ch]) || ch;
+      terrainMat = fam;
+      terrainSmooth = !!(G.World.SMOOTH_CHAR && G.World.SMOOTH_CHAR[fam] === ch);
+      tool = 'solid';
+      const msel = $('terrainMat'); if (msel) msel.value = terrainMat;
+    } else return ch;                              // unknown char — leave tools untouched
+    setPlacing(null); refreshToolbar();
+    return ch;
   }
   function lineTiles(a, b, ch) {                   // Bresenham, stamped with the brush
     let x0 = a.c, y0 = a.r; const x1 = b.c, y1 = b.r;
@@ -663,7 +712,7 @@
     while (stack.length && guard++ < L.w * L.h * 4 + 50) {
       const [c, r] = stack.pop();
       if (at(c, r) !== target) continue;
-      setTile(c, r, ch);
+      pSet(c, r, ch);
       stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]);
     }
     if (autoTile && (tool === 'solid' || tool === 'erase')) autotileRegion(0, 0, L.w - 1, L.h - 1);
@@ -764,18 +813,28 @@
       const tileRect = (c, r) => { const A = U.toScreen(c, L.h - r), B = U.toScreen(c + 1, L.h - 1 - r); return { x: A.x, y: A.y, w: B.x - A.x, h: B.y - A.y }; };
       const col = tool === 'solid' ? '#7fb2e8' : tool === 'oneway' ? '#7fe8c0' : tool === 'spike' ? '#e8b85f' : '#e87f7f';
       octx.strokeStyle = col; octx.fillStyle = col + '33'; octx.lineWidth = 1.5;
-      if (painting && paintStart && (brushShape === 'rect' || brushShape === 'line')) {
+      // Mirror X: show the reflection axis so it's clear paints will be doubled
+      if (mirrorX) {
+        const a = U.toScreen(L.w / 2, L.h), b = U.toScreen(L.w / 2, 0);
+        octx.save(); octx.strokeStyle = 'rgba(255,166,90,0.55)'; octx.setLineDash([5, 5]); octx.lineWidth = 1.5;
+        octx.beginPath(); octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y); octx.stroke(); octx.restore();
+      }
+      if (painting && paintStart && isDragShape(brushShape)) {
         const e = worldToTile(lastWorld.x, lastWorld.y);
-        if (brushShape === 'rect') {
-          const c0 = Math.min(paintStart.c, e.c), c1 = Math.max(paintStart.c, e.c), r0 = Math.min(paintStart.r, e.r), r1 = Math.max(paintStart.r, e.r);
+        const c0 = Math.min(paintStart.c, e.c), c1 = Math.max(paintStart.c, e.c), r0 = Math.min(paintStart.r, e.r), r1 = Math.max(paintStart.r, e.r);
+        if (brushShape === 'rect' || brushShape === 'orect') {
           const A = U.toScreen(c0, L.h - r0), B = U.toScreen(c1 + 1, L.h - 1 - r1);
-          octx.fillRect(A.x, A.y, B.x - A.x, B.y - A.y); octx.strokeRect(A.x, A.y, B.x - A.x, B.y - A.y);
-        } else {
+          if (brushShape === 'rect') octx.fillRect(A.x, A.y, B.x - A.x, B.y - A.y);
+          octx.strokeRect(A.x, A.y, B.x - A.x, B.y - A.y);
+        } else if (brushShape === 'ellipse') {
+          const cx = (c0 + c1) / 2, cy = (r0 + r1) / 2, rx = Math.max(0.5, (c1 - c0) / 2 + 0.5), ry = Math.max(0.5, (r1 - r0) / 2 + 0.5);
+          for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const nx = (c - cx) / rx, ny = (r - cy) / ry; if (nx * nx + ny * ny <= 1) { const rr = tileRect(c, r); octx.fillRect(rr.x, rr.y, rr.w, rr.h); } }
+        } else {   // line
           let x0 = paintStart.c, y0 = paintStart.r; const x1 = e.c, y1 = e.r;
           const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy, g = 0;
           while (g++ < 2000) { const rr = tileRect(x0, y0); octx.fillRect(rr.x, rr.y, rr.w, rr.h); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
         }
-      } else if (brushShape !== 'fill') {
+      } else if (brushShape !== 'fill' && brushShape !== 'replace') {
         const t = worldToTile(lastWorld.x, lastWorld.y), h0 = Math.floor((brushSize - 1) / 2);
         const A = tileRect(t.c - h0, t.r - h0), B = tileRect(t.c - h0 + brushSize - 1, t.r - h0 + brushSize - 1);
         octx.strokeRect(A.x, A.y, (B.x + B.w) - A.x, (B.y + B.h) - A.y);
@@ -2718,6 +2777,7 @@
     $('btnScatter').classList.toggle('on', scatter);
     $('btnSmooth').classList.toggle('on', terrainSmooth);
     $('btnAutotile').classList.toggle('on', autoTile);
+    const bm = $('btnMirror'); if (bm) bm.classList.toggle('on', mirrorX);
   }
   document.querySelectorAll('.tool').forEach(b2 => {
     b2.addEventListener('click', () => { tool = b2.dataset.tool; setPlacing(null); refreshToolbar(); });
@@ -2738,6 +2798,7 @@
     if (e.shiftKey) { pushUndo(); retileWholeLevel(); return; }   // shift+click = retile the whole level now
     autoTile = !autoTile; if (autoTile && tool !== 'solid' && tool !== 'erase') tool = 'solid'; refreshToolbar();
   });
+  { const bm = $('btnMirror'); if (bm) bm.addEventListener('click', () => { mirrorX = !mirrorX; refreshToolbar(); }); }
   $('btnUndo').addEventListener('click', doUndo);
   $('btnRedo').addEventListener('click', doRedo);
   $('tabScene').addEventListener('click', () => setTab('scene'));
@@ -3779,6 +3840,15 @@
     openLevel: id => openLevel(id), currentId: () => currentId, validateWorld: () => validateWorld(), setTab: t => setTab(t),
     pickAt: (x, y) => pickAt(x, y),
     retileAll: () => retileWholeLevel(),
+    // Terrain brushes 2.0 hooks (tests): drive the new shapes / mirror / eyedropper on tile coords directly
+    terrainOps: {
+      setTool: t => { tool = t; }, setShape: s => { brushShape = s; }, setMat: m => { terrainMat = m; },
+      setMirror: v => { mirrorX = !!v; }, getMirror: () => mirrorX, setAuto: v => { autoTile = !!v; },
+      rectFill: (a, b) => fillRectTiles(a, b, paintCh()), rectOutline: (a, b) => outlineRectTiles(a, b, paintCh()),
+      ellipse: (a, b) => ellipseTiles(a, b, paintCh()), line: (a, b) => lineTiles(a, b, paintCh()),
+      replace: (c, r) => replaceTiles(c, r), stamp: (c, r) => brushStamp(c, r, paintCh()), eyedrop: (c, r) => eyedropAt(c, r),
+      tileAt: (c, r) => tileCh(c, r), mat: () => terrainMat, curTool: () => tool, smooth: () => terrainSmooth
+    },
     logicAdd: (type) => addLogicNode(type), logicSelect: (id) => { logicSel = id; refreshInspector(); },
     logicLink: (from, fp, to) => { const g = graphOf(); g.links.push({ from, fp: fp | 0, to, tp: 0 }); markDirty(); },
     logicGraph: () => graphOf(), logicDelete: () => logicDeleteSelected(),
@@ -3867,7 +3937,7 @@
   // Inline-panel "2.0" overhauls (not standalone tools) mark themselves on the roadmap once
   // tools-core.js has loaded — it runs after editor.js in the script list.
   // #33 Hierarchy 2.0, #34 Asset browser 2.0, #31 Logic graph 2.0
-  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39, 32); } catch (_) { } }, 0);
+  setTimeout(() => { try { if (G.Tools && G.Tools.roadmapDone) G.Tools.roadmapDone(33, 34, 31, 39, 32, 36); } catch (_) { } }, 0);
 
   boot();
 })();
