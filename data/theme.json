@@ -1,0 +1,12 @@
+{
+ "fonts": {
+  "body": "Georgia, \"Times New Roman\", serif",
+  "display": "\"Arial Black\", \"Arial Bold\", Impact, sans-serif"
+ },
+ "icons": {
+  "glimmer": "✦",
+  "diamond": "◆",
+  "diamondOutline": "◇",
+  "check": "✓"
+ }
+}

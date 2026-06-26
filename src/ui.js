@@ -82,7 +82,9 @@
   };
   UI.resetDeathText = () => { deathTextT = 0; };
 
-  const serif = 'Georgia, "Times New Roman", serif';
+  const serif = (G.Theme && G.Theme.font) ? G.Theme.font('body') : 'Georgia, "Times New Roman", serif';
+  const ICON_DEF = { glimmer: '✦', diamond: '◆', diamondOutline: '◇', check: '✓' };
+  const icon = name => (G.Theme && G.Theme.icon) ? G.Theme.icon(name) : (ICON_DEF[name] || '');
   const SLOT_VIEW = 5;   // number of save slots shown on the slots screen
 
   function maskPath(x, y, s) {
@@ -213,7 +215,7 @@
     cx.save(); cx.textAlign = 'right'; cx.textBaseline = 'alphabetic';
     cx.shadowColor = 'rgba(0,0,0,0.65)'; cx.shadowBlur = 5;
     cx.fillStyle = 'rgba(255,233,176,0.92)'; cx.font = `bold ${Math.round(h * 0.022)}px ${serif}`;
-    cx.fillText('◆ ' + (q.title || ''), w - 22, 30);
+    cx.fillText(icon('diamond') + ' ' + (q.title || ''), w - 22, 30);
     if (q.objective) { cx.fillStyle = 'rgba(208,222,214,0.82)'; cx.font = `italic ${Math.round(h * 0.018)}px ${serif}`; cx.fillText(q.objective, w - 22, 30 + Math.round(h * 0.026)); }
     cx.restore();
     if (q.target && G.room && q.target.room === G.room.id) {
@@ -246,7 +248,7 @@
       if (sel) { cx.globalAlpha = 0.9; cx.fillStyle = pmAcc; cx.fillRect(lx - 12, yy - 24, w * 0.46, step - 12); cx.globalAlpha = 1; }
       cx.font = `${sel ? '900' : '700'} ${Math.round(h * 0.03)}px ${menuFont}`; cx.textAlign = 'left';
       cx.fillStyle = sel ? '#06120e' : (isDone ? 'rgba(140,170,150,0.6)' : 'rgba(220,236,226,0.95)');
-      cx.fillText((isDone ? '✓ ' : '◆ ') + (q.title || q.id), lx, yy);
+      cx.fillText((isDone ? icon('check') + ' ' : icon('diamond') + ' ') + (q.title || q.id), lx, yy);
       cx.font = `italic ${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = sel ? 'rgba(6,18,14,0.78)' : 'rgba(180,200,190,0.7)';
       cx.fillText(isDone ? 'Complete' : (q.objective || ''), lx, yy + Math.round(h * 0.03));
     }
@@ -260,7 +262,7 @@
     const tree = G.Main.SPELL_TREE || [], idx = U.clamp(G.Main.spellIndex || 0, 0, tree.length - 1);
     cx.save(); cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
     cx.font = `${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = 'rgba(201,160,255,0.85)';
-    cx.fillText('Glimmer  ' + (G.Main.glimmer ? G.Main.glimmer() : 0) + ' ✦', w * 0.3, h * 0.16 + 26);
+    cx.fillText('Glimmer  ' + (G.Main.glimmer ? G.Main.glimmer() : 0) + ' ' + icon('glimmer'), w * 0.3, h * 0.16 + 26);
     const lx = w * 0.3, ly = h * 0.28, step = Math.min(h * 0.1, 76);
     for (let i = 0; i < tree.length; i++) {
       const s = tree[i], yy = ly + i * step, sel = i === idx, lvl = G.Main.spellLevel(s.id), cost = G.Main.spellCost(s.id);
@@ -271,7 +273,7 @@
       cx.font = `italic ${Math.round(h * 0.021)}px ${serif}`; cx.fillStyle = sel ? 'rgba(6,18,14,0.8)' : 'rgba(180,200,190,0.7)';
       cx.fillText(s.tiers[lvl] || s.tiers[1], lx, yy + Math.round(h * 0.03));
       cx.textAlign = 'right'; cx.font = `${Math.round(h * 0.022)}px ${serif}`; cx.fillStyle = sel ? 'rgba(6,18,14,0.85)' : 'rgba(201,160,255,0.8)';
-      cx.fillText(lvl >= 2 ? 'mastered' : (cost + ' ✦  ·  ' + s.cast), lx + w * 0.5 - 16, yy);
+      cx.fillText(lvl >= 2 ? 'mastered' : (cost + ' ' + icon('glimmer') + '  ·  ' + s.cast), lx + w * 0.5 - 16, yy);
       cx.textAlign = 'left';
     }
     cx.restore();
@@ -666,7 +668,7 @@
   // fully black while the menu swaps in/out behind it, then REVEALs the result.
   const SWP_COVER = 0.22, SWP_HOLD = 0.30, SWP_REVEAL = 0.26;   // faster curtain (bats themselves stay calm)
   const SWP_TOTAL = SWP_COVER + SWP_HOLD + SWP_REVEAL;   // ~1.08s
-  const menuFont = '"Arial Black", "Arial Bold", Impact, sans-serif';
+  const menuFont = (G.Theme && G.Theme.font) ? G.Theme.font('display') : '"Arial Black", "Arial Bold", Impact, sans-serif';
   // the pause menu's accent follows the biome the player is in
   function biomeAccent() {
     const gl = G.room && G.room.pal && G.room.pal.glow;
@@ -821,7 +823,7 @@
     cx.strokeStyle = pmAcc; cx.lineWidth = 1.5; cx.stroke();
     cx.textAlign = 'left'; cx.textBaseline = 'middle';
     cx.fillStyle = '#ffe28a'; cx.font = `bold 19px ${serif}`;
-    cx.fillText('◇ ' + (G.Main.glimmer ? G.Main.glimmer() : 0), bx + 14, by + 15);
+    cx.fillText(icon('diamondOutline') + ' ' + (G.Main.glimmer ? G.Main.glimmer() : 0), bx + 14, by + 15);
     cx.fillStyle = 'rgba(190,210,200,0.7)'; cx.font = `10px ${serif}`;
     cx.fillText('GLIMMER', bx + 15, by + 32);
     cx.restore();
@@ -910,7 +912,7 @@
       // cost / equipped tag (right)
       cx.textAlign = 'right'; cx.font = `${Math.round(fs * 0.8)}px ${serif}`;
       cx.fillStyle = sel ? '#06120e' : 'rgba(200,220,190,0.75)';
-      cx.fillText(owned ? ('◆'.repeat(c.cost) + (eq ? '   equipped' : '')) : 'undiscovered', colW - 8, yy);
+      cx.fillText(owned ? (icon('diamond').repeat(c.cost) + (eq ? '   equipped' : '')) : 'undiscovered', colW - 8, yy);
       const scx = lx + (-16) * cos - yy * sin, scy = ly + (-16) * sin + yy * cos;
       G.UI.charmButtons.push({ x: scx, y: scy - fs * 0.85, w: colW + 40, h: fs * 1.6, index: i });
     });
@@ -1197,7 +1199,7 @@
     cx.font = `15px ${serif}`; cx.fillStyle = '#ffe28a'; cx.textAlign = 'center';
     cx.fillText('Glimmer  ' + G.Main.glimmer(), w / 2, h * 0.15 + 28);
     const sl = G.Main.shopList || [];
-    const items = sl.map(c => { const price = G.Main.charmPrice(c.id); return { label: c.name, sub: c.desc, right: price + ' ◇', afford: G.Main.glimmer() >= price }; });
+    const items = sl.map(c => { const price = G.Main.charmPrice(c.id); return { label: c.name, sub: c.desc, right: price + ' ' + icon('diamondOutline'), afford: G.Main.glimmer() >= price }; });
     G.UI.shopButtons = vmenu(items, G.Main.shopIndex, h * 0.25, Math.min(620, w - 80), 56, 8);
     menuHint('↑ ↓ select · Enter buy · ESC leave');
     cx.restore();

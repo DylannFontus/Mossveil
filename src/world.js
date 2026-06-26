@@ -1833,7 +1833,7 @@
           const lvl = G.Main.nailLevel();
           if (lvl >= G.Main.NAIL_MAX) G.UI.prompt(p.x, p.y + 2.7, 'nail fully forged');
           else {
-            G.UI.prompt(p.x, p.y + 2.7, 'forge nail +' + (lvl + 1) + ' — ' + G.Main.nailCost(lvl) + ' ✦   E or ↑');
+            G.UI.prompt(p.x, p.y + 2.7, 'forge nail +' + (lvl + 1) + ' — ' + G.Main.nailCost(lvl) + ' ' + (G.Theme ? G.Theme.icon('glimmer') : '✦') + '   E or ↑');
             if (G.Input.pressed('interact') || G.Input.pressed('up')) G.Main.forgeNail();
           }
         }
