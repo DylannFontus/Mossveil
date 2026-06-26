@@ -124,7 +124,11 @@
   FX.p = (additive, o) => { (additive ? addPool : mixPool).spawn(o); };
 
   // ---------------- burst presets ----------------
-  FX.BURSTS = ['dust', 'land', 'spark', 'soul', 'spore', 'heal', 'healPop', 'death', 'gib', 'ember', 'leaf', 'mote'];
+  // Built-in bursts (below) are unchanged. The Particle/FX editor (Edit ▸ World) authors NEW
+  // burst ids stored in data/fx.js (window.G.FX_DATA.bursts) as parametric emitter specs; FX.burst
+  // falls back to those for any name that isn't a built-in. FX.BURSTS = built-ins + custom.
+  const BUILTIN_BURSTS = ['dust', 'land', 'spark', 'soul', 'spore', 'heal', 'healPop', 'death', 'gib', 'ember', 'leaf', 'mote'];
+  FX.BURSTS = BUILTIN_BURSTS.slice();
   FX.burst = (name, x, y, o = {}) => {
     const n = o.n, dir = o.dir || 0, col = o.color;
     switch (name) {
@@ -188,7 +192,51 @@
         FX.p(true, { x, y, vx: U.rand(-.25, .25), vy: U.rand(-.15, .25), life: U.rand(2.5, 5), size: U.rand(.06, .16), color: col || 0xaef0d0, alpha: U.rand(.25, .6), swirl: U.rand(-.6, .6) });
         break;
     }
+    // not a built-in name? play an authored custom emitter if one exists
+    if (BUILTIN_BURSTS.indexOf(name) < 0 && CUSTOM[name]) playCustom(CUSTOM[name], x, y, o);
   };
+
+  // ---------------- custom (authored) emitters: data/fx.js -> G.FX_DATA ----------------
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const rng = (v, dflt) => Array.isArray(v) ? U.rand(v[0], v[1]) : (typeof v === 'number' ? v : dflt);
+  let CUSTOM = {};
+  // play one authored burst spec { emitters:[ {glow,count,dist,...} ] }
+  function playCustom(spec, x, y, o) {
+    o = o || {}; const dir = o.dir || 0, colO = o.color;
+    (spec.emitters || []).forEach(em => {
+      const n = Math.max(0, em.count | 0) || 8;
+      for (let i = 0; i < n; i++) {
+        let px = x, py = y, vx = 0, vy = 0;
+        if (em.dist === 'ring' || em.dist === 'radial') {
+          const a = em.dist === 'ring' ? (i / n) * U.TAU : U.rand(0, U.TAU);
+          const sp = rng(em.speed, 4); vx = Math.cos(a) * sp; vy = Math.sin(a) * sp;
+        } else {
+          px = x + U.rand(-(em.spreadX || 0), em.spreadX || 0);
+          py = y + U.rand(-(em.spreadY || 0), em.spreadY || 0);
+          vx = rng(em.vx, 0); vy = rng(em.vy, 0);
+        }
+        vy += em.vyBias || 0; vx += dir * (em.dirMul || 0);
+        FX.p(!!em.glow, {
+          x: px, y: py, vx, vy, life: rng(em.life, 0.6), size: rng(em.size, 0.2),
+          sizeEnd: em.sizeEnd, grav: em.grav || 0, drag: em.drag || 0,
+          alpha: em.alpha != null ? rng(em.alpha, 1) : 1,
+          color: colO != null ? colO : (em.color != null ? em.color : 0xffffff),
+          home: !!em.home, swirl: rng(em.swirl, 0)
+        });
+      }
+    });
+  }
+  function applyFxData(data) {
+    const d = data || G.FX_DATA || null;
+    CUSTOM = (d && d.bursts) ? clone(d.bursts) : {};
+    FX.BURSTS = BUILTIN_BURSTS.concat(Object.keys(CUSTOM));
+  }
+  FX.applyData = applyFxData;
+  FX.exportDefaults = () => ({ bursts: {} });
+  FX.exportCurrent = () => ({ bursts: clone(CUSTOM) });
+  FX.BUILTIN_BURSTS = () => BUILTIN_BURSTS.slice();
+  FX.playSpec = (spec, x, y, o) => playCustom(spec, x, y, o);   // audition an unsaved spec
+  applyFxData();
 
   // ---------------- slash arc (crescent blade) ----------------
   // A real curved blade: sharp tips, a fat belly and a concave back edge, that sweeps
