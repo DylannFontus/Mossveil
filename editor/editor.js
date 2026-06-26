@@ -1404,7 +1404,9 @@
           textField(body, 'Name', () => p.name || '', v => { p.name = v; });
           colorField(body, 'Colour', () => p.color || '#6a7a8a', v => { p.color = v || '#6a7a8a'; });
           numField(body, 'Scale', () => p.scale || 1, v => { p.scale = Math.max(0.3, v); }, 0.1);
-          el('div', { class: 'hgroup' }, body, 'Dialogue');
+          const dlgHd = el('div', { class: 'hgroup', style: 'display:flex;align-items:center;justify-content:space-between' }, body);
+          el('span', {}, dlgHd, 'Dialogue');
+          if (G.Tools && G.Tools.dialogue) el('button', { class: 'tbtn', style: 'padding:1px 8px', title: 'Edit this dialogue as a visual node graph' }, dlgHd, '💬 Graph editor').addEventListener('click', () => G.Tools.dialogue.editNPC(currentId, sel.i));
           p.dialogue = p.dialogue || { lines: [] };
           const lines = p.dialogue.lines;
           lines.forEach((ln, li) => {
@@ -3521,6 +3523,11 @@
       [{ path: 'data/' + name + '.json', content: jsonText(obj) },
        { path: 'data/' + name + '.js', content: mirrorJs(name, global, obj) }],
       'Edit ' + name + ' dataset via MOSSVEIL editor'),
+    // mark the world dirty + refresh panels (used by in-place authoring tools, e.g. the dialogue graph)
+    markDirty: () => markDirty(),
+    refreshInspector: () => refreshInspector(),
+    selectedItem: () => selectedItem(),
+    selectProp: (id, i) => { if (id && id !== currentId && G.LEVELS[id]) openLevel(id); sel = { kind: 'prop', i }; multi = []; refreshHierarchy(); refreshInspector(); },
     // full-world snapshot / restore for autosave + crash recovery
     snapshot: () => ({ levels: G.LEVELS, cutscenes: G.CUTSCENES || {}, id: currentId, ts: Date.now() }),
     loadWorld: (levels, cutscenes, id) => {
