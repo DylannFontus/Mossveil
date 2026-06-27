@@ -48,11 +48,12 @@ const PKG_JSON = JSON.stringify({
   scripts: {
     start: 'electron .',
     // default build: @electron/packager -> a runnable app folder. No code signing, no admin/symlinks.
-    dist: 'electron-packager . MOSSVEIL --out=build --overwrite --app-copyright=MOSSVEIL',
+    // --electron-version is pinned (matches the electron devDependency) so the version is never ambiguous.
+    dist: 'electron-packager . MOSSVEIL --out=build --overwrite --electron-version=31.7.7 --app-copyright=MOSSVEIL',
     // optional installer (NSIS + single portable .exe). Needs Windows Developer Mode or admin — see README.
     'dist:installer': 'electron-builder'
   },
-  devDependencies: { electron: '^31.7.0', '@electron/packager': '^18.3.6', 'electron-builder': '^24.13.3' },
+  devDependencies: { electron: '31.7.7', '@electron/packager': '^18.3.6', 'electron-builder': '^24.13.3' },
   build: {
     appId: 'com.mossveil.game',
     productName: 'MOSSVEIL',
