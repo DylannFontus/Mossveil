@@ -43,9 +43,16 @@ const PKG_JSON = JSON.stringify({
   name: 'mossveil',
   version: '1.0.0',
   description: 'MOSSVEIL — Echoes Beneath',
+  author: 'MOSSVEIL',
   main: 'main.js',
-  scripts: { start: 'electron .', dist: 'electron-builder' },
-  devDependencies: { electron: '^31.7.0', 'electron-builder': '^24.13.3' },
+  scripts: {
+    start: 'electron .',
+    // default build: @electron/packager -> a runnable app folder. No code signing, no admin/symlinks.
+    dist: 'electron-packager . MOSSVEIL --out=build --overwrite --app-copyright=MOSSVEIL',
+    // optional installer (NSIS + single portable .exe). Needs Windows Developer Mode or admin — see README.
+    'dist:installer': 'electron-builder'
+  },
+  devDependencies: { electron: '^31.7.0', '@electron/packager': '^18.3.6', 'electron-builder': '^24.13.3' },
   build: {
     appId: 'com.mossveil.game',
     productName: 'MOSSVEIL',
@@ -83,26 +90,42 @@ This folder is a self-contained [Electron](https://www.electronjs.org/) wrapper 
 (\`mossveil.html\`). Building it produces a real desktop application that bundles its own browser
 engine, so players need **no browser and no install of anything** — just run the executable.
 
-## Build the .exe (Windows)
-
-You need [Node.js](https://nodejs.org/) installed. Then, in this folder:
+You need [Node.js](https://nodejs.org/) installed. First, one time:
 
 \`\`\`
-npm install        # one-time: downloads Electron + the builder (~150 MB)
-npm run dist       # builds the app
+npm install        # downloads Electron + the packager (~150 MB)
 \`\`\`
 
-The result lands in **build/**:
+## Build the app  (recommended)
 
-- \`build/MOSSVEIL <version>.exe\` — a **portable** single-file executable (double-click to play).
-- \`build/MOSSVEIL Setup <version>.exe\` — an installer (Start-menu shortcut, uninstaller).
+\`\`\`
+npm run dist
+\`\`\`
 
-For macOS you get a \`.dmg\`, for Linux an \`AppImage\` (run \`npm run dist\` on that OS).
+This uses [@electron/packager](https://github.com/electron/packager) and lands a ready-to-run folder in
+**build/MOSSVEIL-win32-x64/** (on Windows). Inside is **MOSSVEIL.exe** — double-click it to play. To hand
+the game to someone else, zip that whole folder and send it; they just unzip and run the .exe. No code
+signing, no administrator rights, nothing to install.
+
+## Optional: an installer / single portable .exe
+
+\`\`\`
+npm run dist:installer
+\`\`\`
+
+This uses electron-builder to produce an NSIS **installer** (Start-menu shortcut + uninstaller) and a
+**portable single .exe** in \`build/\`. It unpacks a code-signing toolkit that contains symlinks, and on
+Windows creating symlinks needs a privilege normal accounts lack — so do **one** of these first:
+
+- turn on **Settings → Privacy & security → For developers → Developer Mode**, or
+- run the terminal **as Administrator**.
+
+Otherwise it fails with *"Cannot create symbolic link … a required privilege is not held"*. (The default
+\`npm run dist\` above avoids this entirely.) macOS → \`.dmg\`, Linux → \`AppImage\` (build on that OS).
 
 ## Run without building
 
 \`\`\`
-npm install
 npm start
 \`\`\`
 
