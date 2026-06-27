@@ -420,6 +420,8 @@
 
     renderer.localClippingEnabled = true;
 
+    if (G.Mods && G.Mods.boot) G.Mods.boot();   // run external mods before the first room loads (#98)
+
     // direct cutscene preview from the editor: index.html?cutscene=<id>
     const q = new URLSearchParams(location.search);
     const csParam = q.get('cutscene');
