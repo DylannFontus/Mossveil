@@ -175,6 +175,7 @@
         this.dead = true;
         this.deathT = 0;
         this.body.vx = 0; this.body.vy = 0;
+        if (G.Heatmap && G.Heatmap.onDeath) G.Heatmap.onDeath(this);   // death heatmap (#66)
         G.Audio.sfx('die');
         G.FX.shake(0.5, 0.6);
         G.FX.hitStop(0.3);
