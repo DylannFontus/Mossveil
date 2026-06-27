@@ -168,7 +168,7 @@
   }
 
   T.registerTool({
-    id: 'regression', label: 'Level regression record / assert', icon: '🎞️', group: 'Tools',
+    id: 'regression', label: 'Level regression record / assert', icon: '⏺️', group: 'Tools',
     sub: 'record a run → save a case → F9 in Play asserts no regression',
     build(host, a) { api = a; bodyEl = host; render(); }
   });

@@ -50,12 +50,14 @@ G.LEVELS = {
    {
     "type": "tumblebug",
     "x": 32.5,
-    "y": 7.5
+    "y": 7.5,
+    "oid": 4
    },
    {
     "type": "tumblebug",
     "x": 44.5,
-    "y": 5.5
+    "y": 5.5,
+    "oid": 5
    }
   ],
   "props": [
@@ -63,26 +65,30 @@ G.LEVELS = {
     "type": "sign",
     "x": 7.5,
     "y": 15,
-    "text": "← →  or  A D — walk"
+    "text": "← →  or  A D — walk",
+    "oid": 1
    },
    {
     "type": "sign",
     "x": 18.5,
     "y": 11,
-    "text": "Z or SPACE — jump\nhold to leap higher"
+    "text": "Z or SPACE — jump\nhold to leap higher",
+    "oid": 2
    },
    {
     "type": "sign",
     "x": 33.5,
     "y": 7,
-    "text": "X — strike  ·  C — dash\ndown-strike in the air to bounce off foes"
+    "text": "X — strike  ·  C — dash\ndown-strike in the air to bounce off foes",
+    "oid": 3
    }
   ],
   "transitions": [
    {
     "side": "R",
     "to": "glade",
-    "spawn": "1"
+    "spawn": "1",
+    "oid": 6
    },
    {
     "rect": {
@@ -94,12 +100,14 @@ G.LEVELS = {
     "to": "test",
     "spawn": "P",
     "x": -6.5,
-    "y": -1
+    "y": -1,
+    "oid": 7
    },
    {
     "side": "L",
     "to": "forge",
-    "spawn": "R"
+    "spawn": "R",
+    "oid": 8
    }
   ],
   "intro": "intro"
@@ -449,72 +457,85 @@ G.LEVELS = {
    {
     "type": "gnatling",
     "x": 52.5,
-    "y": 12.5
+    "y": 12.5,
+    "oid": 6
    },
    {
     "type": "gnatling",
     "x": 40.5,
-    "y": 11.5
+    "y": 11.5,
+    "oid": 7
    },
    {
     "type": "tumblebug",
     "x": 28.5,
-    "y": 7.5
+    "y": 7.5,
+    "oid": 8
    },
    {
     "type": "bramblehog",
     "x": 38.5,
-    "y": 4.5
+    "y": 4.5,
+    "oid": 9
    },
    {
     "type": "bulbil",
     "x": 50.5,
-    "y": 4.5
+    "y": 4.5,
+    "oid": 10
    },
    {
     "type": "bramblehog",
     "x": 56.5,
-    "y": 4.5
+    "y": 4.5,
+    "oid": 11
    }
   ],
   "props": [
    {
     "type": "crystal",
     "x": 20.5,
-    "y": 10
+    "y": 10,
+    "oid": 1
    },
    {
     "type": "sign",
     "x": 33.5,
     "y": 4,
-    "text": "The dark gnaws.\nFollow the crystal-glow."
+    "text": "The dark gnaws.\nFollow the crystal-glow.",
+    "oid": 2
    },
    {
     "type": "crystal",
     "x": 34.5,
-    "y": 4
+    "y": 4,
+    "oid": 3
    },
    {
     "type": "crystal",
     "x": 47.5,
-    "y": 4
+    "y": 4,
+    "oid": 4
    },
    {
     "type": "crystal",
     "x": 60.5,
-    "y": 4
+    "y": 4,
+    "oid": 5
    }
   ],
   "transitions": [
    {
     "side": "L",
     "to": "shaft",
-    "spawn": "2"
+    "spawn": "2",
+    "oid": 12
    },
    {
     "side": "R",
     "to": "approach",
-    "spawn": "1"
+    "spawn": "1",
+    "oid": 13
    }
   ]
  },

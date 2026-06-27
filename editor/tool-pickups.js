@@ -234,7 +234,7 @@
   }
 
   T.registerTool({
-    id: 'pickups', label: 'Pickups & Items', icon: '🎁', group: 'Content',
+    id: 'pickups', label: 'Pickups & items', icon: '🎁', group: 'Content',
     sub: 'every pickup · obtainability · charm/ability coverage · lint',
     build(host, a) { api = a; bodyEl = host; render(); }
   });

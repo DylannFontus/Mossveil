@@ -137,7 +137,7 @@
   }
 
   T.registerTool({
-    id: 'credits', label: 'Ending / credits', icon: '📜', group: 'Systems',
+    id: 'credits', label: 'Ending / credits', icon: '🏁', group: 'Systems',
     sub: 'final roll · text · timing',
     build(host, a) { api = a; bodyEl = host; if (!data) MT.load(); render(); }
   });

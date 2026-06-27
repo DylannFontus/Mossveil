@@ -148,7 +148,15 @@
       charms: 'charm notch effect synergy equip', spells: 'spell ability bolt cast tier upgrade element',
       biomes: 'biome palette colour color fog terrain moss decor area look', grade: 'colour color grade exposure contrast saturation bloom vignette tone',
       weather: 'weather rain snow storm fog wind atmosphere preset', reverb: 'reverb echo space hall room acoustics audio',
-      mixer: 'mixer volume balance bus loudness audio level meter', fx: 'particle particles fx effect burst spark emitter', materials: 'terrain material ground tile floor surface footstep'
+      mixer: 'mixer volume balance bus loudness audio level meter', fx: 'particle particles fx effect burst spark emitter', materials: 'terrain material ground tile floor surface footstep',
+      gates: 'progression lock key world-state softlock deadend gate switch flag', heatmaps: 'heatmap death path playtest analytics hotspot',
+      packager: 'export package build desktop exe electron ship release distribute standalone app installer html', mods: 'mod plugin api extension addon hook script moddable',
+      lighting: 'light lighting shadow glow lamp ray shaft flicker torch brightness radius', furniture: 'furniture building house interior sofa chair table plant prop',
+      tutorial: 'tutorial hint onboarding tooltip teach tip first-time', perf: 'perf performance budget fps cost optimize profiler draws room',
+      dps: 'dps damage encounter balance combat simulator clear threat ttk', regression: 'regression record replay assert baseline golden test case',
+      debugoverlays: 'debug overlay hitbox collision velocity probe gizmo bounds label', cheats: 'cheat god invincible noclip unlock heal kill soul',
+      timectl: 'time pause slow fast single-step freeze frame slowmo step', deps: 'dependency reference usage orphan delete unused safe',
+      versions: 'version snapshot checkpoint restore diff history backup', savemigrate: 'save migration migrate upgrade version legacy convert slot'
     };
     const tools = (G.Tools && G.Tools.tools) || [];
     for (const t of tools) entry({

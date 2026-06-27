@@ -142,7 +142,7 @@
   }
 
   T.registerTool({
-    id: 'sfxvar', label: 'Randomization pools', icon: '🎲', group: 'Audio',
+    id: 'sfxvar', label: 'Randomization pools', icon: '🔀', group: 'Audio',
     sub: 'per-play pitch/volume variation so repeats don’t sound robotic',
     build(host, a) { api = a; bodyEl = host; if (!data) MT.load(); render(); }
   });

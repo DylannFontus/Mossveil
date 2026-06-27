@@ -77,7 +77,7 @@
   }
 
   T.registerTool({
-    id: 'datamgr', label: 'Data Manager', icon: '🗂', group: 'Project',
+    id: 'datamgr', label: 'Data manager', icon: '🗂', group: 'Project',
     sub: 'every dataset in one place',
     build(host, a) { api = a; bodyEl = host; render(); }
   });

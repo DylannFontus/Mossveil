@@ -125,7 +125,7 @@
   }
 
   T.registerTool({
-    id: 'poststack', label: 'Post-FX & screen feedback', icon: '✨', group: 'Systems',
+    id: 'poststack', label: 'Post-FX & screen feedback', icon: '🎛️', group: 'Systems',
     sub: 'AO · grade fade · impact aberration & flash',
     build(host, a) { api = a; bodyEl = host; if (!data) MT.load(); render(); }
   });
