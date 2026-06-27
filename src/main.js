@@ -27,7 +27,7 @@
       const raw = localStorage.getItem(slotKey(i));
       if (!raw) return null;
       const s = JSON.parse(raw);
-      if (s && typeof s === 'object' && s.data && typeof s.data === 'object') return s;
+      if (s && typeof s === 'object' && s.data && typeof s.data === 'object') { if (G.SaveMigrate) G.SaveMigrate.migrate(s.data); return s; }   // upgrade old saves (#99)
     } catch (e) { /* corrupted slot -> treat as empty */ }
     return null;
   }
