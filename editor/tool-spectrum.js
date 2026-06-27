@@ -176,7 +176,7 @@
   }
 
   T.registerTool({
-    id: 'spectrum', label: 'Spectrum & waveform', icon: '📊', group: 'Audio',
+    id: 'spectrum', label: 'Spectrum & waveform', icon: '📈', group: 'Audio',
     sub: 'live oscilloscope + frequency spectrum + level meter',
     build(host, a) { api = a; bodyEl = host; render(); }
   });

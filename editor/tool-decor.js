@@ -177,7 +177,7 @@
   }
 
   T.registerTool({
-    id: 'decor', label: 'Decor & Foliage', icon: '🌿', group: 'World',
+    id: 'decor', label: 'Decor & foliage', icon: '🌿', group: 'World',
     sub: 'silhouette catalog · live preview · biome & prop usage · lint',
     build(host, a) { api = a; bodyEl = host; render(); }
   });

@@ -115,7 +115,7 @@
   }
 
   T.registerTool({
-    id: 'mods', label: 'Mods & API', icon: '🧩', group: 'Tools',
+    id: 'mods', label: 'Mods & API', icon: '🔌', group: 'Tools',
     sub: 'load external mods · moddable-surface reference',
     build(host, a) { api = a; bodyEl = host; render(); }
   });

@@ -89,7 +89,7 @@
   }
 
   T.registerTool({
-    id: 'moves', label: 'Attack / move editor', icon: '⚔', group: 'Content',
+    id: 'moves', label: 'Attack / move editor', icon: '🗡️', group: 'Content',
     sub: 'tune the feel of every boss attack',
     build(host, a) { api = a; bodyEl = host; if (!data) MT.load(); render(); }
   });

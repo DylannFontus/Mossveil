@@ -182,7 +182,7 @@
     // group registered tools
     const groups = {};
     T.tools.forEach(t => { (groups[t.group || 'Tools'] = groups[t.group || 'Tools'] || []).push(t); });
-    const order = ['Audio', 'Content', 'World', 'Narrative', 'Systems', 'Tools'];
+    const order = ['Audio', 'Content', 'World', 'Narrative', 'Systems', 'Tools', 'Project'];
     const names = Object.keys(groups).sort((a, b) => {
       const ia = order.indexOf(a), ib = order.indexOf(b);
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
