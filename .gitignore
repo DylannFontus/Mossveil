@@ -7,6 +7,9 @@ data/backups/
 # Headless test screenshots / scratch output
 shots/
 
+# Packager build output (dist/mossveil.html + the Electron desktop scaffold)
+dist/
+
 # Local save dumps
 *.save.json
 
