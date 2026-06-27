@@ -1365,5 +1365,6 @@
     }
     if (G.Debug && G.Debug.on && G.Debug.draw) G.Debug.draw(cx, w, h);   // dev entity inspector (F4)
     if (G.DebugTime && G.DebugTime.draw) G.DebugTime.draw(cx, w, h);      // time-control readout (#62)
+    if (G.Cheats && G.Cheats.draw) G.Cheats.draw(cx, w, h);              // active-cheat indicator (#63)
   };
 })();

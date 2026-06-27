@@ -135,6 +135,7 @@
       },
       spendSoul(n) { this.soul = Math.max(0, this.soul - n); },
       damage(n, fromX) {
+        if (G.Cheats && G.Cheats.god) return false;   // playtest god mode (#63)
         if (this.dead || this.invulnT > 0) return false;
         // nail clash / parry: if mid-swing into the threat, deflect it instead of taking damage
         const threatDir = fromX >= this.body.x ? 1 : -1;

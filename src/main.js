@@ -1075,6 +1075,7 @@
       if (Main.state === 'cutscene') G.Cutscene.update(dt);
       else if (Main.state === 'prologue') G.Prologue.update(dt);
       else if (Main.state !== 'title' && Main.state !== 'prologue' && G.player) G.player.update(dt);
+      if (G.Cheats && G.Cheats.update && Main.state === 'play') G.Cheats.update(dt);   // playtest cheats (#63): god / soul / dash / air
       G.FX.update(dt);
       if (G.Decals) G.Decals.update(dt);   // fade lingering ground marks (#72)
     }
