@@ -446,6 +446,30 @@
     for (const s of all) { const t = moveTarget(s); if (t && t.x !== undefined) { t.x = Math.round(t.x * 2) / 2; t.y = Math.round(t.y * 2) / 2; } }
     queueRebuild(); refreshInspector();
   }
+  // Smart align & distribute (#43): operate on the multi-selection's x/y. mode: left|right|centerH|
+  // top|bottom|centerV|distH|distV|snapGuides (arg={xs,ys} for snapGuides). Returns objects moved.
+  function alignOps(mode, arg) {
+    const objs = selAll().map(s => moveTarget(s)).filter(t => t && t.x != null && t.y != null);
+    const need = (mode === 'distH' || mode === 'distV') ? 3 : (mode === 'snapGuides' ? 1 : 2);
+    if (objs.length < need) return 0;
+    pushUndo();
+    const xs = objs.map(o => o.x), ys = objs.map(o => o.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const near = (v, arr) => { if (!arr || !arr.length) return v; let b = arr[0], d = Math.abs(v - arr[0]); for (const a of arr) { const dd = Math.abs(v - a); if (dd < d) { d = dd; b = a; } } return b; };
+    if (mode === 'left') objs.forEach(o => o.x = minX);
+    else if (mode === 'right') objs.forEach(o => o.x = maxX);
+    else if (mode === 'centerH') { const m = (minX + maxX) / 2; objs.forEach(o => o.x = m); }
+    else if (mode === 'top') objs.forEach(o => o.y = maxY);
+    else if (mode === 'bottom') objs.forEach(o => o.y = minY);
+    else if (mode === 'centerV') { const m = (minY + maxY) / 2; objs.forEach(o => o.y = m); }
+    else if (mode === 'distH') { const s = objs.slice().sort((a, b) => a.x - b.x), st = (maxX - minX) / (s.length - 1); s.forEach((o, i) => o.x = minX + st * i); }
+    else if (mode === 'distV') { const s = objs.slice().sort((a, b) => a.y - b.y), st = (maxY - minY) / (s.length - 1); s.forEach((o, i) => o.y = minY + st * i); }
+    else if (mode === 'snapGuides') { const A = arg || {}; objs.forEach(o => { o.x = near(o.x, A.xs); o.y = near(o.y, A.ys); }); }
+    else return 0;
+    objs.forEach(o => { o.x = +(+o.x).toFixed(2); o.y = +(+o.y).toFixed(2); });
+    queueRebuild(); refreshInspector(); refreshHierarchy();
+    return objs.length;
+  }
 
   // ---------------- viewport input ----------------
   let panning = false, painting = false, dragging = null;
@@ -840,6 +864,9 @@
         octx.strokeRect(A.x, A.y, (B.x + B.w) - A.x, (B.y + B.h) - A.y);
       }
     }
+
+    // overlay seam: rulers / guides / neighbour-ghosts tool draws here (always, even with gizmos off)
+    if (G.Tools && G.Tools.overlayDraw) { try { G.Tools.overlayDraw(octx, U, L, { gizmos, tool, viewW: G.viewW, viewH: G.viewH }); } catch (_) { } }
 
     if (!gizmos) return;
     const item = selectedItem();
@@ -3878,7 +3905,7 @@
 
   // small hook for headless tests
   G.__ed = {
-    copySelection, pasteClipboard, savePrefab, stampPrefab, alignSelected, captureSelection, selectInBox,
+    copySelection, pasteClipboard, savePrefab, stampPrefab, alignSelected, alignOps, captureSelection, selectInBox,
     setSel: v => { sel = v; }, setMulti: v => { multi = v; }, getMulti: () => multi, getSel: () => sel,
     getClip: () => clipboard, getPrefabs: () => prefabs, setLastWorld: (x, y) => { lastWorld = { x, y }; },
     nestPrefab: (parent, child, dx, dy) => nestPrefab(parent, child, dx, dy), stampPrefab: (n, x, y) => stampPrefab(n, x, y),
